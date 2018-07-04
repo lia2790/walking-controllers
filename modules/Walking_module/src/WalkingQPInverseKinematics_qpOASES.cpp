@@ -631,3 +631,19 @@ bool WalkingQPIK_qpOASES::getRightFootError(iDynTree::VectorDynSize& output)
                                                                                1);
     return true;
 }
+
+
+bool WalkingQPIK_qpOASES::getNeckOrientationError(iDynTree::Vector3& output)
+{
+    // if(!m_isSolutionEvaluated)
+    // {
+    //     yError() << "[getRightFootError] The solution is not evaluated. "
+    //              << "Please call 'solve()' method.";
+    //     return false;
+    // }
+
+    auto error = m_neckOrientation * m_desiredNeckOrientation.inverse();
+    output = error.asRPY();
+
+    return true;
+}
