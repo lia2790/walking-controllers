@@ -1,6 +1,7 @@
 /**
  * @file JoypadModule.cpp
  * @authors Giulio Romualdi <giulio.romualdi@iit.it>
+ *          Mohamed Babiker Mohamed Elobaid <mohamed.elobaid@iit.it>
  * @copyright 2018 iCub Facility - Istituto Italiano di Tecnologia
  *            Released under the terms of the LGPLv2.1 or later, see LGPL.TXT
  * @date 2018
@@ -111,6 +112,8 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
         yError() << "[configure] Unable to open the polydriver.";
         return false;
     }
+
+    //CVirt ports
 
     // get the interface
     if (!m_joypad.view(m_joypadController) || !m_joypadController)
