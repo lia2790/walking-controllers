@@ -474,6 +474,28 @@ bool TrajectoryGenerator::isTrajectoryAsked()
     return m_generatorState == GeneratorState::Called;
 }
 
+
+bool TrajectoryGenerator::updateTimings(const double& minStepDuration,
+                                        const double& maxStepDuration,
+                                        const double& nominalStepDuration)
+{
+    // check if it is possible to change the timings
+    std::lock_guard<std::mutex> guard(m_mutex);
+    if(m_generatorState == GeneratorState::Called)
+    {
+        yError() << "[updateTimings] Timings cannot be update if a new trajectory is evaluating.";
+        return false;
+    }
+
+    bool ok = true;
+    ok = ok && m_trajectoryGenerator.setStepTimings(minStepDuration, maxStepDuration,
+                                                    nominalStepDuration);
+
+    ok = ok && m_trajectoryGenerator.setPauseConditions(maxStepDuration, nominalStepDuration);
+
+    return ok;
+}
+
 bool TrajectoryGenerator::getDCMPositionTrajectory(std::vector<iDynTree::Vector2>& DCMPositionTrajectory)
 {
     if(!isTrajectoryComputed())
