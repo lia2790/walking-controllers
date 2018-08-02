@@ -174,6 +174,7 @@ bool JoypadModule::updateModule()
     // start walking (B button)
     m_joypadController->getButton(1, buttonMapping[1]);
 
+
     // reset connection (L1 + R1)
     m_joypadController->getButton(6, buttonMapping[2]);
     m_joypadController->getButton(7, buttonMapping[3]);
