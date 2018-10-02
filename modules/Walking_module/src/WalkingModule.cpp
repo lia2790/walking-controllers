@@ -1383,33 +1383,34 @@ bool WalkingModule::updateModule()
             else
                 m_IKSolver->getDesiredNeckOrientation(torsoDesired);
 
-            // m_walkingLogger->sendData(measuredDCM, m_DCMPositionDesired.front(),
-            //                           m_DCMVelocityDesired.front(),
-            //                           measuredZMP, desiredZMP,
-            //                           measuredCoM,
-            //                           desiredCoMPositionXY, desiredCoMVelocityXY,
-            //                           desiredCoMPosition,
-            //                           leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
-            //                           rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
-            //                           m_leftTrajectory.front().getPosition(),
-            //                           m_leftTrajectory.front().getRotation().asRPY(),
-            //                           m_rightTrajectory.front().getPosition(),
-            //                           m_rightTrajectory.front().getRotation().asRPY(),
-            //                           torsoDesired,
-            //                           m_FKSolver->getNeckOrientation().asRPY());
+            m_walkingLogger->sendData(measuredDCM, m_DCMPositionDesired.front(),
+                                      m_DCMVelocityDesired.front(),
+                                      measuredZMP, desiredZMP,
+                                      measuredCoM,
+                                      desiredCoMPositionXY, desiredCoMVelocityXY,
+                                      desiredCoMPosition,
+                                      leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
+                                      rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
+                                      m_leftTrajectory.front().getPosition(),
+                                      m_leftTrajectory.front().getRotation().asRPY(),
+                                      m_rightTrajectory.front().getPosition(),
+                                      m_rightTrajectory.front().getRotation().asRPY(),
+                                      torsoDesired,
+                                      m_FKSolver->getNeckOrientation().asRPY());
+
 	    auto leftTemp = m_FKSolver->getHeadLinkToWorldTransform() *
 	      m_desiredLeftHandToRootLinkTransform;
 	    auto rightTemp = m_FKSolver->getHeadLinkToWorldTransform() *
 	      m_desiredRightHandToRootLinkTransform;
 
-            m_walkingLogger->sendData(m_FKSolver->getLeftHandToWorldTransform().getPosition(),
-				      m_FKSolver->getLeftHandToWorldTransform().getRotation().asRPY(),
-				      leftTemp.getPosition(),
-				      leftTemp.getRotation().asRPY(),
-				      m_FKSolver->getRightHandToWorldTransform().getPosition(),
-				      m_FKSolver->getRightHandToWorldTransform().getRotation().asRPY(),
-				      rightTemp.getPosition(),
-				      rightTemp.getRotation().asRPY());
+            // m_walkingLogger->sendData(m_FKSolver->getLeftHandToWorldTransform().getPosition(),
+	    //     		      m_FKSolver->getLeftHandToWorldTransform().getRotation().asRPY(),
+	    //     		      leftTemp.getPosition(),
+	    //     		      leftTemp.getRotation().asRPY(),
+	    //     		      m_FKSolver->getRightHandToWorldTransform().getPosition(),
+	    //     		      m_FKSolver->getRightHandToWorldTransform().getRotation().asRPY(),
+	    //     		      rightTemp.getPosition(),
+	    //     		      rightTemp.getRotation().asRPY());
 
 
         }
@@ -1830,11 +1831,30 @@ bool WalkingModule::setDirectPositionReferences(const iDynTree::VectorDynSize& d
 
     std::pair<int, double> worstErrorRad(-1, 0.0);
 
-    if(!getWorstError(desiredPositionsRad, worstErrorRad))
+    bool amIAlive = false;
+    for(int i = 0; i < 200; i++)
     {
-        yError() << "[setPositionReferences] Unable to get the worst error.";
+        if(m_encodersInterface->getEncoders(m_positionFeedbackInDegrees.data()))
+        {
+            amIAlive = true;
+            break;
+        }
+        yarp::os::Time::delay(0.01);
+        yInfo() << "[setDirectPositionReferences] Seconds:" << i * 0.01;
+    }
+
+    if(!amIAlive)
+    {
+        yError() << "[setDirectPositionReferences] The encoders interface does not response for two seconds.";
         return false;
     }
+
+
+    // if(!getWorstError(desiredPositionsRad, worstErrorRad))
+    // {
+    //     yError() << "[setDirectPositionReferences] Unable to get the worst error.";
+    //     return false;
+    // }
 
     // if(worstErrorRad.second > 1.0)
     // {
@@ -2370,29 +2390,29 @@ bool WalkingModule::startWalking()
     if(m_dumpData)
     {
         m_walkingLogger->startRecord({"record",
-	      "l_arm_x", "l_arm_y", "l_arm_z", "l_arm_roll", "l_arm_pitch", "l_arm_yaw",
-	      "l_arm_des_x", "l_arm_des_y", "l_arm_des_z", "l_arm_des_roll", "l_arm_des_pitch", "l_arm_des_yaw",
-	      "r_arm_x", "r_arm_y", "r_arm_z", "r_arm_roll", "r_arm_pitch", "r_arm_yaw",
-	      "r_arm_des_x", "r_arm_des_y", "r_arm_des_z", "r_arm_des_roll", "r_arm_des_pitch", "r_arm_des_yaw"});
-                    //" dcm_x", "dcm_y",
-                    // "dcm_des_x", "dcm_des_y",
-                    // "dcm_des_dx", "dcm_des_dy",
-                    // "zmp_x", "zmp_y",
-                    // "zmp_des_x", "zmp_des_y",
-                    // "com_x", "com_y", "com_z",
-                    // "com_des_x", "com_des_y",
-                    // "com_des_dx", "com_des_dy",
-                    // "com_ik_x", "com_ik_y", "com_ik_z",
-                    // "lf_x", "lf_y", "lf_z",
-                    // "lf_roll", "lf_pitch", "lf_yaw",
-                    // "rf_x", "rf_y", "rf_z",
-                    // "rf_roll", "rf_pitch", "rf_yaw",
-                    // "lf_des_x", "lf_des_y", "lf_des_z",
-                    // "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
-                    // "rf_des_x", "rf_des_y", "rf_des_z",
-                    // "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
-                    // "torso_des_roll", "torso_des_pitch", "torso_des_yaw",
-                    // "torso_roll", "torso_pitch", "torso_yaw"});
+	      // "l_arm_x", "l_arm_y", "l_arm_z", "l_arm_roll", "l_arm_pitch", "l_arm_yaw",
+	      // "l_arm_des_x", "l_arm_des_y", "l_arm_des_z", "l_arm_des_roll", "l_arm_des_pitch", "l_arm_des_yaw",
+	      // "r_arm_x", "r_arm_y", "r_arm_z", "r_arm_roll", "r_arm_pitch", "r_arm_yaw",
+	      // "r_arm_des_x", "r_arm_des_y", "r_arm_des_z", "r_arm_des_roll", "r_arm_des_pitch", "r_arm_des_yaw"});
+                    " dcm_x", "dcm_y",
+                    "dcm_des_x", "dcm_des_y",
+                    "dcm_des_dx", "dcm_des_dy",
+                    "zmp_x", "zmp_y",
+                    "zmp_des_x", "zmp_des_y",
+                    "com_x", "com_y", "com_z",
+                    "com_des_x", "com_des_y",
+                    "com_des_dx", "com_des_dy",
+                    "com_ik_x", "com_ik_y", "com_ik_z",
+                    "lf_x", "lf_y", "lf_z",
+                    "lf_roll", "lf_pitch", "lf_yaw",
+                    "rf_x", "rf_y", "rf_z",
+                    "rf_roll", "rf_pitch", "rf_yaw",
+                    "lf_des_x", "lf_des_y", "lf_des_z",
+                    "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
+                    "rf_des_x", "rf_des_y", "rf_des_z",
+                    "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
+                    "torso_des_roll", "torso_des_pitch", "torso_des_yaw",
+                    "torso_roll", "torso_pitch", "torso_yaw"});
     }
 
     {
