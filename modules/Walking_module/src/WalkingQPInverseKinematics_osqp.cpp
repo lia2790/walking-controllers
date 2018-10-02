@@ -299,7 +299,7 @@ bool WalkingQPIK_osqp::initialize(const yarp::os::Searchable& config,
     m_optimizerSolver->data()->setNumberOfVariables(m_numberOfVariables);
     m_optimizerSolver->data()->setNumberOfConstraints(m_numberOfConstraints);
 
-    m_optimizerSolver->settings()->setVerbosity(true);
+    m_optimizerSolver->settings()->setVerbosity(false);
     m_optimizerSolver->settings()->setLinearSystemSolver(0);
 
     return true;
