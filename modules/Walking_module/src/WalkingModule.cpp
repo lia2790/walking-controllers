@@ -1003,7 +1003,7 @@ bool WalkingModule::updateModule()
                 }
             }
 
-            if(m_newTrajectoryMergeCounter == 2)
+            if(m_newTrajectoryMergeCounter == 0)
             {
                 // TODO
                 // cowboy cooding don't try this at home
