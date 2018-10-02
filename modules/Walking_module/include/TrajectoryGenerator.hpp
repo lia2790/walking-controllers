@@ -116,7 +116,9 @@ public:
      */
     bool updateTrajectories(double initTime, const iDynTree::Vector2& DCMBoundaryConditionAtMergePointPosition,
                             const iDynTree::Vector2& DCMBoundaryConditionAtMergePointVelocity, bool correctLeft,
-                            const iDynTree::Transform& measured, const iDynTree::Vector2& desiredPosition);
+                            const iDynTree::Transform& measuredLeft,
+                            const iDynTree::Transform& measuredRight,
+                            const iDynTree::Vector2& desiredPosition);
 
     /**
      * Return if the trajectory was computed

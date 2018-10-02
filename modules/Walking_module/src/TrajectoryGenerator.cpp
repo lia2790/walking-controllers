@@ -236,10 +236,21 @@ void TrajectoryGenerator::computeThread()
         measuredPosition = correctLeft ? measuredPositionLeft : measuredPositionRight;
         measuredAngle = correctLeft ? measuredAngleLeft : measuredAngleRight;
 
+
+        // if(m_trajectoryGenerator.reGenerateDCM(initTime, dT, endTime,
+        //                                        DCMBoundaryConditionAtMergePointPosition,
+        //                                        DCMBoundaryConditionAtMergePointVelocity,
+        //                                        correctLeft, measuredPosition, measuredAngle))
+        // {
+        //     std::lock_guard<std::mutex> guard(m_mutex);
+        //     m_generatorState = GeneratorState::Returned;
+        //     continue;
+        // }
         if(m_trajectoryGenerator.reGenerateDCM(initTime, dT, endTime,
                                                DCMBoundaryConditionAtMergePointPosition,
                                                DCMBoundaryConditionAtMergePointVelocity,
-                                               correctLeft, measuredPosition, measuredAngle))
+                                               measuredPositionLeft, measuredAngleLeft,
+                                               measuredPositionRight, measuredAngleRight))
         {
             std::lock_guard<std::mutex> guard(m_mutex);
             m_generatorState = GeneratorState::Returned;
@@ -396,7 +407,9 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
 
 bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Vector2& DCMBoundaryConditionAtMergePointPosition,
                                              const iDynTree::Vector2& DCMBoundaryConditionAtMergePointVelocity, bool correctLeft,
-                                             const iDynTree::Transform& measured, const iDynTree::Vector2& desiredPosition)
+                                             const iDynTree::Transform& measuredLeft,
+                                             const iDynTree::Transform& measuredRight,
+                                             const iDynTree::Vector2& desiredPosition)
 {
     {
         std::lock_guard<std::mutex> guard(m_mutex);
@@ -426,6 +439,9 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
     iDynTree::toEigen(desredPositionFromStanceFoot) = iDynTree::toEigen(unicyclePositionFromStanceFoot)
         + iDynTree::toEigen(m_referencePointDistance) + iDynTree::toEigen(desiredPosition);
 
+    iDynTree::Transform measured;
+    measured = correctLeft ? measuredLeft : measuredRight;
+
     // prepare the rotation matrix w_R_{unicycle}
     double theta = measured.getRotation().asRPY()(2);
     double s_theta = std::sin(theta);
@@ -436,24 +452,45 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
         std::lock_guard<std::mutex> guard(m_mutex);
 
         // apply the homogeneous transformation w_H_{unicycle}
+
+        // try to use only relative transformation
         m_desiredPoint(0) = c_theta * desredPositionFromStanceFoot(0)
-            - s_theta * desredPositionFromStanceFoot(1) + measured.getPosition()(0);
+            - s_theta * desredPositionFromStanceFoot(1);
         m_desiredPoint(1) = s_theta * desredPositionFromStanceFoot(0)
-            + c_theta * desredPositionFromStanceFoot(1) + measured.getPosition()(1);
+            + c_theta * desredPositionFromStanceFoot(1);
 
         m_initTime = initTime;
 
         // Boundary condition
-        m_DCMBoundaryConditionAtMergePointPosition = DCMBoundaryConditionAtMergePointPosition;
+        m_DCMBoundaryConditionAtMergePointPosition(0) = DCMBoundaryConditionAtMergePointPosition(0) - measured.getPosition()(0);
+        m_DCMBoundaryConditionAtMergePointPosition(1) = DCMBoundaryConditionAtMergePointPosition(1) - measured.getPosition()(1);
         m_DCMBoundaryConditionAtMergePointVelocity = DCMBoundaryConditionAtMergePointVelocity;
 
         m_correctLeft = correctLeft;
 
-        if(correctLeft)
-            m_measuredTransformLeft = measured;
-        else
-            m_measuredTransformRight = measured;
+        iDynTree::Position correctLeftPosition;
+        iDynTree::toEigen(correctLeftPosition) = iDynTree::toEigen(measuredLeft.getPosition())
+            - iDynTree::toEigen(measured.getPosition());
 
+        iDynTree::Position correctRightPosition;
+        iDynTree::toEigen(correctRightPosition) = iDynTree::toEigen(measuredRight.getPosition())
+            - iDynTree::toEigen(measured.getPosition());
+
+        m_measuredTransformLeft = measuredLeft;
+        m_measuredTransformLeft.setPosition(correctLeftPosition);
+
+        m_measuredTransformRight = measuredRight;
+        m_measuredTransformRight.setPosition(correctRightPosition);
+
+        // // try to use only relative transformation
+        // if(correctLeft)
+        // {
+
+        // }
+        // else
+        // {
+        //     m_measuredTransformRight.setPosition(iDynTree::Position(0, 0, 0));
+        // }
         m_generatorState = GeneratorState::Called;
     }
 

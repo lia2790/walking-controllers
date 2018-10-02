@@ -128,7 +128,7 @@ bool WalkingModule::setRobotModel(const yarp::os::Searchable& rf)
     }
 
     // load the model in iDynTree::KinDynComputations
-    std::string model = rf.check("model",yarp::os::Value("modelForWalking.urdf")).asString();
+    std::string model = rf.check("model",yarp::os::Value("model.urdf")).asString();
     std::string pathToModel = yarp::os::ResourceFinder::getResourceFinderSingleton().findFileByName(model);
 
     yInfo() << "The model is found in: " << pathToModel;
@@ -980,20 +980,22 @@ bool WalkingModule::updateModule()
         // the time to attach new one
         if(m_newTrajectoryRequired)
         {
+
+            iDynTree::Transform measuredTransform = m_isLeftFixedFrame.front() ?
+                m_rightTrajectory[m_newTrajectoryMergeCounter] :
+                m_leftTrajectory[m_newTrajectoryMergeCounter];
+
             // when we are near to the merge point the new trajectory is evaluated
             if(m_newTrajectoryMergeCounter == 20)
             {
-
                 double initTimeTrajectory;
                 initTimeTrajectory = m_time + m_newTrajectoryMergeCounter * m_dT;
 
-                iDynTree::Transform measuredTransform = m_isLeftFixedFrame.front() ?
-                    m_rightTrajectory[m_newTrajectoryMergeCounter] :
-                    m_leftTrajectory[m_newTrajectoryMergeCounter];
-
                 // ask for a new trajectory
                 if(!askNewTrajectories(initTimeTrajectory, !m_isLeftFixedFrame.front(),
-                                       measuredTransform, m_newTrajectoryMergeCounter,
+                                       m_leftTrajectory[m_newTrajectoryMergeCounter],
+                                       m_rightTrajectory[m_newTrajectoryMergeCounter],
+                                       m_newTrajectoryMergeCounter,
                                        m_desiredPosition))
                 {
                     yError() << "[updateModule] Unable to ask for a new trajectory.";
@@ -1003,6 +1005,19 @@ bool WalkingModule::updateModule()
 
             if(m_newTrajectoryMergeCounter == 2)
             {
+                // TODO
+                // cowboy cooding don't try this at home
+                iDynTree::Vector2 dummy, controllerOutputPosition, resetZMPCoMController, stableModelCoMPosition, resetStableModel;
+                m_walkingZMPController->getControllerOutput(controllerOutputPosition, dummy);
+                resetZMPCoMController(0) = controllerOutputPosition(0) - measuredTransform.getPosition()(0);
+                resetZMPCoMController(1) = controllerOutputPosition(1) - measuredTransform.getPosition()(1);
+                m_walkingZMPController->reset(resetZMPCoMController);
+
+                m_stableDCMModel->getCoMPosition(stableModelCoMPosition);
+                resetStableModel(0) = stableModelCoMPosition(0) - measuredTransform.getPosition()(0);
+                resetStableModel(1) = stableModelCoMPosition(1) - measuredTransform.getPosition()(1);
+                m_stableDCMModel->reset(resetStableModel);
+
                 if(!updateTrajectories(m_newTrajectoryMergeCounter))
                 {
                     yError() << "[updateModule] Error while updating trajectories. They were not computed yet.";
@@ -2096,7 +2111,6 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         }
     }
 
-
     m_robotState = WalkingFSM::Prepared;
     return true;
 }
@@ -2154,7 +2168,8 @@ bool WalkingModule::generateFirstTrajectories()
 }
 
 bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLeftSwinging,
-                                       const iDynTree::Transform& measuredTransform,
+                                       const iDynTree::Transform& measuredLeftTransform,
+                                       const iDynTree::Transform& measuredRightTransform,
                                        const size_t& mergePoint, const iDynTree::Vector2& desiredPosition)
 {
     if(m_trajectoryGenerator == nullptr)
@@ -2171,7 +2186,8 @@ bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLef
 
     if(!m_trajectoryGenerator->updateTrajectories(initTime, m_DCMPositionDesired[mergePoint],
                                                   m_DCMVelocityDesired[mergePoint], isLeftSwinging,
-                                                  measuredTransform, desiredPosition))
+                                                  measuredLeftTransform, measuredRightTransform,
+                                                  desiredPosition))
     {
         yError() << "[askNewTrajectories] Unable to update the trajectory.";
         return false;

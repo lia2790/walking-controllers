@@ -390,7 +390,8 @@ class WalkingModule:
      * @return true/false in case of success/failure.
      */
     bool askNewTrajectories(const double& initTime, const bool& isLeftSwinging,
-                            const iDynTree::Transform& measuredTransform,
+                            const iDynTree::Transform& measuredLeftTransform,
+                            const iDynTree::Transform& measuredRightTransform,
                             const size_t& mergePoint, const iDynTree::Vector2& desiredPosition);
 
     /**
