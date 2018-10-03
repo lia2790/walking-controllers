@@ -980,7 +980,6 @@ bool WalkingModule::updateModule()
         // the time to attach new one
         if(m_newTrajectoryRequired)
         {
-
             iDynTree::Transform measuredTransform = m_isLeftFixedFrame.front() ?
                 m_rightTrajectory[m_newTrajectoryMergeCounter] :
                 m_leftTrajectory[m_newTrajectoryMergeCounter];
@@ -992,14 +991,29 @@ bool WalkingModule::updateModule()
                 initTimeTrajectory = m_time + m_newTrajectoryMergeCounter * m_dT;
 
                 // ask for a new trajectory
-                if(!askNewTrajectories(initTimeTrajectory, !m_isLeftFixedFrame.front(),
-                                       m_leftTrajectory[m_newTrajectoryMergeCounter],
-                                       m_rightTrajectory[m_newTrajectoryMergeCounter],
-                                       m_newTrajectoryMergeCounter,
-                                       m_desiredPosition))
+                if(m_resetPlanner)
                 {
-                    yError() << "[updateModule] Unable to ask for a new trajectory.";
-                    return false;
+                    yInfo() << "[updateModule] Reset Planner";
+                    if(!askNewTrajectories(initTimeTrajectory, !m_isLeftFixedFrame.front(),
+                                           m_leftTrajectory[m_newTrajectoryMergeCounter],
+                                           m_rightTrajectory[m_newTrajectoryMergeCounter],
+                                           m_newTrajectoryMergeCounter,
+                                           m_desiredPosition))
+                    {
+                        yError() << "[updateModule] Unable to ask for a new trajectory (reset).";
+                        return false;
+                    }
+                }
+                else
+                {
+                    yInfo() << "[updateModule] Do not reset";
+                    if(!askNewTrajectories(initTimeTrajectory, !m_isLeftFixedFrame.front(),
+                                           measuredTransform, m_newTrajectoryMergeCounter,
+                                           m_desiredPosition))
+                    {
+                        yError() << "[updateModule] Unable to ask for a new trajectory.";
+                        return false;
+                    }
                 }
             }
 
@@ -1007,17 +1021,21 @@ bool WalkingModule::updateModule()
             {
                 // TODO
                 // cowboy cooding don't try this at home
-                iDynTree::Vector2 dummy, controllerOutputPosition, resetZMPCoMController, stableModelCoMPosition, resetStableModel;
-                m_walkingZMPController->getControllerOutput(controllerOutputPosition, dummy);
-                resetZMPCoMController(0) = controllerOutputPosition(0) - measuredTransform.getPosition()(0);
-                resetZMPCoMController(1) = controllerOutputPosition(1) - measuredTransform.getPosition()(1);
-                m_walkingZMPController->reset(resetZMPCoMController);
+                if(m_resetPlanner)
+                {
+                    iDynTree::Vector2 dummy, controllerOutputPosition, resetZMPCoMController, stableModelCoMPosition, resetStableModel;
+                    m_walkingZMPController->getControllerOutput(controllerOutputPosition, dummy);
+                    resetZMPCoMController(0) = controllerOutputPosition(0) - measuredTransform.getPosition()(0);
+                    resetZMPCoMController(1) = controllerOutputPosition(1) - measuredTransform.getPosition()(1);
+                    m_walkingZMPController->reset(resetZMPCoMController);
 
-                m_stableDCMModel->getCoMPosition(stableModelCoMPosition);
-                resetStableModel(0) = stableModelCoMPosition(0) - measuredTransform.getPosition()(0);
-                resetStableModel(1) = stableModelCoMPosition(1) - measuredTransform.getPosition()(1);
-                m_stableDCMModel->reset(resetStableModel);
+                    m_stableDCMModel->getCoMPosition(stableModelCoMPosition);
+                    resetStableModel(0) = stableModelCoMPosition(0) - measuredTransform.getPosition()(0);
+                    resetStableModel(1) = stableModelCoMPosition(1) - measuredTransform.getPosition()(1);
+                    m_stableDCMModel->reset(resetStableModel);
 
+                    m_resetPlanner = false;
+                }
                 if(!updateTrajectories(m_newTrajectoryMergeCounter))
                 {
                     yError() << "[updateModule] Error while updating trajectories. They were not computed yet.";
@@ -2188,6 +2206,32 @@ bool WalkingModule::generateFirstTrajectories()
 }
 
 bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLeftSwinging,
+                                       const iDynTree::Transform& measuredTransform,
+                                       const size_t& mergePoint, const iDynTree::Vector2& desiredPosition)
+{
+    if(m_trajectoryGenerator == nullptr)
+    {
+        yError() << "[askNewTrajectories] Unicycle planner not available.";
+        return false;
+    }
+
+    if(mergePoint >= m_DCMPositionDesired.size())
+    {
+        yError() << "[askNewTrajectories] The mergePoint has to be lower than the trajectory size.";
+        return false;
+    }
+
+    if(!m_trajectoryGenerator->updateTrajectories(initTime, m_DCMPositionDesired[mergePoint],
+                                                  m_DCMVelocityDesired[mergePoint], isLeftSwinging,
+                                                  measuredTransform, desiredPosition))
+    {
+        yError() << "[askNewTrajectories] Unable to update the trajectory.";
+        return false;
+    }
+    return true;
+}
+
+bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLeftSwinging,
                                        const iDynTree::Transform& measuredLeftTransform,
                                        const iDynTree::Transform& measuredRightTransform,
                                        const size_t& mergePoint, const iDynTree::Vector2& desiredPosition)
@@ -2430,10 +2474,6 @@ bool WalkingModule::setGoal(double x, double y)
     if(m_robotState != WalkingFSM::Walking && m_robotState != WalkingFSM::Stance)
         return false;
 
-    // remove because of the unicycle planner
-    // if(x == 0 && y == 0 && m_robotState == WalkingFSM::Stance)
-    //     return true;
-
     // the trajectory was already finished the new trajectory will be attached as soon as possible
     if(m_mergePoints.empty())
     {
@@ -2505,6 +2545,12 @@ bool WalkingModule::setGoal(double x, double y)
 
     m_desiredPosition(0) = x;
     m_desiredPosition(1) = y;
+
+    // reset planner every time the robot stops
+    m_resetPlanner = false;
+    if(x == 0 && y == 0)
+        m_resetPlanner = true;
+
 
     m_newTrajectoryRequired = true;
 

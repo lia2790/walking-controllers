@@ -57,6 +57,8 @@ class TrajectoryGenerator
     iDynTree::Vector2 m_DCMBoundaryConditionAtMergePointPosition; /**< DCM position at the merge point. */
     iDynTree::Vector2 m_DCMBoundaryConditionAtMergePointVelocity; /**< DCM velocity at the merge point. */
 
+    bool m_resetTrajectory;
+
     std::mutex m_mutex; /**< Mutex. */
 
     /**
@@ -119,6 +121,13 @@ public:
                             const iDynTree::Transform& measuredLeft,
                             const iDynTree::Transform& measuredRight,
                             const iDynTree::Vector2& desiredPosition);
+
+
+    bool updateTrajectories(double initTime, const iDynTree::Vector2& DCMBoundaryConditionAtMergePointPosition,
+                            const iDynTree::Vector2& DCMBoundaryConditionAtMergePointVelocity, bool correctLeft,
+                            const iDynTree::Transform& measured,
+                            const iDynTree::Vector2& desiredPosition);
+
 
     /**
      * Return if the trajectory was computed

@@ -237,31 +237,44 @@ void TrajectoryGenerator::computeThread()
         measuredAngle = correctLeft ? measuredAngleLeft : measuredAngleRight;
 
 
-        // if(m_trajectoryGenerator.reGenerateDCM(initTime, dT, endTime,
-        //                                        DCMBoundaryConditionAtMergePointPosition,
-        //                                        DCMBoundaryConditionAtMergePointVelocity,
-        //                                        correctLeft, measuredPosition, measuredAngle))
-        // {
-        //     std::lock_guard<std::mutex> guard(m_mutex);
-        //     m_generatorState = GeneratorState::Returned;
-        //     continue;
-        // }
-        if(m_trajectoryGenerator.reGenerateDCM(initTime, dT, endTime,
-                                               DCMBoundaryConditionAtMergePointPosition,
-                                               DCMBoundaryConditionAtMergePointVelocity,
-                                               measuredPositionLeft, measuredAngleLeft,
-                                               measuredPositionRight, measuredAngleRight))
+        if(!m_resetTrajectory)
         {
-            std::lock_guard<std::mutex> guard(m_mutex);
-            m_generatorState = GeneratorState::Returned;
-            continue;
+            if(m_trajectoryGenerator.reGenerateDCM(initTime, dT, endTime,
+                                                   DCMBoundaryConditionAtMergePointPosition,
+                                                   DCMBoundaryConditionAtMergePointVelocity,
+                                                   correctLeft, measuredPosition, measuredAngle))
+            {
+                std::lock_guard<std::mutex> guard(m_mutex);
+                m_generatorState = GeneratorState::Returned;
+                continue;
+            }
+            else
+            {
+                std::lock_guard<std::mutex> guard(m_mutex);
+                m_generatorState = GeneratorState::Configured;
+                yError() << "[TrajectoryGenerator_Thread] Failed in computing new trajectory.";
+                continue;
+            }
         }
         else
         {
-            std::lock_guard<std::mutex> guard(m_mutex);
-            m_generatorState = GeneratorState::Configured;
-            yError() << "[TrajectoryGenerator_Thread] Failed in computing new trajectory.";
-            continue;
+            if(m_trajectoryGenerator.reGenerateDCM(initTime, dT, endTime,
+                                                   DCMBoundaryConditionAtMergePointPosition,
+                                                   DCMBoundaryConditionAtMergePointVelocity,
+                                                   measuredPositionLeft, measuredAngleLeft,
+                                                   measuredPositionRight, measuredAngleRight))
+            {
+                std::lock_guard<std::mutex> guard(m_mutex);
+                m_generatorState = GeneratorState::Returned;
+                continue;
+            }
+            else
+            {
+                std::lock_guard<std::mutex> guard(m_mutex);
+                m_generatorState = GeneratorState::Configured;
+                yError() << "[TrajectoryGenerator_Thread] Failed in computing new trajectory.";
+                continue;
+            }
         }
     }
 }
@@ -405,6 +418,77 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     return true;
 }
 
+
+bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Vector2& DCMBoundaryConditionAtMergePointPosition,
+                                             const iDynTree::Vector2& DCMBoundaryConditionAtMergePointVelocity, bool correctLeft,
+                                             const iDynTree::Transform& measured, const iDynTree::Vector2& desiredPosition)
+{
+    {
+        std::lock_guard<std::mutex> guard(m_mutex);
+
+        if(m_generatorState == GeneratorState::Called)
+        {
+            yError() << "[updateTrajectories_one correction] Cannot launch the generator twice. "
+                     << "Please wait until the trajectory has be evaluated .";
+            return false;
+        }
+
+        if(m_generatorState != GeneratorState::Returned)
+        {
+            yError() << "[updateTrajectories_one correction] The trajectory generator has not computed any trajectory yet. "
+                     << "Please call 'generateFirstTrajectories()' method.";
+            return false;
+        }
+    }
+    // if correctLeft is true the stance foot is the true.
+    // The vector (expressed in the unicycle reference frame from the left foot to the center of the
+    // unicycle is [0, width/2]')
+    iDynTree::Vector2 unicyclePositionFromStanceFoot;
+    unicyclePositionFromStanceFoot(0) = 0.0;
+    unicyclePositionFromStanceFoot(1) = correctLeft ? -m_nominalWidth/2 : m_nominalWidth/2;
+
+    iDynTree::Vector2 desredPositionFromStanceFoot;
+    iDynTree::toEigen(desredPositionFromStanceFoot) = iDynTree::toEigen(unicyclePositionFromStanceFoot)
+        + iDynTree::toEigen(m_referencePointDistance) + iDynTree::toEigen(desiredPosition);
+
+    // prepare the rotation matrix w_R_{unicycle}
+    double theta = measured.getRotation().asRPY()(2);
+    double s_theta = std::sin(theta);
+    double c_theta = std::cos(theta);
+
+    // save the data
+    {
+        std::lock_guard<std::mutex> guard(m_mutex);
+
+        // apply the homogeneous transformation w_H_{unicycle}
+        m_desiredPoint(0) = c_theta * desredPositionFromStanceFoot(0)
+            - s_theta * desredPositionFromStanceFoot(1) + measured.getPosition()(0);
+        m_desiredPoint(1) = s_theta * desredPositionFromStanceFoot(0)
+            + c_theta * desredPositionFromStanceFoot(1) + measured.getPosition()(1);
+
+        m_initTime = initTime;
+
+        // Boundary condition
+        m_DCMBoundaryConditionAtMergePointPosition = DCMBoundaryConditionAtMergePointPosition;
+        m_DCMBoundaryConditionAtMergePointVelocity = DCMBoundaryConditionAtMergePointVelocity;
+
+        m_correctLeft = correctLeft;
+
+        if(correctLeft)
+            m_measuredTransformLeft = measured;
+        else
+            m_measuredTransformRight = measured;
+
+        m_resetTrajectory = false;
+
+        m_generatorState = GeneratorState::Called;
+    }
+
+    m_conditionVariable.notify_one();
+
+    return true;
+}
+
 bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Vector2& DCMBoundaryConditionAtMergePointPosition,
                                              const iDynTree::Vector2& DCMBoundaryConditionAtMergePointVelocity, bool correctLeft,
                                              const iDynTree::Transform& measuredLeft,
@@ -482,15 +566,8 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
         m_measuredTransformRight = measuredRight;
         m_measuredTransformRight.setPosition(correctRightPosition);
 
-        // // try to use only relative transformation
-        // if(correctLeft)
-        // {
+        m_resetTrajectory = true;
 
-        // }
-        // else
-        // {
-        //     m_measuredTransformRight.setPosition(iDynTree::Position(0, 0, 0));
-        // }
         m_generatorState = GeneratorState::Called;
     }
 

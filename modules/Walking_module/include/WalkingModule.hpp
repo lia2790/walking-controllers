@@ -74,6 +74,8 @@ class WalkingModule:
     bool m_useRightHand; /**< Use the right hand inside the  inverse kinematics. */
     bool m_useVelocityModulation; /**< Use velocity modulation. */
 
+    bool m_resetPlanner;
+
     std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */
     std::unique_ptr<WalkingController> m_walkingController; /**< Pointer to the walking DCM MPC object. */
     std::unique_ptr<WalkingDCMReactiveController> m_walkingDCMReactiveController; /**< Pointer to the walking DCM reactive controller object. */
@@ -393,6 +395,11 @@ class WalkingModule:
                             const iDynTree::Transform& measuredLeftTransform,
                             const iDynTree::Transform& measuredRightTransform,
                             const size_t& mergePoint, const iDynTree::Vector2& desiredPosition);
+
+    bool askNewTrajectories(const double& initTime, const bool& isLeftSwinging,
+                            const iDynTree::Transform& measuredTransform,
+                            const size_t& mergePoint, const iDynTree::Vector2& desiredPosition);
+
 
     /**
      * Update the old trajectory.
