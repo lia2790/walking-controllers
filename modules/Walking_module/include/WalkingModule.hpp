@@ -138,6 +138,7 @@ class WalkingModule:
     yarp::os::Bottle m_remoteControlBoards; /**< Contain all the name of the controlled joints. */
 
     yarp::sig::Vector m_positionFeedbackInDegrees; /**< Vector containing the current joint position [deg]. */
+    yarp::sig::Vector m_positionFeedbackInDegreesPreviousStep; /**< Vector containing the previous joint position [deg]. */
     yarp::sig::Vector m_velocityFeedbackInDegrees; /**< Vector containing the current joint velocity [deg/s]. */
 
     iDynTree::VectorDynSize m_qDesired; /**< Vector containing the results of the IK algorithm [rad]. */

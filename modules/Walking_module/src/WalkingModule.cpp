@@ -233,6 +233,7 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
 
     // resize the buffers
     m_positionFeedbackInDegrees.resize(m_actuatedDOFs, 0.0);
+    m_positionFeedbackInDegreesPreviousStep.resize(m_actuatedDOFs, 0.0);
     m_velocityFeedbackInDegrees.resize(m_actuatedDOFs, 0.0);
 
     m_positionFeedbackInRadians.resize(m_actuatedDOFs);
@@ -275,6 +276,9 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
         return false;
     }
 
+    // useful for the safety check
+    m_positionFeedbackInDegreesPreviousStep = m_positionFeedbackInDegrees;
+
     // set the inertial to world rotation
     m_inertial_R_worldFrame = iDynTree::Rotation::Identity();
 
@@ -309,16 +313,6 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
         // m_positionFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(10, m_dT);
         m_velocityFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency, m_dT);
 
-        // double tau = 2 * M_PI / cutFrequency;
-        // yarp::sig::Vector num(2);
-        // yarp::sig::Vector den(2);
-        // num(0) = m_dT;
-        // num(1) = m_dT;
-        // den(0) = 2 * tau + m_dT;
-        // den(1) = -2 * tau + m_dT;
-        // m_velocityFilter = std::make_unique<WalkingLPFilter>();
-        // m_velocityFilter->initialize(m_dT, cutFrequency);
-
         // m_positionFilter->init(m_positionFeedbackInDegrees);
         m_velocityFilter->init(m_velocityFeedbackInDegrees);
     }
@@ -349,8 +343,6 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
         }
         m_minJointsPosition(i) = iDynTree::deg2rad(min);
         m_maxJointsPosition(i) = iDynTree::deg2rad(max);
-
-	yInfo() << min << " " << max;
 
         // get velocity limits
         if(!m_limitsInterface->getVelLimits(i, &min, &max))
@@ -1382,35 +1374,13 @@ bool WalkingModule::updateModule()
                                       m_rightTrajectory.front().getRotation().asRPY(),
                                       torsoDesired,
                                       m_FKSolver->getNeckOrientation().asRPY());
-	    // auto leftTemp = m_FKSolver->getHeadLinkToWorldTransform() *
-	    //   m_desiredLeftHandToRootLinkTransform;
-	    // auto rightTemp = m_FKSolver->getHeadLinkToWorldTransform() *
-	    //   m_desiredRightHandToRootLinkTransform;
-
-            // m_walkingLogger->sendData(m_FKSolver->getLeftHandToWorldTransform().getPosition(),
-	    //     		      m_FKSolver->getLeftHandToWorldTransform().getRotation().asRPY(),
-	    //     		      leftTemp.getPosition(),
-	    //     		      leftTemp.getRotation().asRPY(),
-	    //     		      m_FKSolver->getRightHandToWorldTransform().getPosition(),
-	    //     		      m_FKSolver->getRightHandToWorldTransform().getRotation().asRPY(),
-	    //     		      rightTemp.getPosition(),
-	    //     		      rightTemp.getRotation().asRPY());
-
 
         }
 
-	// data for the virtualizer
-	// do it in a better way.
-	// double yawLeft = m_leftTrajectory.front().getRotation().asRPY()(2);
-	// double yawRight = m_rightTrajectory.front().getRotation().asRPY()(2);
-
-	// double meanYaw = std::atan2(std::sin(yawLeft) + std::sin(yawRight),
-	// 			std::cos(yawLeft) + std::cos(yawRight));
-
-	yarp::os::Bottle& output = m_torsoOrientationPort.prepare();
-	output.clear();
-	output.addDouble(meanYaw);
-	m_torsoOrientationPort.write(false);
+        yarp::os::Bottle& output = m_torsoOrientationPort.prepare();
+        output.clear();
+        output.addDouble(meanYaw);
+        m_torsoOrientationPort.write(false);
 
         propagateTime();
 
@@ -1503,6 +1473,18 @@ bool WalkingModule::getFeedbacks(unsigned int maxAttempts)
                 okRightWrench = true;
             }
         }
+
+        // security check
+        // stop the controller if a spike is detected at joint encoder level
+        for(int i = 0; i < m_actuatedDOFs; i++)
+        {
+            if(std::fabs(m_positionFeedbackInDegrees(i) - m_positionFeedbackInDegreesPreviousStep(i)) > 15)
+            {
+                yError() << "[getFeedbacks] Spike at joint number " << i;
+                return false;
+            }
+        }
+        m_positionFeedbackInDegreesPreviousStep = m_positionFeedbackInDegrees;
 
         if(okVelocity && okPosition && okLeftWrench && okRightWrench)
         {
@@ -1918,34 +1900,33 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     if(onTheFly)
     {
         if(!m_FKSolver->setBaseOnTheFly())
-	{
+        {
            yError() << "[onTheFlyStartWalking] Unable to set the onTheFly base.";
-	   return false;
-	}
+           return false;
+        }
+        if(!m_FKSolver->setInternalRobotState(m_positionFeedbackInRadians, m_velocityFeedbackInRadians))
+        {
+            yError() << "[onTheFlyStartWalking] Unable to evaluate the CoM.";
+            return false;
+        }
 
-	if(!m_FKSolver->setInternalRobotState(m_positionFeedbackInRadians, m_velocityFeedbackInRadians))
-	{
-	  yError() << "[onTheFlyStartWalking] Unable to evaluate the CoM.";
-	  return false;
-	}
+        // evaluate the left to right transformation, the inertial frame is on the left foot
+        leftToRightTransform = m_FKSolver->getRightFootToWorldTransform();
 
-	// evaluate the left to right transformation, the inertial frame is on the left foot
-	leftToRightTransform = m_FKSolver->getRightFootToWorldTransform();
-
-	// evaluate the first trajectory. The robot does not move!
-	if(!generateFirstTrajectories(leftToRightTransform))
-	{
-	   yError() << "[onTheFlyStartWalking] Failed to evaluate the first trajectories.";
-	   return false;
-	}
+        // evaluate the first trajectory. The robot does not move!
+        if(!generateFirstTrajectories(leftToRightTransform))
+        {
+            yError() << "[onTheFlyStartWalking] Failed to evaluate the first trajectories.";
+            return false;
+        }
     }
     else
     {
         // evaluate the first trajectory. The robot does not move! So the first trajectory
         if(!generateFirstTrajectories())
         {
-	    yError() << "[prepareRobot] Failed to evaluate the first trajectories.";
-	    return false;
+            yError() << "[prepareRobot] Failed to evaluate the first trajectories.";
+            return false;
         }
     }
 
@@ -2033,6 +2014,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     }
 
     // get feedback to initialize integrator and hands minimum jerk trajectories
+    // notice the data are got after the preparation phase
     if(!getFeedbacks(10))
     {
         yError() << "[prepareRobot] Unable to get the feedback.";
@@ -2354,10 +2336,10 @@ bool WalkingModule::startWalking()
     if(m_dumpData)
     {
         m_walkingLogger->startRecord({"record",
-	      // "l_arm_x", "l_arm_y", "l_arm_z", "l_arm_roll", "l_arm_pitch", "l_arm_yaw",
-	      // "l_arm_des_x", "l_arm_des_y", "l_arm_des_z", "l_arm_des_roll", "l_arm_des_pitch", "l_arm_des_yaw",
-	      // "r_arm_x", "r_arm_y", "r_arm_z", "r_arm_roll", "r_arm_pitch", "r_arm_yaw",
-	      // "r_arm_des_x", "r_arm_des_y", "r_arm_des_z", "r_arm_des_roll", "r_arm_des_pitch", "r_arm_des_yaw"});
+              // "l_arm_x", "l_arm_y", "l_arm_z", "l_arm_roll", "l_arm_pitch", "l_arm_yaw",
+              // "l_arm_des_x", "l_arm_des_y", "l_arm_des_z", "l_arm_des_roll", "l_arm_des_pitch", "l_arm_des_yaw",
+              // "r_arm_x", "r_arm_y", "r_arm_z", "r_arm_roll", "r_arm_pitch", "r_arm_yaw",
+              // "r_arm_des_x", "r_arm_des_y", "r_arm_des_z", "r_arm_des_roll", "r_arm_des_pitch", "r_arm_des_yaw"});
                     "dcm_x", "dcm_y",
                     "dcm_des_x", "dcm_des_y",
                     "dcm_des_dx", "dcm_des_dy",
@@ -2458,7 +2440,7 @@ bool WalkingModule::setGoal(double x, double y)
                                               m_maxForwardVelocity, m_maxStepDurationFinal, velocityModule);
 
         nominalStepDuration = linearInterpolation(m_minForwardVelocity, m_nominalStepDurationIni,
-						  m_maxForwardVelocity, m_nominalStepDurationFinal, velocityModule);
+                                                  m_maxForwardVelocity, m_nominalStepDurationFinal, velocityModule);
 
         if(!m_trajectoryGenerator->updateTimings(minStepDuration, maxStepDuration, nominalStepDuration))
         {
