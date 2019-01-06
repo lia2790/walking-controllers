@@ -34,13 +34,13 @@ bool WalkingDCMReactiveController::initialize(const yarp::os::Searchable& config
         return false;
     }
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "kIDCM", m_kIDCM))
+    if(!YarpHelper::getNumberFromSearchable(config, "kIDCM", m_kIDCM))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
     }
 
-    
+
     double comHeight;
     if(!YarpHelper::getNumberFromSearchable(config, "com_height", comHeight))
     {
@@ -52,7 +52,7 @@ bool WalkingDCMReactiveController::initialize(const yarp::os::Searchable& config
 
     yarp::sig::Vector buffer(2, 0.0);
     m_dcmErrorIntegral = std::make_unique<iCub::ctrl::Integrator>(0.01, buffer);
-    
+
     m_isInitialized = true;
 
     return true;
@@ -87,7 +87,7 @@ bool WalkingDCMReactiveController::evaluateControl()
     // evaluate the control law
     iDynTree::toEigen(m_controllerOutput) = iDynTree::toEigen(m_dcmPositionDesired) -
       1 / m_omega * (iDynTree::toEigen(m_dcmVelocityDesired)) -
-      m_kDCM * iDynTree::toEigen(error)  + 
+      m_kDCM * iDynTree::toEigen(error)  +
       m_kIDCM * iDynTree::toEigen(evaluateIntegralError(m_dcmErrorIntegral, error));
 
 

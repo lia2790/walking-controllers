@@ -47,13 +47,13 @@ bool WalkingQPIK_osqp::initializeMatrices(const yarp::os::Searchable& config)
     if(m_useLeftHand || m_useRightHand)
     {
         m_handWeightMatrix.resize(6, 6);
-        if(!YarpHelper::getDoubleFromSearchable(config, "k_posHand", m_kPosHand))
+        if(!YarpHelper::getNumberFromSearchable(config, "k_posHand", m_kPosHand))
         {
             yError() << "Initialization failed while reading k_posHand.";
             return false;
         }
 
-        if(!YarpHelper::getDoubleFromSearchable(config, "k_attHand", m_kAttHand))
+        if(!YarpHelper::getNumberFromSearchable(config, "k_attHand", m_kAttHand))
         {
             yError() << "Initialization failed while reading k_attHand.";
             return false;
@@ -78,7 +78,7 @@ bool WalkingQPIK_osqp::initializeMatrices(const yarp::os::Searchable& config)
             }
 
             double smoothingTime;
-            if(!YarpHelper::getDoubleFromSearchable(config, "smoothingTime", smoothingTime))
+            if(!YarpHelper::getNumberFromSearchable(config, "smoothingTime", smoothingTime))
             {
                 yError() << "Initialization failed while reading smoothingTime.";
                 return false;

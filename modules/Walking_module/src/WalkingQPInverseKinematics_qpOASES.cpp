@@ -46,13 +46,13 @@ bool WalkingQPIK_qpOASES::initializeMatrices(const yarp::os::Searchable& config)
     if(m_useLeftHand || m_useRightHand)
     {
         m_handWeightMatrix.resize(6, 6);
-        if(!YarpHelper::getDoubleFromSearchable(config, "k_posHand", m_kPosHand))
+        if(!YarpHelper::getNumberFromSearchable(config, "k_posHand", m_kPosHand))
         {
             yError() << "Initialization failed while reading k_posHand.";
             return false;
         }
 
-        if(!YarpHelper::getDoubleFromSearchable(config, "k_attHand", m_kAttHand))
+        if(!YarpHelper::getNumberFromSearchable(config, "k_attHand", m_kAttHand))
         {
             yError() << "Initialization failed while reading k_attHand.";
             return false;
@@ -77,7 +77,7 @@ bool WalkingQPIK_qpOASES::initializeMatrices(const yarp::os::Searchable& config)
             }
 
             double smoothingTime;
-            if(!YarpHelper::getDoubleFromSearchable(config, "smoothingTime", smoothingTime))
+            if(!YarpHelper::getNumberFromSearchable(config, "smoothingTime", smoothingTime))
             {
                 yError() << "Initialization failed while reading smoothingTime.";
                 return false;
@@ -148,13 +148,13 @@ bool WalkingQPIK_qpOASES::initializeMatrices(const yarp::os::Searchable& config)
         return false;
     }
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "k_intPosFoot", m_kIPosFoot))
+    if(!YarpHelper::getNumberFromSearchable(config, "k_intPosFoot", m_kIPosFoot))
     {
         yError() << "Initialization failed while reading k_intPosFoot.";
         return false;
     }
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "k_attFoot", m_kAttFoot))
+    if(!YarpHelper::getNumberFromSearchable(config, "k_attFoot", m_kAttFoot))
     {
         yError() << "Initialization failed while reading k_attFoot.";
         return false;
@@ -172,7 +172,7 @@ bool WalkingQPIK_qpOASES::initializeMatrices(const yarp::os::Searchable& config)
         return false;
     }
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "k_intPosCom", m_kICom))
+    if(!YarpHelper::getNumberFromSearchable(config, "k_intPosCom", m_kICom))
     {
         yError() << "Initialization failed while reading k_intPosCom.";
         return false;
@@ -231,7 +231,7 @@ bool WalkingQPIK_qpOASES::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "sampling_time", m_dT))
+    if(!YarpHelper::getNumberFromSearchable(config, "sampling_time", m_dT))
     {
         yError() << "Initialization failed while reading sampling_time.";
         return false;
@@ -317,14 +317,14 @@ bool WalkingQPIK_qpOASES::initialize(const yarp::os::Searchable& config,
 
     // set integral
     double samplingTime;
-    if(!YarpHelper::getDoubleFromSearchable(config, "sampling_time", samplingTime))
+    if(!YarpHelper::getNumberFromSearchable(config, "sampling_time", samplingTime))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
     }
 
     if(m_useHandsAsConstraint)
-        if(!YarpHelper::getDoubleFromSearchable(config, "handTolerance", m_handTolerance))
+        if(!YarpHelper::getNumberFromSearchable(config, "handTolerance", m_handTolerance))
         {
             yError() << "[initialize] Unable to get the double from searchable.";
             return false;

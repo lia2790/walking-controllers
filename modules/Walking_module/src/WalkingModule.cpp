@@ -282,7 +282,7 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
     if(m_usePositionFilter)
     {
         double cutFrequency;
-        if(!YarpHelper::getDoubleFromSearchable(rf, "joint_position_cut_frequency", cutFrequency))
+        if(!YarpHelper::getNumberFromSearchable(rf, "joint_position_cut_frequency", cutFrequency))
         {
             yError() << "[configure] Unable get double from searchable.";
             return false;
@@ -378,7 +378,7 @@ bool WalkingModule::configureHandRetargeting(const yarp::os::Searchable& config)
     }
 
     double smoothingTime;
-    if(!YarpHelper::getDoubleFromSearchable(config, "hand_smoothing_time", smoothingTime))
+    if(!YarpHelper::getNumberFromSearchable(config, "hand_smoothing_time", smoothingTime))
     {
         yError() << "[configureHandRetargeting] Initialization failed while reading smoothing time.";
         return false;
@@ -475,7 +475,7 @@ bool WalkingModule::configureForceTorqueSensors(const yarp::os::Searchable& conf
     }
 
     // get the normal force threshold
-    if(!YarpHelper::getDoubleFromSearchable(config, "normalForceThreshold", m_normalForceThreshold))
+    if(!YarpHelper::getNumberFromSearchable(config, "normalForceThreshold", m_normalForceThreshold))
     {
         yError() << "Initialization failed while reading normalForceThreshold.";
         return false;
@@ -494,49 +494,49 @@ bool WalkingModule::configureVelocityModulation(yarp::os::Searchable& config)
     }
     m_useVelocityModulation  = true;
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "minForwardVelocity", m_minForwardVelocity))
+    if(!YarpHelper::getNumberFromSearchable(config, "minForwardVelocity", m_minForwardVelocity))
     {
         yError() << "Initialization failed while reading minForwardVelocity.";
         return false;
     }
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "maxForwardVelocity", m_maxForwardVelocity))
+    if(!YarpHelper::getNumberFromSearchable(config, "maxForwardVelocity", m_maxForwardVelocity))
     {
         yError() << "Initialization failed while reading maxForwardVelocity.";
         return false;
     }
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "minStepDurationIni", m_minStepDurationIni))
+    if(!YarpHelper::getNumberFromSearchable(config, "minStepDurationIni", m_minStepDurationIni))
     {
         yError() << "Initialization failed while reading minStepDurationIni.";
         return false;
     }
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "minStepDurationFinal", m_minStepDurationFinal))
+    if(!YarpHelper::getNumberFromSearchable(config, "minStepDurationFinal", m_minStepDurationFinal))
     {
         yError() << "Initialization failed while reading minStepDurationFinal.";
         return false;
     }
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "maxStepDurationIni", m_maxStepDurationIni))
+    if(!YarpHelper::getNumberFromSearchable(config, "maxStepDurationIni", m_maxStepDurationIni))
     {
         yError() << "Initialization failed while reading maxStepDurationIni.";
         return false;
     }
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "maxStepDurationFinal", m_maxStepDurationFinal))
+    if(!YarpHelper::getNumberFromSearchable(config, "maxStepDurationFinal", m_maxStepDurationFinal))
     {
         yError() << "Initialization failed while reading maxStepDurationFinal.";
         return false;
     }
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "nominalStepDurationIni", m_nominalStepDurationIni))
+    if(!YarpHelper::getNumberFromSearchable(config, "nominalStepDurationIni", m_nominalStepDurationIni))
     {
         yError() << "Initialization failed while reading nominalStepDurationIni.";
         return false;
     }
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "nominalStepDurationFinal", m_nominalStepDurationFinal))
+    if(!YarpHelper::getNumberFromSearchable(config, "nominalStepDurationFinal", m_nominalStepDurationFinal))
     {
         yError() << "Initialization failed while reading nominalStepDurationFinal.";
         return false;
