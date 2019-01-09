@@ -279,9 +279,10 @@ class WalkingModule:
 
     /**
      * Get all the feedback signal from the interfaces
+     * @param checkSpikes if true check the presence of spikes at joint level
      * @return true in case of success and false otherwise.
      */
-    bool getFeedbacks(unsigned int maxAttempts = 1);
+    bool getFeedbacks(bool checkSpikes, unsigned int maxAttempts = 1);
 
     /**
      * Get the higher position error among all joints.

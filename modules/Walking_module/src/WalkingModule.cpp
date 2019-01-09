@@ -128,7 +128,7 @@ bool WalkingModule::setRobotModel(const yarp::os::Searchable& rf)
     }
 
     // load the model in iDynTree::KinDynComputations
-    std::string model = rf.check("model",yarp::os::Value("modelForWalking.urdf")).asString();
+    std::string model = rf.check("model",yarp::os::Value("model.urdf")).asString();
     std::string pathToModel = yarp::os::ResourceFinder::getResourceFinderSingleton().findFileByName(model);
 
     yInfo() << "The model is found in: " << pathToModel;
@@ -1017,7 +1017,7 @@ bool WalkingModule::updateModule()
         }
 
         // get feedbacks and evaluate useful quantities
-        if(!getFeedbacks(100))
+        if(!getFeedbacks(true, 100))
         {
             yError() << "[updateModule] Unable to get the feedback.";
             return false;
@@ -1428,7 +1428,7 @@ bool WalkingModule::updateModule()
     return true;
 }
 
-bool WalkingModule::getFeedbacks(unsigned int maxAttempts)
+bool WalkingModule::getFeedbacks(bool checkSpikes, unsigned int maxAttempts)
 {
     if(!m_encodersInterface)
     {
@@ -1476,14 +1476,15 @@ bool WalkingModule::getFeedbacks(unsigned int maxAttempts)
 
         // security check
         // stop the controller if a spike is detected at joint encoder level
-        for(int i = 0; i < m_actuatedDOFs; i++)
-        {
-            if(std::fabs(m_positionFeedbackInDegrees(i) - m_positionFeedbackInDegreesPreviousStep(i)) > 15)
+        if(checkSpikes)
+            for(int i = 0; i < m_actuatedDOFs; i++)
             {
-                yError() << "[getFeedbacks] Spike at joint number " << i;
-                return false;
+                if(std::fabs(m_positionFeedbackInDegrees(i) - m_positionFeedbackInDegreesPreviousStep(i)) > 15)
+                {
+                    yError() << "[getFeedbacks] Spike at joint " << m_axesList[i];
+                    return false;
+                }
             }
-        }
         m_positionFeedbackInDegreesPreviousStep = m_positionFeedbackInDegrees;
 
         if(okVelocity && okPosition && okLeftWrench && okRightWrench)
@@ -1891,7 +1892,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // get the current state of the robot
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
-    if(!getFeedbacks(10))
+    if(!getFeedbacks(false, 10))
     {
         yError() << "[onTheFlyStartWalking] Unable to get the feedback.";
         return false;
@@ -2015,7 +2016,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
 
     // get feedback to initialize integrator and hands minimum jerk trajectories
     // notice the data are got after the preparation phase
-    if(!getFeedbacks(10))
+    if(!getFeedbacks(false, 10))
     {
         yError() << "[prepareRobot] Unable to get the feedback.";
         return false;
@@ -2483,7 +2484,7 @@ bool WalkingModule::onTheFlyStartWalking(const double smoothingTime)
     // get the current state of the robot
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
-    if(!getFeedbacks(10))
+    if(!getFeedbacks(false, 10))
     {
         yError() << "[onTheFlyStartWalking] Unable to get the feedback.";
         return false;
