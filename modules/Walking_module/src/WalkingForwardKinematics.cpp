@@ -19,8 +19,8 @@
 #include <iDynTree/yarp/YARPEigenConversions.h>
 #include <iDynTree/Model/Model.h>
 
-#include "WalkingForwardKinematics.hpp"
-#include "Utils.hpp"
+#include <WalkingForwardKinematics.hpp>
+#include <Utils.hpp>
 
 bool WalkingFK::setRobotModel(const iDynTree::Model& model)
 {
@@ -30,7 +30,11 @@ bool WalkingFK::setRobotModel(const iDynTree::Model& model)
         return false;
     }
 
+    // set desired velocity representation
     m_kinDyn.setFrameVelocityRepresentation(iDynTree::MIXED_REPRESENTATION);
+
+    // resize the generalized bias force vector
+    m_generalizedBiasForces.resize(model);
 
     // initialize some quantities needed for the first step
     m_prevContactLeft = false;
@@ -251,7 +255,9 @@ bool WalkingFK::evaluateWorldToBaseTransformation(const iDynTree::Transform& lef
         }
     }
 
-    m_firstStep = false;
+    if(m_firstStep)
+        m_firstStep = false;
+
     return true;
 }
 
@@ -269,8 +275,6 @@ bool WalkingFK::setInternalRobotState(const iDynTree::VectorDynSize& positionFee
         yError() << "[setInternalRobotState] Error while updating the state.";
         return false;
     }
-
-    m_firstStep = true;
 
     return true;
 }
@@ -320,26 +324,20 @@ bool WalkingFK::evaluateDCM()
         return false;
     }
 
-    iDynTree::Vector3 dcm3D;
-
     // evaluate the 3D-DCM
     if(m_useFilters)
-        iDynTree::toEigen(dcm3D) = iDynTree::toEigen(m_comPositionFiltered) +
+        iDynTree::toEigen(m_dcm) = iDynTree::toEigen(m_comPositionFiltered) +
             iDynTree::toEigen(m_comVelocityFiltered) / m_omega;
     else
-        iDynTree::toEigen(dcm3D) = iDynTree::toEigen(m_comPosition) +
+        iDynTree::toEigen(m_dcm) = iDynTree::toEigen(m_comPosition) +
             iDynTree::toEigen(m_comVelocity) / m_omega;
-
-    // take only the 2D projection
-    m_dcm(0) = dcm3D(0);
-    m_dcm(1) = dcm3D(1);
 
     m_dcmEvaluated = true;
 
     return true;
 }
 
-bool WalkingFK::getDCM(iDynTree::Vector2& dcm)
+bool WalkingFK::getDCM(iDynTree::Vector3& dcm)
 {
     if(!m_dcmEvaluated)
     {
@@ -413,9 +411,19 @@ iDynTree::Transform WalkingFK::getLeftFootToWorldTransform()
     return m_kinDyn.getWorldTransform(m_frameLeftIndex);
 }
 
+iDynTree::Twist WalkingFK::getLeftFootVelocity()
+{
+    return m_kinDyn.getFrameVel(m_frameLeftIndex);
+}
+
 iDynTree::Transform WalkingFK::getRightFootToWorldTransform()
 {
     return m_kinDyn.getWorldTransform(m_frameRightIndex);
+}
+
+iDynTree::Twist WalkingFK::getRightFootVelocity()
+{
+    return m_kinDyn.getFrameVel(m_frameRightIndex);
 }
 
 iDynTree::Transform WalkingFK::getRootLinkToWorldTransform()
@@ -433,6 +441,11 @@ iDynTree::Rotation WalkingFK::getNeckOrientation()
     return m_kinDyn.getWorldTransform(m_frameNeckIndex).getRotation();
 }
 
+iDynTree::Twist WalkingFK::getNeckVelocity()
+{
+    return m_kinDyn.getFrameVel(m_frameNeckIndex);
+}
+
 bool WalkingFK::getLeftFootJacobian(iDynTree::MatrixDynSize &jacobian)
 {
     return m_kinDyn.getFrameFreeFloatingJacobian(m_frameLeftIndex, jacobian);
@@ -443,12 +456,65 @@ bool WalkingFK::getRightFootJacobian(iDynTree::MatrixDynSize &jacobian)
     return m_kinDyn.getFrameFreeFloatingJacobian(m_frameRightIndex, jacobian);
 }
 
+bool WalkingFK::getLeftHandJacobian(iDynTree::MatrixDynSize &jacobian)
+{
+    return m_kinDyn.getFrameFreeFloatingJacobian(m_frameLeftHandIndex, jacobian);
+}
+
+bool WalkingFK::getRightHandJacobian(iDynTree::MatrixDynSize &jacobian)
+{
+    return m_kinDyn.getFrameFreeFloatingJacobian(m_frameRightHandIndex, jacobian);
+}
+
 bool WalkingFK::getNeckJacobian(iDynTree::MatrixDynSize &jacobian)
 {
     return m_kinDyn.getFrameFreeFloatingJacobian(m_frameNeckIndex, jacobian);
 }
 
+iDynTree::Vector3 WalkingFK::getCoMBiasAcceleration()
+{
+    return m_kinDyn.getCenterOfMassBiasAcc();
+}
+
+iDynTree::Vector6 WalkingFK::getLeftFootBiasAcceleration()
+{
+    return m_kinDyn.getFrameBiasAcc(m_frameLeftIndex);
+}
+
+iDynTree::Vector6 WalkingFK::getRightFootBiasAcceleration()
+{
+    return m_kinDyn.getFrameBiasAcc(m_frameRightIndex);
+}
+
+iDynTree::Vector6 WalkingFK::getNeckBiasAcceleration()
+{
+    return m_kinDyn.getFrameBiasAcc(m_frameNeckIndex);
+}
+
 bool WalkingFK::getCoMJacobian(iDynTree::MatrixDynSize &jacobian)
 {
     return m_kinDyn.getCenterOfMassJacobian(jacobian);
+}
+
+bool WalkingFK::getFreeFloatingMassMatrix(iDynTree::MatrixDynSize &freeFloatingMassMatrix)
+{
+    return m_kinDyn.getFreeFloatingMassMatrix(freeFloatingMassMatrix);
+}
+
+bool WalkingFK::getGeneralizedBiasForces(iDynTree::VectorDynSize &generalizedBiasForces)
+{
+    if(!m_kinDyn.generalizedBiasForces(m_generalizedBiasForces))
+    {
+        yError() << "[WalkingFK::generalizedBiasForces] Unable to get the generalized bias forces";
+        return false;
+    }
+
+    iDynTree::toEigen(generalizedBiasForces).block(0,0,6,1) = iDynTree::toEigen(m_generalizedBiasForces.baseWrench());
+    iDynTree::toEigen(generalizedBiasForces).block(6,0,m_generalizedBiasForces.jointTorques().size(), 1) = iDynTree::toEigen(m_generalizedBiasForces.jointTorques());
+    return true;
+}
+
+iDynTree::SpatialMomentum WalkingFK::getCentroidalTotalMomentum()
+{
+    return m_kinDyn.getCentroidalTotalMomentum();
 }
