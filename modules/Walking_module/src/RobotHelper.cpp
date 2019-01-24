@@ -215,6 +215,12 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
         return false;
     }
 
+    if(!m_robotDevice.view(m_torqueInterface) || !m_torqueInterface)
+    {
+        yError() << "[configureRobot] Cannot obtain ITorqueControl interface";
+        return false;
+    }
+
     if(!m_robotDevice.view(m_controlModeInterface) || !m_controlModeInterface)
     {
         yError() << "[configureRobot] Cannot obtain IControlMode interface";
@@ -641,6 +647,29 @@ bool RobotHelper::setVelocityReferences(const iDynTree::VectorDynSize& desiredVe
         return false;
     }
 
+    return true;
+}
+
+bool RobotHelper::setTorqueReferences(const iDynTree::VectorDynSize& desiredTorque)
+{
+    if(m_torqueInterface == nullptr)
+    {
+        yError() << "[setTorqueReferences] Torque I/F not ready.";
+        return false;
+    }
+
+    if(desiredTorque.size() != m_actuatedDOFs)
+    {
+        yError() << "[setTorqueReferences] Dimension mismatch between desired torque "
+                 << "vector and the number of controlled joints.";
+        return false;
+    }
+
+    if(!m_torqueInterface->setRefTorques(desiredTorque.data()))
+    {
+        yError() << "[setTorqueReferences] Error while setting the desired torque.";
+        return false;
+    }
     return true;
 }
 

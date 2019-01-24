@@ -20,6 +20,7 @@
 #include <yarp/dev/IPositionControl.h>
 #include <yarp/dev/IPositionDirect.h>
 #include <yarp/dev/IVelocityControl.h>
+#include <yarp/dev/ITorqueControl.h>
 #include <yarp/sig/Vector.h>
 #include <yarp/os/Timer.h>
 
@@ -40,7 +41,8 @@ class RobotHelper
     yarp::dev::IEncodersTimed *m_encodersInterface{nullptr}; /**< Encorders interface. */
     yarp::dev::IPositionDirect *m_positionDirectInterface{nullptr}; /**< Direct position control interface. */
     yarp::dev::IPositionControl *m_positionInterface{nullptr}; /**< Position control interface. */
-    yarp::dev::IVelocityControl *m_velocityInterface{nullptr}; /**< Position control interface. */
+    yarp::dev::IVelocityControl *m_velocityInterface{nullptr}; /**< Velocity control interface. */
+    yarp::dev::ITorqueControl *m_torqueInterface{nullptr}; /**< Torque control interface. */
     yarp::dev::IControlMode *m_controlModeInterface{nullptr}; /**< Control mode interface. */
     yarp::dev::IControlLimits *m_limitsInterface{nullptr}; /**< Encorders interface. */
 
@@ -145,11 +147,17 @@ public:
 
     /**
      * Set the desired velocity reference.
-     * (The position will be sent using DirectPositionControl mode)
      * @param desiredVelocityRad desired joints velocity;
      * @return true in case of success and false otherwise.
      */
     bool setVelocityReferences(const iDynTree::VectorDynSize& desiredVelocityRad);
+
+    /**
+     * Set the desired torque reference.
+     * @param desiredTorque desired joints torque;
+     * @return true in case of success and false otherwise.
+     */
+    bool setTorqueReferences(const iDynTree::VectorDynSize& desiredTorque);
 
     bool resetFilters();
 
