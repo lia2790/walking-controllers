@@ -61,6 +61,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     bool m_useQPIK; /**< True if the QP-IK is used. */
     bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
     bool m_dumpData; /**< True if data are saved. */
+    bool m_useTorque; /**< True if the torque controller is used. */
 
     std::unique_ptr<RobotHelper> m_robotControlHelper; /**< Robot control helper. */
     std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */
@@ -103,6 +104,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     iDynTree::VectorDynSize m_qDesired; /**< Vector containing the results of the IK algorithm [rad]. */
     iDynTree::VectorDynSize m_dqDesired; /**< Vector containing the results of the IK algorithm [rad]. */
+    iDynTree::VectorDynSize m_torqueDesired; /**< Vector containing the desired joint torques. */
 
     iDynTree::Rotation m_inertial_R_worldFrame; /**< Rotation between the inertial and the world frame. */
 
@@ -156,30 +158,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     bool solveQPIK(const std::shared_ptr<WalkingQPIK> solver,
                    const iDynTree::Position& desiredCoMPosition,
                    const iDynTree::Vector3& desiredCoMVelocity,
-                   const iDynTree::Position& actualCoMPosition,
                    const iDynTree::Rotation& desiredNeckOrientation,
                    iDynTree::VectorDynSize &output);
-    /**
-     * Evaluate the position of CoM.
-     * @param comPosition position of the center of mass;
-     * @param comVelocity velocity of the center of mass.
-     * @return true in case of success and false otherwise.
-     */
-    bool evaluateCoM(iDynTree::Position& comPosition, iDynTree::Vector3& comVelocity);
-
-    /**
-     * Evaluate the position of 2D-Divergent component of motion.
-     * @param dcm 2d-Divergent component of motion.
-     * @return true in case of success and false otherwise.
-     */
-    bool evaluateDCM(iDynTree::Vector2& dcm);
-
-    /**
-     * Evaluate the position of Zero momentum point.
-     * @param zmp zero momentum point.
-     * @return true in case of success and false otherwise.
-     */
-    bool evaluateZMP(iDynTree::Vector2& zmp);
 
     /**
      * Generate the first trajectory.
