@@ -136,34 +136,36 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
     }
-    double gravityAcceleration = config.check("gravity_acceleration", yarp::os::Value(9.81)).asDouble();
-    m_omega = sqrt(gravityAcceleration / comHeight);
-
-    // init filters
-    double samplingTime;
-    if(!YarpHelper::getNumberFromSearchable(config, "sampling_time", samplingTime))
-    {
-        yError() << "[initialize] Unable to get the double from searchable.";
-        return false;
-    }
-
-    double cutFrequency;
-    if(!YarpHelper::getNumberFromSearchable(config, "cut_frequency", cutFrequency))
-    {
-        yError() << "[initialize] Unable to get the double from searchable.";
-        return false;
-    }
-
-    m_comPositionFiltered.resize(3,0);
-    m_comPositionFiltered(2) = comHeight;
-    m_comVelocityFiltered.resize(3,0);
-
-    m_comPositionFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency, samplingTime);
-    m_comVelocityFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency, samplingTime);
-    m_comPositionFilter->init(m_comPositionFiltered);
-    m_comVelocityFilter->init(m_comVelocityFiltered);
+    m_gravityAcceleration = config.check("gravity_acceleration", yarp::os::Value(9.81)).asDouble();
 
     m_useFilters = config.check("use_filters", yarp::os::Value(false)).asBool();
+    if (m_useFilters)
+    {
+        // init filters
+        double samplingTime;
+        if(!YarpHelper::getNumberFromSearchable(config, "sampling_time", samplingTime))
+        {
+            yError() << "[initialize] Unable to get the double from searchable.";
+            return false;
+        }
+
+        double cutFrequency;
+        if(!YarpHelper::getNumberFromSearchable(config, "cut_frequency", cutFrequency))
+        {
+            yError() << "[initialize] Unable to get the double from searchable.";
+            return false;
+        }
+
+        m_comPositionFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency, samplingTime);
+        m_comVelocityFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency, samplingTime);
+        yarp::sig::Vector comPosition(3, 0.0);
+        comPosition(2) = comHeight;
+        m_comPositionFilter->init(comPosition);
+
+        yarp::sig::Vector comVelocity(3, 0.0);
+        m_comVelocityFilter->init(comVelocity);
+    }
+
     m_firstStep = true;
     return true;
 }
@@ -281,7 +283,6 @@ bool WalkingFK::setInternalRobotState(const iDynTree::VectorDynSize& positionFee
 
 bool WalkingFK::evaluateCoM()
 {
-    m_comEvaluated = false;
     if(!m_kinDyn.isValid())
     {
         yError() << "[evaluateCoM] The KinDynComputations solver is not initialized.";
@@ -291,106 +292,103 @@ bool WalkingFK::evaluateCoM()
     m_comPosition = m_kinDyn.getCenterOfMassPosition();
     m_comVelocity = m_kinDyn.getCenterOfMassVelocity();
 
-    yarp::sig::Vector temp;
-    temp.resize(3);
-
-    if(!iDynTree::toYarp(m_comPosition, temp))
+    if(m_useFilters)
     {
-        yError() << "[evaluateCoM] Unable to convert an iDynTree::Position to a yarp vector";
-        return false;
+        yarp::sig::Vector temp(3);
+
+        if(!iDynTree::toYarp(m_comPosition, temp))
+        {
+            yError() << "[evaluateCoM] Unable to convert an iDynTree::Vector to a yarp vector";
+            return false;
+        }
+        iDynTree::toEigen(m_comPosition) = iDynTree::toEigen(m_comPositionFilter->filt(temp));
+
+        if(!iDynTree::toYarp(m_comVelocity, temp))
+        {
+            yError() << "[evaluateCoM] Unable to convert an iDynTree::Vector to a yarp vector";
+            return false;
+        }
+        iDynTree::toEigen(m_comVelocity) = iDynTree::toEigen(m_comVelocityFilter->filt(temp));
     }
-    m_comPositionFiltered = m_comPositionFilter->filt(temp);
-
-    if(!iDynTree::toYarp(m_comVelocity, temp))
-    {
-        yError() << "[evaluateCoM] Unable to convert an iDynTree::Vector to a yarp vector";
-        return false;
-    }
-    m_comVelocityFiltered = m_comVelocityFilter->filt(temp);
-
-    m_comEvaluated = true;
-
     return true;
 }
 
-bool WalkingFK::evaluateDCM()
+void WalkingFK::evaluateDCM()
 {
-    m_dcmEvaluated = false;
-
-    if(!m_comEvaluated)
-    {
-        yError() << "[evaluateDCM] The CoM position and velocity is not evaluated. "
-                 << "Please call evaluateCoM method.";
-        return false;
-    }
+    double omega = sqrt(m_gravityAcceleration / m_comPosition(2));
 
     // evaluate the 3D-DCM
-    if(m_useFilters)
-        iDynTree::toEigen(m_dcm) = iDynTree::toEigen(m_comPositionFiltered) +
-            iDynTree::toEigen(m_comVelocityFiltered) / m_omega;
-    else
-        iDynTree::toEigen(m_dcm) = iDynTree::toEigen(m_comPosition) +
-            iDynTree::toEigen(m_comVelocity) / m_omega;
+    iDynTree::toEigen(m_dcm) = iDynTree::toEigen(m_comPosition) +
+        iDynTree::toEigen(m_comVelocity) / omega;
 
-    m_dcmEvaluated = true;
+    return;
+}
+
+bool WalkingFK::evaluateZMP(const iDynTree::Wrench& leftWrench,
+                            const iDynTree::Wrench& rightWrench)
+{
+    iDynTree::Position zmpLeft, zmpRight, zmpWorld;
+    double zmpLeftDefined = 0.0, zmpRightDefined = 0.0;
+
+    if(rightWrench.getLinearVec3()(2) < 0.001)
+        zmpRightDefined = 0.0;
+    else
+    {
+        zmpRight(0) = -rightWrench.getAngularVec3()(1) / rightWrench.getLinearVec3()(2);
+        zmpRight(1) = rightWrench.getAngularVec3()(0) / rightWrench.getLinearVec3()(2);
+        zmpRight(2) = 0.0;
+        zmpRightDefined = 1.0;
+    }
+
+    if(leftWrench.getLinearVec3()(2) < 0.001)
+        zmpLeftDefined = 0.0;
+    else
+    {
+        zmpLeft(0) = -leftWrench.getAngularVec3()(1) / leftWrench.getLinearVec3()(2);
+        zmpLeft(1) = leftWrench.getAngularVec3()(0) / leftWrench.getLinearVec3()(2);
+        zmpLeft(2) = 0.0;
+        zmpLeftDefined = 1.0;
+    }
+
+    double totalZ = rightWrench.getLinearVec3()(2) + leftWrench.getLinearVec3()(2);
+    if(totalZ < 0.1)
+    {
+        yError() << "[evaluateZMP] The total z-component of contact wrenches is too low.";
+        return false;
+    }
+
+    zmpLeft = getLeftFootToWorldTransform() * zmpLeft;
+    zmpRight = getRightFootToWorldTransform() * zmpRight;
+
+    // the global zmp is given by a weighted average
+    iDynTree::toEigen(zmpWorld) = ((leftWrench.getLinearVec3()(2) * zmpLeftDefined) / totalZ)
+        * iDynTree::toEigen(zmpLeft) +
+        ((rightWrench.getLinearVec3()(2) * zmpRightDefined)/totalZ) * iDynTree::toEigen(zmpRight);
+
+    m_zmp(0) = zmpWorld(0);
+    m_zmp(1) = zmpWorld(1);
 
     return true;
 }
 
-bool WalkingFK::getDCM(iDynTree::Vector3& dcm)
+const iDynTree::Vector3& WalkingFK::getDCM() const
 {
-    if(!m_dcmEvaluated)
-    {
-        yError() << "[getDCM] The dcm is not evaluated. Please call evaluateDCM() method.";
-        return false;
-    }
-
-    dcm = m_dcm;
-    return true;
+    return m_dcm;
 }
 
-bool WalkingFK::getCoMPosition(iDynTree::Position& comPosition)
+const iDynTree::Position& WalkingFK::getCoMPosition() const
 {
-    if(!m_comEvaluated)
-    {
-        yError() << "[getCoMPosition] The CoM is not evaluated. Please call evaluateCoM() method.";
-        return false;
-    }
-
-    if(m_useFilters)
-    {
-        if(!iDynTree::toiDynTree(m_comPositionFiltered, comPosition))
-        {
-            yError() << "[getCoMPosition] Unable to convert a yarp vector to an iDynTree position";
-            return false;
-        }
-    }
-    else
-        comPosition = m_comPosition;
-
-    return true;
+    return m_comPosition;
 }
 
-bool WalkingFK::getCoMVelocity(iDynTree::Vector3& comVelocity)
+const iDynTree::Vector3& WalkingFK::getCoMVelocity() const
 {
-    if(!m_comEvaluated)
-    {
-        yError() << "[getCoMVelocity] The CoM is not evaluated. Please call evaluateCoM() method.";
-        return false;
-    }
+    return m_comVelocity;
+}
 
-    if(m_useFilters)
-    {
-        if(!iDynTree::toiDynTree(m_comVelocityFiltered, comVelocity))
-        {
-            yError() << "[getCoMVelocity] Unable to convert a yarp vector to an iDynTree vector";
-            return false;
-        }
-    }
-    else
-        comVelocity = m_comVelocity;
-
-    return true;
+const iDynTree::Vector2& WalkingFK::getZMP() const
+{
+    return m_zmp;
 }
 
 bool WalkingFK::setBaseOnTheFly()
@@ -454,16 +452,6 @@ bool WalkingFK::getLeftFootJacobian(iDynTree::MatrixDynSize &jacobian)
 bool WalkingFK::getRightFootJacobian(iDynTree::MatrixDynSize &jacobian)
 {
     return m_kinDyn.getFrameFreeFloatingJacobian(m_frameRightIndex, jacobian);
-}
-
-bool WalkingFK::getLeftHandJacobian(iDynTree::MatrixDynSize &jacobian)
-{
-    return m_kinDyn.getFrameFreeFloatingJacobian(m_frameLeftHandIndex, jacobian);
-}
-
-bool WalkingFK::getRightHandJacobian(iDynTree::MatrixDynSize &jacobian)
-{
-    return m_kinDyn.getFrameFreeFloatingJacobian(m_frameRightHandIndex, jacobian);
 }
 
 bool WalkingFK::getNeckJacobian(iDynTree::MatrixDynSize &jacobian)

@@ -26,8 +26,6 @@ class WalkingFK
     iDynTree::KinDynComputations m_kinDyn; /**< KinDynComputations solver. */
 
     bool m_prevContactLeft; /**< Boolean is the previous contact foot the left one? */
-    bool m_dcmEvaluated; /**< is the DCM evaluated? */
-    bool m_comEvaluated; /**< is the CoM evaluated? */
 
     iDynTree::FreeFloatingGeneralizedTorques m_generalizedBiasForces;
 
@@ -46,7 +44,8 @@ class WalkingFK
     iDynTree::Position m_comPosition; /**< Position of the CoM. */
     iDynTree::Vector3 m_comVelocity; /**< Velocity of the CoM. */
     iDynTree::Vector3 m_dcm; /**< DCM position. */
-    double m_omega; /**< Inverted time constant of the 3D-LIPM. */
+    iDynTree::Vector2 m_zmp; /**< ZMP position. */
+    double m_gravityAcceleration; /**< Gravity acceleration magnitude. */
 
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_comPositionFilter; /**< CoM position low pass filter. */
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_comVelocityFilter; /**< CoM velocity low pass filter. */
@@ -132,9 +131,8 @@ public:
 
     /**
      * Evaluate the 2D-Divergent component of motion.
-     * @return true/false in case of success/failure.
      */
-    bool evaluateDCM();
+    void evaluateDCM();
 
     /**
      * Evaluate the CoM position.
@@ -143,25 +141,36 @@ public:
     bool evaluateCoM();
 
     /**
-     * Get the CoM position.
-     * @param comPosition position of the center of mass.
+     * Evaluate the ZMP_controller position.
+     * @param leftWrench wrench acting on the left foot
+     * @param rightWrench wrench acting on the right foot
      * @return true/false in case of success/failure.
      */
-    bool getCoMPosition(iDynTree::Position& comPosition);
+    bool evaluateZMP(const iDynTree::Wrench& leftWrench, const iDynTree::Wrench& rightWrench);
+
+    /**
+     * Get the CoM position.
+     * @return the position of the center of mass
+     */
+    const iDynTree::Position& getCoMPosition() const;
 
     /**
      * Get the CoM velocity.
-     * @param comVelocity velocity of the center of mass.
-     * @return true/false in case of success/failure.
+     * @return the velocity of the center of mass.
      */
-    bool getCoMVelocity(iDynTree::Vector3& comVelocity);
+    const iDynTree::Vector3& getCoMVelocity() const;
 
     /**
      * Get the 3D-Divergent component of motion.
-     * @param dcm 3D-Divergent component of motion.
-     * @return true/false in case of success/failure.
+     * @return dcm 3D-Divergent component of motion.
      */
-    bool getDCM(iDynTree::Vector3& dcm);
+    const iDynTree::Vector3& getDCM() const;
+
+    /**
+     * Get the ZMP.
+     * @return zero moment point.
+     */
+    const iDynTree::Vector2& getZMP() const;
 
     /**
      * Return the transformation between the left foot frame (l_sole) and the world reference frame.
