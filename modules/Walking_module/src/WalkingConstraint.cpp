@@ -165,7 +165,7 @@ CartesianConstraint::CartesianConstraint(const CartesianElementType& elementType
 
 void CartesianConstraint::evaluateJacobian(Eigen::SparseMatrix<double>& jacobian)
 {
-    copyDenseIntoSparse(*m_roboticJacobian, m_roboticJacobian->rows(), m_roboticJacobian->cols(),
+    copyDenseIntoSparse(*m_roboticJacobian, m_jacobianStartingRow, m_jacobianStartingColumn,
                         jacobian);
 }
 
