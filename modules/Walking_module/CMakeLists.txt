@@ -44,6 +44,7 @@ set(${EXE_TARGET_NAME}_SRC
   src/TimeProfiler.cpp
   src/CartesianPID.cpp
   src/WalkingConstraint.cpp
+  src/WalkingTaskBasedTorqueSolver.cpp
   )
 
 # set hpp files
@@ -66,6 +67,7 @@ set(${EXE_TARGET_NAME}_HDR
   include/TimeProfiler.hpp
   include/CartesianPID.hpp
   include/WalkingConstraint.hpp
+  include/WalkingTaskBasedTorqueSolver.hpp
   )
 
 # add include directories to the build.
