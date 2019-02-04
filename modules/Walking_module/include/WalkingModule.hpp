@@ -32,6 +32,7 @@
 #include <WalkingQPInverseKinematics.hpp>
 #include <WalkingQPInverseKinematics_osqp.hpp>
 #include <WalkingQPInverseKinematics_qpOASES.hpp>
+#include <WalkingTaskBasedTorqueController.hpp>
 #include <WalkingForwardKinematics.hpp>
 #include <StableDCMModel.hpp>
 #include <WalkingPIDHandler.hpp>
@@ -71,6 +72,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::unique_ptr<WalkingIK> m_IKSolver; /**< Pointer to the inverse kinematics solver. */
     std::shared_ptr<WalkingQPIK_osqp> m_QPIKSolver_osqp; /**< Pointer to the inverse kinematics solver (osqp). */
     std::shared_ptr<WalkingQPIK_qpOASES> m_QPIKSolver_qpOASES; /**< Pointer to the inverse kinematics solver (qpOASES). */
+    std::unique_ptr<WalkingTaskBasedTorqueController> m_taskBasedTorqueSolver; /**< Pointer to the task-based torque solver. */
     std::unique_ptr<WalkingFK> m_FKSolver; /**< Pointer to the forward kinematics solver. */
     std::unique_ptr<StableDCMModel> m_stableDCMModel; /**< Pointer to the stable DCM dynamics. */
     std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
@@ -94,7 +96,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::deque<double> m_comHeightTrajectory; /**< Deque containing the CoM height trajectory. */
     std::deque<double> m_comHeightVelocity; /**< Deque containing the CoM height velocity. */
     std::deque<size_t> m_mergePoints; /**< Deque containing the time position of the merge points. */
-
+    std::deque<double> m_weightInLeft; /**< Deque containing the left foot weight percentage. */
+    std::deque<double> m_weightInRight; /**< Deque containing the right foot weight percentage. */
     std::deque<bool> m_isLeftFixedFrame; /**< Deque containing when the main frame of the left foot is the fixed frame
                                             In general a main frame of a foot is the fix frame only during the
                                             stance and the switch out phases. */
@@ -160,6 +163,24 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
                    const iDynTree::Vector3& desiredCoMVelocity,
                    const iDynTree::Rotation& desiredNeckOrientation,
                    iDynTree::VectorDynSize &output);
+
+    /**
+     * Set the task based torque controller problem.
+     * @param desiredCoMPosition desired CoM position;
+     * @param desiredCoMVelocity desired CoM velocity;
+     * @param desiredCoMAcceleration desired CoM Acceleration;
+     * @param desiredCoMAcceleration desired ZMP Position;
+     * @param desiredNeckOrientation desired neck orientation (rotation matrix);
+     * @param output is the output of the solver (i.e. the desired joint velocity)
+     * @return true in case of success and false otherwise.
+     */
+    bool solveTaskBased(const iDynTree::Rotation& desiredNeckOrientation,
+                        const iDynTree::Position& desiredCoMPosition,
+                        const iDynTree::Vector3& desiredCoMVelocity,
+                        const iDynTree::Vector3& desiredCoMAcceleration,
+                        const iDynTree::Vector2& desiredZMPPosition,
+                        iDynTree::VectorDynSize &output);
+
 
     /**
      * Generate the first trajectory.

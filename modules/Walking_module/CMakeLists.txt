@@ -21,6 +21,10 @@ find_package(OsqpEigen REQUIRED)
 find_package(qpOASES REQUIRED)
 find_package(Threads REQUIRED)
 
+
+find_package(EigenMatio CONFIG REQUIRED)
+
+
 include(FindPackageHandleStandardArgs)
 
 # set cpp files
@@ -45,6 +49,7 @@ set(${EXE_TARGET_NAME}_SRC
   src/CartesianPID.cpp
   src/WalkingConstraint.cpp
   src/WalkingTaskBasedTorqueSolver.cpp
+  src/WalkingTaskBasedTorqueController.cpp
   )
 
 # set hpp files
@@ -68,6 +73,7 @@ set(${EXE_TARGET_NAME}_HDR
   include/CartesianPID.hpp
   include/WalkingConstraint.hpp
   include/WalkingTaskBasedTorqueSolver.hpp
+  include/WalkingTaskBasedTorqueController.hpp
   )
 
 # add include directories to the build.
@@ -96,6 +102,8 @@ target_link_libraries(${EXE_TARGET_NAME}
   OsqpEigen::OsqpEigen
   osqp::osqp
   Threads::Threads
-  ${qpOASES_LIBRARIES})
+  ${qpOASES_LIBRARIES}
+  EigenMatio
+  "-lmatio")
 
 install(TARGETS ${EXE_TARGET_NAME} DESTINATION bin)
