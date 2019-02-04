@@ -15,6 +15,8 @@
 #include <WalkingTaskBasedTorqueSolver.hpp>
 #include <Utils.hpp>
 
+#include <EigenMatio/EigenMatio.hpp>
+
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXd;
 
 bool TaskBasedTorqueSolver::instantiateCoMConstraint(const yarp::os::Searchable& config)
@@ -967,13 +969,14 @@ bool TaskBasedTorqueSolver::solve()
 
     if(!m_optimizer->solve())
     {
-        // Eigen::MatioFile file("data.mat");
-        // file.write_mat("hessian", Eigen::MatrixXd(m_hessianEigen));
-        // file.write_mat("gradient", Eigen::MatrixXd(m_gradient));
-        // file.write_mat("constraint", Eigen::MatrixXd(m_constraintMatrix));
-        // file.write_mat("lowerBound", Eigen::MatrixXd(m_lowerBound));
-        // file.write_mat("upperBound", Eigen::MatrixXd(m_upperBound));
-        // file.write_mat("massMatrix", iDynTree::toEigen(m_massMatrix));
+        Eigen::MatioFile file("data.mat");
+        file.write_mat("hessian", Eigen::MatrixXd(m_hessianEigen));
+        file.write_mat("gradient", Eigen::MatrixXd(m_gradient));
+        file.write_mat("constraint", Eigen::MatrixXd(m_constraintMatrix));
+        file.write_mat("lowerBound", Eigen::MatrixXd(m_lowerBound));
+        file.write_mat("upperBound", Eigen::MatrixXd(m_upperBound));
+        file.write_mat("massMatrix", iDynTree::toEigen(m_massMatrix));
+        file.write_mat("comJacobian", iDynTree::toEigen(m_comJacobian));
 
         yError() << "[solve] Unable to solve the problem.";
         return false;
@@ -1102,9 +1105,9 @@ bool TaskBasedTorqueSolver::isSolutionFeasible()
     return false;
 }
 
-void TaskBasedTorqueSolver::getSolution(iDynTree::VectorDynSize& output)
+const iDynTree::VectorDynSize& TaskBasedTorqueSolver::getSolution() const
 {
-    output = m_desiredJointTorque;
+    return m_desiredJointTorque;
 }
 
 iDynTree::Wrench TaskBasedTorqueSolverDoubleSupport::getLeftWrench()
@@ -1145,7 +1148,6 @@ bool TaskBasedTorqueSolverDoubleSupport::instantiateFeetConstraint(const yarp::o
     // resize quantities
     m_leftFootJacobian.resize(6, m_actuatedDOFs + 6);
     m_leftFootBiasAcceleration.resize(6);
-
     ptr = std::make_shared<CartesianConstraint>(CartesianElementType::CONTACT);
     ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 0);
     ptr->setRoboticJacobian(m_leftFootJacobian);

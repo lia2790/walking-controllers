@@ -108,11 +108,11 @@ protected:
     double m_regularizationForceScale;
     double m_regularizationForceOffset;
 
-    std::unordered_map<std::string, std::shared_ptr<Constraint>> m_constraints;
-    std::unordered_map<std::string, std::shared_ptr<CostFunctionElement>> m_costFunction;
+    std::map<std::string, std::shared_ptr<Constraint>> m_constraints;
+    std::map<std::string, std::shared_ptr<CostFunctionElement>> m_costFunction;
 
-    std::unordered_map<std::string, std::unique_ptr<Eigen::SparseMatrix<double>>> m_hessianMatrices;
-    std::unordered_map<std::string, std::unique_ptr<Eigen::VectorXd>> m_gradientVectors;
+    std::map<std::string, std::unique_ptr<Eigen::SparseMatrix<double>>> m_hessianMatrices;
+    std::map<std::string, std::unique_ptr<Eigen::VectorXd>> m_gradientVectors;
 
     int m_actuatedDOFs;
     int m_numberOfVariables; /**<Number of variables in the QP problem (# of joints + 12) */
@@ -187,7 +187,7 @@ public:
      * Get the solution of the optimization problem.
      * @param output joint torque
      */
-    void getSolution(iDynTree::VectorDynSize& output);
+    const iDynTree::VectorDynSize& getSolution() const;
 
     virtual iDynTree::Vector2 getZMP() = 0;
 
