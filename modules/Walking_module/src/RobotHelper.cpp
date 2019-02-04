@@ -1,6 +1,15 @@
+/**
+ * @file RobotHelper.cpp
+ * @authors Giulio Romualdi <giulio.romualdi@iit.it>
+ * @copyright 2019 iCub Facility - Istituto Italiano di Tecnologia
+ *            Released under the terms of the LGPLv2.1 or later, see LGPL.TXT
+ * @date 2019
+ */
+
 #include <iDynTree/Core/Utils.h>
 #include <iDynTree/Core/EigenHelpers.h>
 #include <iDynTree/yarp/YARPConversions.h>
+#include <iDynTree/yarp/YARPEigenConversions.h>
 
 #include <RobotHelper.hpp>
 #include <Utils.hpp>
@@ -129,7 +138,7 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
     // robot name: used to connect to the robot
     std::string robot = config.check("robot", yarp::os::Value("icubSim")).asString();
 
-    double sampligTime = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
+    m_dT = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
 
     std::string name;
     if(!YarpHelper::getStringFromSearchable(config, "name", name))
@@ -233,6 +242,8 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
         return false;
     }
 
+    m_manuallyEvaluateVelocity = config.check("manually_evaluate_velocity", yarp::os::Value("False")).asBool();
+
     // resize the buffers
     m_positionFeedbackDeg.resize(m_actuatedDOFs, 0.0);
     m_velocityFeedbackDeg.resize(m_actuatedDOFs, 0.0);
@@ -284,7 +295,7 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
         // set filters
         // m_positionFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(10, m_dT);
         m_velocityFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency,
-                                                                                 sampligTime);
+                                                                                 m_dT);
 
         // m_positionFilter->init(m_positionFeedbackDeg);
         m_velocityFilter->init(m_velocityFeedbackDeg);
@@ -323,7 +334,7 @@ bool RobotHelper::configureForceTorqueSensors(const yarp::os::Searchable& config
         return false;
     }
 
-    double sampligTime = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
+    m_dT = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
 
     // open and connect left foot wrench
     if(!YarpHelper::getStringFromSearchable(config, "leftFootWrenchInputPort_name", portInput))
@@ -377,9 +388,9 @@ bool RobotHelper::configureForceTorqueSensors(const yarp::os::Searchable& config
         }
 
         m_leftWrenchFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency,
-                                                                                   sampligTime);
+                                                                                   m_dT);
         m_rightWrenchFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency,
-                                                                                    sampligTime);
+                                                                                    m_dT);
     }
     return true;
 }
@@ -408,6 +419,9 @@ bool RobotHelper::resetFilters()
         m_rightWrenchFilter->init(m_rightWrenchInput);
     }
 
+    // reset the value for evaluating the velocity
+    m_positionFeedbackRadPrevious =  m_positionFeedbackRad;
+
     return true;
 }
 
@@ -417,6 +431,13 @@ bool RobotHelper::getFeedbacks(unsigned int maxAttempts)
     {
         yError() << "[RobotHelper::getFeedbacks] Unable to get the feedback from the robot";
         return false;
+    }
+
+    if(m_manuallyEvaluateVelocity)
+    {
+        iDynTree::toEigen(m_velocityFeedbackRad) = (iDynTree::toEigen(m_positionFeedbackRad) -
+                                                    iDynTree::toEigen(m_positionFeedbackRadPrevious)) / m_dT;
+        m_positionFeedbackRadPrevious = m_positionFeedbackRad;
     }
 
     if(m_useVelocityFilter)

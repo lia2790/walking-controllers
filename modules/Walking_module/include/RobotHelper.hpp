@@ -33,6 +33,7 @@
 
 class RobotHelper
 {
+    double m_dT;
     yarp::dev::PolyDriver m_robotDevice; /**< Main robot device. */
     std::vector<std::string> m_axesList; /**< Vector containing the name of the controlled joints. */
     unsigned int m_actuatedDOFs; /**< Number of the actuated DoFs. */
@@ -55,6 +56,7 @@ class RobotHelper
     yarp::sig::Vector m_positionFeedbackDeg; /**< Current joint position [deg]. */
     yarp::sig::Vector m_velocityFeedbackDeg; /**< Current joint velocity [deg/s]. */
     iDynTree::VectorDynSize m_positionFeedbackRad; /**< Current joint position [rad]. */
+    iDynTree::VectorDynSize m_positionFeedbackRadPrevious; /**< Previous joint position [rad]. */
     iDynTree::VectorDynSize m_velocityFeedbackRad; /**< Current joint velocity [rad/s]. */
 
     iDynTree::VectorDynSize m_desiredJointPositionRad; /**< Desired Joint Position [rad]. */
@@ -67,6 +69,7 @@ class RobotHelper
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_positionFilter; /**< Joint position low pass filter .*/
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_velocityFilter; /**< Joint velocity low pass filter .*/
     bool m_useVelocityFilter; /**< True if the joint velocity filter is used. */
+    bool m_manuallyEvaluateVelocity;
 
     yarp::os::BufferedPort<yarp::sig::Vector> m_leftWrenchPort; /**< Left foot wrench port. */
     yarp::os::BufferedPort<yarp::sig::Vector> m_rightWrenchPort; /**< Right foot wrench port. */
