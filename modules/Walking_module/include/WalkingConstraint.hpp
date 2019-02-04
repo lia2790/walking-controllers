@@ -23,32 +23,36 @@
 
 #include <TimeProfiler.hpp>
 
+/** Cartesian Element Type */
 enum class CartesianElementType {POSE, POSITION, ORIENTATION, ONE_DIMENSION, CONTACT};
 
-
 /**
- * GenericCartesianElement
+ * Generic Cartesian Element
  */
 class CartesianElement
 {
 
 protected:
-    /**
-     * Evaluate the desired acceleration. It depends on the type of constraint (Positional,
-     * Rotational)
-     */
-    void evaluateDesiredAcceleration();
-
     iDynTree::VectorDynSize const * m_biasAcceleration; /**< Bias acceleration J \nu. */
     iDynTree::MatrixDynSize const * m_roboticJacobian; /**< Robotic Jacobian in mixed representation. */
     iDynTree::VectorDynSize m_desiredAcceleration; /**< Desired acceleration evaluated by the
                                                       controller. */
     std::unordered_map<std::string, std::shared_ptr<CartesianPID>> m_controllers; /**< Set of
                                                                                      controllers. */
-    CartesianElementType m_elementType;
 
+    CartesianElementType m_elementType; /**< Type of the Cartesian element */
+
+    /**
+     * Evaluate the desired acceleration. It depends on the type of constraint (Positional,
+     * Rotational)
+     */
+    void evaluateDesiredAcceleration();
 public:
 
+    /**
+     * Constructor of the CartesianElement class
+     * @param elementType type of Cartesian element it can be POSE, POSITION, ORIENTATION, ONE_DIMENSION, CONTACT
+     */
     CartesianElement(const CartesianElementType& elementType);
 
     /**
@@ -78,40 +82,71 @@ public:
 };
 
 
+/**
+ * Optimization element is a virtual class that implements a simple optimization element.
+ */
 class OptimizationElement
 {
 protected:
-
-    bool m_firstTime{true};
 
     int m_jacobianStartingRow; /**< Staring row of the jacobian sub-matrix.*/
     int m_jacobianStartingColumn; /**< Staring column of the jacobian sub-matrix.*/
 
     int m_hessianStartingRow; /**< Staring row of the hessian sub-matrix.*/
-    int m_hessianStartingColumn; /**< Staring column of the hessian submatrix.*/
+    int m_hessianStartingColumn; /**< Staring column of the hessian sub-matrix.*/
 
-    int m_sizeOfElement;
+    int m_sizeOfElement; /**< Size of the optimization element.*/
 public:
 
     /**
      * Evaluate Hessian.
+     * @param hessian hessian matrix
      */
     virtual void evaluateHessian(Eigen::SparseMatrix<double>& hessian){;};
 
     /**
-     * Evaluate Jacobian.
+     * Evaluate the gradient.
+     * @param gradient gradient vector
      */
     virtual void evaluateGradient(Eigen::VectorXd& gradient){;};
 
     /**
      * Evaluate Jacobian.
+     * @param jacobian jacobian matrix
      */
     virtual void evaluateJacobian(Eigen::SparseMatrix<double>& jacobian){;};
 
     /**
      * Evaluate lower and upper bounds.
+     * @param upperBounds vector containing the constraint upper bounds
+     * @param lowerBounds vector containing the constraint lower bounds
      */
     virtual void evaluateBounds(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds){;};
+
+    /**
+     * Set the constant elements of the Hessian matrix.
+     * @param hessian hessian matrix
+     */
+    virtual void setHessianConstantElements(Eigen::SparseMatrix<double>& hessian){;};
+
+    /**
+     * Set the constant elements of the Jacobian matrix.
+     * @param jacobian jacobian matrix
+     */
+    virtual void setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian){;};
+
+    /**
+     * Set the constant elements of the Gradient vector.
+     * @param gradient gradient vector
+     */
+    virtual void setGradientConstantElemenets(Eigen::VectorXd& gradient){;};
+
+    /**
+     * Set the constant elements of the upper and lower bounds
+     * @param upperBounds vector containing the constraint upper bounds
+     * @param lowerBounds vector containing the constraint lower bounds
+     */
+    virtual void setBoundsConstantElements(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds){;};
 
     /**
      * Set the jacobian and hessian starting row and column.
@@ -120,17 +155,29 @@ public:
      */
     void setSubMatricesStartingPosition(const int& startingRow, const int& startingColumn);
 
+    /**
+     * Get the jacobian starting row
+     * @return return the index of the staring row of the jacobian
+     */
     inline int getJacobianStartingRow() {return m_jacobianStartingRow;};
 
+    /**
+     * Get the jacobian starting column
+     * @return return the index of the staring columns of the jacobian
+     */
     inline int getJacobianStartingColumn() {return m_jacobianStartingColumn;};
 };
 
+/**
+ * Constraint class
+ */
 class Constraint : public OptimizationElement
 {
 
 public:
     /**
      * Get the number of constraint
+     * @return the number of constraint
      */
     inline int getNumberOfConstraints() {return m_sizeOfElement;};
 };
@@ -159,7 +206,7 @@ public:
     void evaluateJacobian(Eigen::SparseMatrix<double>& jacobian) override;
 
     /**
-     * Evaluate lower and upper bounds.
+     * Set lower and upper bounds constant elements.
      */
     void evaluateBounds(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds) override;
 };
@@ -170,17 +217,6 @@ public:
  */
 class ForceConstraint : public LinearConstraint
 {
-    Eigen::MatrixXd m_transform;
-
-    double m_staticFrictionCoefficient; /**< Static linear coefficient of friction */
-    double m_numberOfPoints; /**< Number of points in each quadrants for linearizing friction cone */
-    double m_torsionalFrictionCoefficient; /**< Torsional coefficient of friction */
-    double m_minimalNormalForce; /**< Minimal positive vertical force at contact */
-
-    iDynTree::Vector2 m_footLimitX; /**< Physical size of the foot (x axis) */
-    iDynTree::Vector2 m_footLimitY; /**< Physical size of the foot (y axis) */
-
-    bool m_isJacobianEvaluated; /**< True if the Jacobian is evaluated. */
     bool m_areBoundsEvaluated; /**< True if the bounds are evaluated. */
 
     //todo
@@ -188,38 +224,24 @@ class ForceConstraint : public LinearConstraint
 
     iDynTree::Transform const * m_footToWorldTransform;
 
+    iDynTree::VectorDynSize m_upperBound;
+    iDynTree::VectorDynSize m_lowerBound;
+
 public:
 
     /**
      * Constructor
      * @param numberOfPoints number of points used to approximated the friction cone
-     */
-    ForceConstraint(const int& numberOfPoints);
-
-    /**
-     * Set the static friction cone coefficient
      * @param staticFrictionCoefficient static friction coefficient.
-     */
-    void setStaticFrictionCoefficient(const double& staticFrictionCoefficient){m_staticFrictionCoefficient = staticFrictionCoefficient;};
-
-    /**
-     * Set the torsional friction coefficient
      * @param torsionalFrictionCoefficient torsional friction coefficient.
-     */
-    void setTorsionalFrictionCoefficient(const double& torsionalFrictionCoefficient){m_torsionalFrictionCoefficient = torsionalFrictionCoefficient;};
-
-    /**
-     * Set minimal normal force
      * @param minimalNormalForce minimal normal force. It has to be a positive number
-     */
-    void setMinimalNormalForce(const double& minimalNormalForce){m_minimalNormalForce = minimalNormalForce;};
-
-    /**
-     * Set the size of the foot
      * @param footLimitX vector containing the max and the min X coordinates
      * @param footLimitY vector containing the max and the min y coordinates
      */
-    void setFootSize(const iDynTree::Vector2& footLimitX, const iDynTree::Vector2& footLimitY);
+    ForceConstraint(const int& numberOfPoints, const double& staticFrictionCoefficient,
+                    const double& torsionalFrictionCoefficient, const double& minimalNormalForce,
+                    const iDynTree::Vector2& footLimitX, const iDynTree::Vector2& footLimitY);
+
 
     // todo
     void setFootToWorldTransform(const iDynTree::Transform& footToWorldTransform){m_footToWorldTransform = &footToWorldTransform;};
@@ -230,9 +252,9 @@ public:
     void evaluateJacobian(Eigen::SparseMatrix<double>& jacobian) override;
 
     /**
-     * Evaluate the lower and upper bounds
+     * Set constant elemenets of the lower and upper boulds
      */
-    void evaluateBounds(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds) override;
+    void setBoundsConstantElements(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds) override;
 };
 
 /**
@@ -240,9 +262,6 @@ public:
  */
 class ZMPConstraint : public LinearConstraint
 {
-
-    bool m_areBoundsEvaluated = false;
-
 protected:
 
     iDynTree::Vector2 m_desiredZMP;
@@ -259,7 +278,7 @@ public:
     /**
      * Evaluate the lower and upper bounds
      */
-    void evaluateBounds(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds) override;
+    void setBoundsConstantElements(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds) override;
 };
 
 class ZMPConstraintDoubleSupport : public ZMPConstraint
@@ -327,7 +346,7 @@ public:
     /**
      * Evaluate the jacobian
      */
-    void evaluateJacobian(Eigen::SparseMatrix<double>& jacobian) override;
+    void setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian) override;
 
     /**
      * Evaluate the lower and upper bounds
@@ -360,6 +379,12 @@ public:
     /**
      * Evaluate the jacobian
      */
+    void setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian) override;
+
+
+    /**
+     * Evaluate the jacobian
+     */
     void evaluateJacobian(Eigen::SparseMatrix<double>& jacobian) override;
 
     /**
@@ -379,12 +404,10 @@ class SystemDynamicConstraint : public LinearConstraint
 protected:
     iDynTree::MatrixDynSize const * m_massMatrix;
     int m_systemSize;
-    iDynSparseMatrix m_selectionMatrix;
 
 public:
 
     SystemDynamicConstraint(const int& systemSize);
-
 
     void setMassMatrix(const iDynTree::MatrixDynSize& massMatrix){m_massMatrix = &massMatrix;};
 
@@ -394,6 +417,8 @@ public:
      * Evaluate lower and upper bounds.
      */
     void evaluateBounds(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds) override;
+
+    void setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian) override;
 };
 
 class SystemDynamicConstraintDoubleSupport : public SystemDynamicConstraint
@@ -449,7 +474,7 @@ public:
     /**
      * Evaluate the constraint jacobian
      */
-    void evaluateJacobian(Eigen::SparseMatrix<double>& jacobian) override;
+    void setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian) override;
 
     /**
      * Evaluate lower and upper bounds.
@@ -542,6 +567,4 @@ public:
      */
     void evaluateHessian(Eigen::SparseMatrix<double>& hessian) override;
 };
-
-
 #endif
