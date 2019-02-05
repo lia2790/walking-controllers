@@ -65,7 +65,7 @@ bool TaskBasedTorqueSolver::instantiateCoMConstraint(const yarp::os::Searchable&
         m_comBiasAcceleration.resize(3);
 
         // memory allocation
-        ptr = std::make_shared<CartesianConstraint>(CartesianElementType::POSITION);
+        ptr = std::make_shared<CartesianConstraint>(CartesianElement::Type::POSITION);
     }
     else
     {
@@ -73,7 +73,7 @@ bool TaskBasedTorqueSolver::instantiateCoMConstraint(const yarp::os::Searchable&
         m_comBiasAcceleration.resize(1);
 
         // memory allocation
-        ptr = std::make_shared<CartesianConstraint>(CartesianElementType::ONE_DIMENSION);
+        ptr = std::make_shared<CartesianConstraint>(CartesianElement::Type::ONE_DIMENSION);
     }
 
     ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 0);
@@ -87,43 +87,6 @@ bool TaskBasedTorqueSolver::instantiateCoMConstraint(const yarp::os::Searchable&
 
     return true;
 }
-
-// bool TaskBasedTorqueSolver::instantiateLinearMomentumConstraint(const yarp::os::Searchable& config)
-// {
-//     if(config.isNull())
-//     {
-//         yInfo() << "[instantiateLinearMomentumConstraint] Empty configuration file. The linear momentum Constraint will not be used";
-//         m_useLinearMomentumConstraint = false;
-//         return true;
-//     }
-//     m_useLinearMomentumConstraint = true;
-
-//     // double kp;
-//     // if(!YarpHelper::getNumberFromSearchable(config, "kp", kp))
-//     // {
-//     //     yError() << "[instantiateCoMConstraint] Unable to get proportional gain";
-//     //     return false;
-//     // }
-
-//     // double kd;
-//     // if(!YarpHelper::getNumberFromSearchable(config, "kd", kd))
-//     // {
-//     //     yError() << "[instantiateCoMConstraint] Unable to get derivative gain";
-//     //     return false;
-//     // }
-
-//     // memory allocation
-//     std::shared_ptr<LinearMomentumConstraint> ptr;
-//     ptr = std::make_shared<LinearMomentumConstraint>();
-//     ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6 + m_actuatedDOFs + m_actuatedDOFs);
-
-//     ptr->controller()->setGains(0, 0);
-
-//     m_constraints.insert(std::make_pair("linear_momentum", ptr));
-//     m_numberOfConstraints += ptr->getNumberOfConstraints();
-
-//     return true;
-// }
 
 // bool TaskBasedTorqueSolver::instantiateAngularMomentumConstraint(const yarp::os::Searchable& config)
 // {
@@ -241,7 +204,7 @@ bool TaskBasedTorqueSolver::instantiateNeckSoftConstraint(const yarp::os::Search
     m_neckJacobian.resize(3, m_actuatedDOFs + 6);
 
     std::shared_ptr<CartesianCostFunction> ptr;
-    ptr = std::make_shared<CartesianCostFunction>(CartesianElementType::ORIENTATION);
+    ptr = std::make_shared<CartesianCostFunction>(CartesianElement::Type::ORIENTATION);
     ptr->setSubMatricesStartingPosition(0, 0);
 
     ptr->setWeight(neckWeight);
@@ -249,7 +212,7 @@ bool TaskBasedTorqueSolver::instantiateNeckSoftConstraint(const yarp::os::Search
     ptr->setRoboticJacobian(m_neckJacobian);
     ptr->orientationController()->setGains(c0, kd, kp);
 
-    m_costFunction.insert(std::make_pair("neck", ptr));
+    m_costFunctions.insert(std::make_pair("neck", ptr));
 
     m_hessianMatrices.insert(std::make_pair("neck", std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
 
@@ -333,7 +296,7 @@ bool TaskBasedTorqueSolver::instantiateRegularizationTaskConstraint(const yarp::
     ptr->setJointPosition(m_jointPosition);
     ptr->setJointVelocity(m_jointVelocity);
 
-    m_costFunction.insert(std::make_pair("regularization_joint", ptr));
+    m_costFunctions.insert(std::make_pair("regularization_joint", ptr));
 
     m_hessianMatrices.insert(std::make_pair("regularization_joint", std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
 
@@ -366,7 +329,7 @@ bool TaskBasedTorqueSolver::instantiateTorqueRegularizationConstraint(const yarp
     ptr->setSubMatricesStartingPosition(6 + m_actuatedDOFs, 0);
     ptr->setWeight(torqueRegularizationWeights);
 
-    m_costFunction.insert(std::make_pair("regularization_torque", ptr));
+    m_costFunctions.insert(std::make_pair("regularization_torque", ptr));
 
     m_hessianMatrices.insert(std::make_pair("regularization_torque", std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
 
@@ -420,12 +383,13 @@ bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
-    // yarp::os::Bottle& linearMomentumConstraintOptions = config.findGroup("LINEAR_MOMENTUM");
-    // if(!instantiateLinearMomentumConstraint(linearMomentumConstraintOptions))
-    // {
-    //     yError() << "[initialize] Unable to instantiate the Linear Momentum constraint.";
-    //     return false;
-    // }
+    yarp::os::Bottle& linearMomentumOptions = config.findGroup("LINEAR_MOMENTUM");
+    instantiateLinearMomentumConstraint(linearMomentumOptions);
+    if(!instantiateLinearMomentumCostFunction(linearMomentumOptions))
+    {
+        yError() << "[initialize] Unable to instantiate the linear momentum cost.";
+        return false;
+    }
 
     // yarp::os::Bottle& angularMomentumConstraintOptions = config.findGroup("ANGULAR_MOMENTUM");
     // if(!instantiateAngularMomentumConstraint(angularMomentumConstraintOptions))
@@ -508,7 +472,7 @@ bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
     m_optimizer->settings()->setLinearSystemSolver(0);
 
     // set constant element of the cost function
-    for(const auto& element: m_costFunction)
+    for(const auto& element: m_costFunctions)
     {
         std::string key = element.first;
         element.second->setHessianConstantElements(*(m_hessianMatrices.at(key)));
@@ -541,10 +505,10 @@ bool TaskBasedTorqueSolver::setMassMatrix(const iDynTree::MatrixDynSize& massMat
         // if first time add robot mass
         if(!m_optimizer->isInitialized())
         {
-            auto constraint = m_constraints.find("linear_momentum");
+            auto constraint = m_constraints.find("linear_momentum_constraint");
             if(constraint == m_constraints.end())
             {
-                yError() << "[setMassMatrix] unable to find the linear constraint. "
+                yError() << "[setMassMatrix] unable to find the linear momentum constraint. "
                          << "Please call 'initialize()' method";
                 return false;
             }
@@ -553,6 +517,25 @@ bool TaskBasedTorqueSolver::setMassMatrix(const iDynTree::MatrixDynSize& massMat
             ptr->setRobotMass(m_massMatrix(0,0));
         }
     }
+
+    if(m_useLinearMomentumCostFunction)
+    {
+        // if first time add robot mass
+        if(!m_optimizer->isInitialized())
+        {
+            auto costFunction = m_costFunctions.find("linear_momentum_costFunction");
+            if(costFunction ==  m_costFunctions.end())
+            {
+                yError() << "[setMassMatrix] unable to find the linear momentum cost function. "
+                         << "Please call 'initialize()' method";
+                return false;
+            }
+
+            auto ptr = std::static_pointer_cast<LinearMomentumCostFunction>(costFunction->second);
+            ptr->setRobotMass(m_massMatrix(0,0));
+        }
+    }
+
 
     return true;
 }
@@ -605,8 +588,8 @@ bool TaskBasedTorqueSolver::setDesiredNeckTrajectory(const iDynTree::Rotation& d
                                                      const iDynTree::Vector3& desiredNeckAcceleration)
 {
 
-    auto cost = m_costFunction.find("neck");
-    if(cost == m_costFunction.end())
+    auto cost = m_costFunctions.find("neck");
+    if(cost == m_costFunctions.end())
     {
         yError() << "[setDesiredNeckTrajectory] unable to find the neck trajectory element. "
                  << "Please call 'initialize()' method";
@@ -626,8 +609,8 @@ bool TaskBasedTorqueSolver::setDesiredNeckTrajectory(const iDynTree::Rotation& d
 bool TaskBasedTorqueSolver::setNeckState(const iDynTree::Rotation& neckOrientation,
                                          const iDynTree::Twist& neckVelocity)
 {
-    auto cost = m_costFunction.find("neck");
-    if(cost == m_costFunction.end())
+    auto cost = m_costFunctions.find("neck");
+    if(cost == m_costFunctions.end())
     {
         yError() << "[setDesiredNeckTrajectory] unable to find the neck trajectory element. "
                  << "Please call 'initialize()' method";
@@ -656,29 +639,6 @@ bool TaskBasedTorqueSolver::setDesiredCoMTrajectory(const iDynTree::Position& co
                                                     const iDynTree::Vector3& comVelocity,
                                                     const iDynTree::Vector3& comAcceleration)
 {
-    iDynTree::Vector3 dummy;
-    dummy.zero();
-    // if(m_useLinearMomentumConstraint)
-    // {
-    //     std::shared_ptr<LinearMomentumConstraint> ptr;
-
-    //     // save com desired trajectory
-    //     auto constraint = m_constraints.find("linear_momentum");
-    //     if(constraint == m_constraints.end())
-    //     {
-    //         yError() << "[setDesiredCoMTrajectory] unable to find the linear momentum constraint. "
-    //                  << "Please call 'initialize()' method";
-    //         return false;
-    //     }
-
-    //     // todo m_massMatrix might be not initialized!!!!!
-    //     ptr = std::static_pointer_cast<LinearMomentumConstraint>(constraint->second);
-    //     iDynTree::Vector3 desiredLinearMomentumDerivative;
-    //     iDynTree::toEigen(desiredLinearMomentumDerivative) = m_massMatrix(0,0) * iDynTree::toEigen(comAcceleration);
-
-    //     ptr->controller()->setDesiredTrajectory(desiredLinearMomentumDerivative, dummy, dummy);
-    // }
-
     if(m_useCoMConstraint)
     {
         auto constraint = m_constraints.find("com");
@@ -698,6 +658,36 @@ bool TaskBasedTorqueSolver::setDesiredCoMTrajectory(const iDynTree::Position& co
 bool TaskBasedTorqueSolver::setCoMState(const iDynTree::Position& comPosition,
                                         const iDynTree::Vector3& comVelocity)
 {
+    if(m_useLinearMomentumConstraint)
+    {
+        // save com desired trajectory
+        auto constraint = m_constraints.find("linear_momentum_constraint");
+        if(constraint == m_constraints.end())
+        {
+            yError() << "[setCoMState] unable to find the linear momentum constraint. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+
+        auto ptr = std::static_pointer_cast<LinearMomentumConstraint>(constraint->second);
+        ptr->setCoMPosition(comPosition);
+    }
+
+    if(m_useLinearMomentumCostFunction)
+    {
+        // save com desired trajectory
+        auto costFunction = m_costFunctions.find("linear_momentum_costFunction");
+        if(costFunction == m_costFunctions.end())
+        {
+            yError() << "[setCoMState] unable to find the linear momentum costFunction. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+
+        auto ptr = std::static_pointer_cast<LinearMomentumCostFunction>(costFunction->second);
+        ptr->setCoMPosition(comPosition);
+    }
+
     if(m_useCoMConstraint)
     {
         auto constraint = m_constraints.find("com");
@@ -710,8 +700,6 @@ bool TaskBasedTorqueSolver::setCoMState(const iDynTree::Position& comPosition,
         auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
         ptr->positionController()->setFeedback(comVelocity, comPosition);
     }
-    m_comPosition = comPosition;
-
     return true;
 }
 
@@ -735,6 +723,36 @@ void TaskBasedTorqueSolver::setCoMBiasAcceleration(const iDynTree::Vector3 &comB
         else
             m_comBiasAcceleration(0) = comBiasAcceleration(2);
     }
+}
+
+bool TaskBasedTorqueSolver::setDesiredVRP(const iDynTree::Vector3 &vrp)
+{
+    if(m_useLinearMomentumConstraint)
+    {
+        auto constraint = m_constraints.find("linear_momentum_constraint");
+        if(constraint == m_constraints.end())
+        {
+            yError() << "[setDesiredVRP] Unable to find the linear_momentum constraint. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+        auto ptr = std::static_pointer_cast<LinearMomentumConstraint>(constraint->second);
+        ptr->setDesiredVRP(vrp);
+    }
+
+    if(m_useLinearMomentumCostFunction)
+    {
+        auto costFunction = m_costFunctions.find("linear_momentum_costFunction");
+        if(costFunction == m_costFunctions.end())
+        {
+            yError() << "[setDesiredVRP] Unable to find the linear_momentum costFunction. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+        auto ptr = std::static_pointer_cast<LinearMomentumCostFunction>(costFunction->second);
+        ptr->setDesiredVRP(vrp);
+    }
+    return true;
 }
 
 bool TaskBasedTorqueSolver::setDesiredZMP(const iDynTree::Vector2 &zmp)
@@ -770,8 +788,8 @@ bool TaskBasedTorqueSolverDoubleSupport::setFeetWeightPercentage(const double &w
             + m_regularizationForceOffset;
     }
 
-    auto cost = m_costFunction.find("regularization_left_force");
-    if(cost == m_costFunction.end())
+    auto cost = m_costFunctions.find("regularization_left_force");
+    if(cost == m_costFunctions.end())
     {
         yError() << "[setDesiredNeckTrajectory] unable to find the neck trajectory element. "
                  << "Please call 'initialize()' method";
@@ -780,8 +798,8 @@ bool TaskBasedTorqueSolverDoubleSupport::setFeetWeightPercentage(const double &w
     auto ptr = std::static_pointer_cast<InputRegularizationTerm>(cost->second);
     ptr->setWeight(weightLeft);
 
-    cost = m_costFunction.find("regularization_right_force");
-    if(cost == m_costFunction.end())
+    cost = m_costFunctions.find("regularization_right_force");
+    if(cost == m_costFunctions.end())
     {
         yError() << "[setDesiredNeckTrajectory] unable to find the neck trajectory element. "
                  << "Please call 'initialize()' method";
@@ -797,7 +815,7 @@ bool TaskBasedTorqueSolver::setHessianMatrix()
 {
     std::string key;
     Eigen::SparseMatrix<double> hessianEigen(m_numberOfVariables, m_numberOfVariables);
-    for(const auto& element: m_costFunction)
+    for(const auto& element: m_costFunctions)
     {
         key = element.first;
         element.second->evaluateHessian(*(m_hessianMatrices.at(key)));
@@ -830,7 +848,7 @@ bool TaskBasedTorqueSolver::setGradientVector()
 {
     std::string key;
     m_gradient = MatrixXd::Zero(m_numberOfVariables, 1);
-    for(const auto& element: m_costFunction)
+    for(const auto& element: m_costFunctions)
     {
         key = element.first;
         element.second->evaluateGradient(*(m_gradientVectors.at(key)));
@@ -1148,7 +1166,7 @@ bool TaskBasedTorqueSolverDoubleSupport::instantiateFeetConstraint(const yarp::o
     // resize quantities
     m_leftFootJacobian.resize(6, m_actuatedDOFs + 6);
     m_leftFootBiasAcceleration.resize(6);
-    ptr = std::make_shared<CartesianConstraint>(CartesianElementType::CONTACT);
+    ptr = std::make_shared<CartesianConstraint>(CartesianElement::Type::CONTACT);
     ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 0);
     ptr->setRoboticJacobian(m_leftFootJacobian);
     ptr->setBiasAcceleration(m_leftFootBiasAcceleration);
@@ -1160,7 +1178,7 @@ bool TaskBasedTorqueSolverDoubleSupport::instantiateFeetConstraint(const yarp::o
     // resize quantities
     m_rightFootJacobian.resize(6, m_actuatedDOFs + 6);
     m_rightFootBiasAcceleration.resize(6);
-    ptr = std::make_shared<CartesianConstraint>(CartesianElementType::CONTACT);
+    ptr = std::make_shared<CartesianConstraint>(CartesianElement::Type::CONTACT);
     ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 0);
     ptr->setRoboticJacobian(m_rightFootJacobian);
     ptr->setBiasAcceleration(m_rightFootBiasAcceleration);
@@ -1344,7 +1362,7 @@ bool TaskBasedTorqueSolverDoubleSupport::instantiateForceRegularizationConstrain
     std::shared_ptr<InputRegularizationTerm> ptr;
     ptr = std::make_shared<InputRegularizationTerm>(6);
     ptr->setSubMatricesStartingPosition(6 + m_actuatedDOFs + m_actuatedDOFs, 0);
-    m_costFunction.insert(std::make_pair("regularization_left_force", ptr));
+    m_costFunctions.insert(std::make_pair("regularization_left_force", ptr));
     m_hessianMatrices.insert(std::make_pair("regularization_left_force",
                                             std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
     m_gradientVectors.insert(std::make_pair("regularization_left_force",
@@ -1353,11 +1371,56 @@ bool TaskBasedTorqueSolverDoubleSupport::instantiateForceRegularizationConstrain
     // right foot
     ptr = std::make_shared<InputRegularizationTerm>(6);
     ptr->setSubMatricesStartingPosition(6 + m_actuatedDOFs + m_actuatedDOFs + 6, 0);
-    m_costFunction.insert(std::make_pair("regularization_right_force", ptr));
+    m_costFunctions.insert(std::make_pair("regularization_right_force", ptr));
     m_hessianMatrices.insert(std::make_pair("regularization_right_force",
                                             std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
     m_gradientVectors.insert(std::make_pair("regularization_right_force",
                                             std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
+    return true;
+}
+
+void TaskBasedTorqueSolverDoubleSupport::instantiateLinearMomentumConstraint(const yarp::os::Searchable& config)
+{
+    m_useLinearMomentumConstraint = config.check("useAsConstraint", yarp::os::Value("False")).asBool();
+    if(m_useLinearMomentumConstraint)
+    {
+        // memory allocation
+        auto ptr = std::make_shared<LinearMomentumConstraint>(LinearMomentumConstraint::Type::DOUBLE_SUPPORT);
+        // only the forces are used to control the linear momentum
+        ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6 + m_actuatedDOFs + m_actuatedDOFs);
+
+        m_constraints.insert(std::make_pair("linear_momentum_constraint", ptr));
+        m_numberOfConstraints += ptr->getNumberOfConstraints();
+    }
+    return;
+}
+
+bool TaskBasedTorqueSolverDoubleSupport::instantiateLinearMomentumCostFunction(const yarp::os::Searchable& config)
+{
+    m_useLinearMomentumCostFunction = config.check("useAsCostFunction", yarp::os::Value("False")).asBool();
+    if(m_useLinearMomentumCostFunction)
+    {
+        yarp::os::Value tempValue = config.find("weight");
+        iDynTree::VectorDynSize weight(3);
+        if(!YarpHelper::yarpListToiDynTreeVectorDynSize(tempValue, weight))
+        {
+            yError() << "[TaskBasedTorqueSolverDoubleSupport::instantiateLinearMomentumCostFunction] Initialization failed while reading weight vector.";
+            return false;
+        }
+
+        // memory allocation
+        auto ptr = std::make_shared<LinearMomentumCostFunction>(LinearMomentumCostFunction::Type::DOUBLE_SUPPORT);
+        // only the forces are used to control the linear momentum
+        ptr->setSubMatricesStartingPosition(6 + m_actuatedDOFs + m_actuatedDOFs, 0);
+        ptr->setWeight(weight);
+
+        m_costFunctions.insert(std::make_pair("linear_momentum_costFunction", ptr));
+
+        m_hessianMatrices.insert(std::make_pair("linear_momentum_costFunction",
+                                                std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
+    m_gradientVectors.insert(std::make_pair("linear_momentum_costFunction",
+                                            std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
+    }
     return true;
 }
 
@@ -1494,7 +1557,7 @@ bool TaskBasedTorqueSolverSingleSupport::instantiateFeetConstraint(const yarp::o
     m_stanceFootJacobian.resize(6, m_actuatedDOFs + 6);
     m_stanceFootBiasAcceleration.resize(6);
 
-    ptr = std::make_shared<CartesianConstraint>(CartesianElementType::CONTACT);
+    ptr = std::make_shared<CartesianConstraint>(CartesianElement::Type::CONTACT);
     ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 0);
     ptr->setRoboticJacobian(m_stanceFootJacobian);
     ptr->setBiasAcceleration(m_stanceFootBiasAcceleration);
@@ -1506,7 +1569,7 @@ bool TaskBasedTorqueSolverSingleSupport::instantiateFeetConstraint(const yarp::o
     m_swingFootJacobian.resize(6, m_actuatedDOFs + 6);
     m_swingFootBiasAcceleration.resize(6);
 
-    ptr = std::make_shared<CartesianConstraint>(CartesianElementType::POSE);
+    ptr = std::make_shared<CartesianConstraint>(CartesianElement::Type::POSE);
     ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 0);
     ptr->positionController()->setGains(kpLinear, kdLinear);
     ptr->orientationController()->setGains(c0, kdAngular, kpAngular);
@@ -1687,13 +1750,58 @@ bool TaskBasedTorqueSolverSingleSupport::instantiateForceRegularizationConstrain
     ptr->setWeight(weight);
 
 
-    m_costFunction.insert(std::make_pair("regularization_stance_force", ptr));
+    m_costFunctions.insert(std::make_pair("regularization_stance_force", ptr));
 
     m_hessianMatrices.insert(std::make_pair("regularization_stance_force",
                                             std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
     m_gradientVectors.insert(std::make_pair("regularization_stance_force",
                                             std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
 
+    return true;
+}
+
+void TaskBasedTorqueSolverSingleSupport::instantiateLinearMomentumConstraint(const yarp::os::Searchable& config)
+{
+    m_useLinearMomentumConstraint = config.check("useAsConstraint", yarp::os::Value("False")).asBool();
+    if(m_useLinearMomentumConstraint)
+    {
+        // memory allocation
+        auto ptr = std::make_shared<LinearMomentumConstraint>(LinearMomentumConstraint::Type::SINGLE_SUPPORT);
+        // only the forces are used to control the linear momentum
+        ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6 + m_actuatedDOFs + m_actuatedDOFs);
+
+        m_constraints.insert(std::make_pair("linear_momentum_constraint", ptr));
+        m_numberOfConstraints += ptr->getNumberOfConstraints();
+    }
+    return;
+}
+
+bool TaskBasedTorqueSolverSingleSupport::instantiateLinearMomentumCostFunction(const yarp::os::Searchable& config)
+{
+    m_useLinearMomentumCostFunction = config.check("useAsCostFunction", yarp::os::Value("False")).asBool();
+    if(m_useLinearMomentumCostFunction)
+    {
+        yarp::os::Value tempValue = config.find("weight");
+        iDynTree::VectorDynSize weight(3);
+        if(!YarpHelper::yarpListToiDynTreeVectorDynSize(tempValue, weight))
+        {
+            yError() << "[TaskBasedTorqueSolverSingleSupport::instantiateLinearMomentumCostFunction] Initialization failed while reading weight vector.";
+            return false;
+        }
+
+        // memory allocation
+        auto ptr = std::make_shared<LinearMomentumCostFunction>(LinearMomentumCostFunction::Type::SINGLE_SUPPORT);
+        // only the forces are used to control the linear momentum
+        ptr->setSubMatricesStartingPosition(6 + m_actuatedDOFs + m_actuatedDOFs, 0);
+        ptr->setWeight(weight);
+
+        m_costFunctions.insert(std::make_pair("linear_momentum_costFunction", ptr));
+
+        m_hessianMatrices.insert(std::make_pair("linear_momentum_costFunction",
+                                                std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
+    m_gradientVectors.insert(std::make_pair("linear_momentum_costFunction",
+                                            std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
+    }
     return true;
 }
 

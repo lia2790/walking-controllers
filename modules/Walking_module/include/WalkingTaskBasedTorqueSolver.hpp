@@ -23,6 +23,7 @@ class TaskBasedTorqueSolver
 protected:
     bool m_useCoMConstraint;
     bool m_useLinearMomentumConstraint;
+    bool m_useLinearMomentumCostFunction;
     bool m_useAngularMomentumConstraint;
     bool m_controlOnlyCoMHeight;
 
@@ -66,13 +67,14 @@ protected:
      */
     bool instantiateCoMConstraint(const yarp::os::Searchable& config);
 
-    // /**
-    //  * Instantiate the Linear momentum constraint.
-    //  * @param config configuration parameters.
-    //  */
-    // bool instantiateLinearMomentumConstraint(const yarp::os::Searchable& config);
-
     // bool instantiateAngularMomentumConstraint(const yarp::os::Searchable& config);
+
+
+    /**
+     * Instantiate the Linear momentum constraint.
+     * @param config configuration parameters.
+     */
+    virtual void instantiateLinearMomentumConstraint(const yarp::os::Searchable& config) = 0;
 
     virtual bool instantiateFeetConstraint(const yarp::os::Searchable& config) = 0;
 
@@ -83,6 +85,8 @@ protected:
     bool instantiateRateOfChangeConstraint(const yarp::os::Searchable& config);
 
     virtual bool instantiateContactForcesConstraint(const yarp::os::Searchable& config) = 0;
+
+    virtual bool instantiateLinearMomentumCostFunction(const yarp::os::Searchable& config) = 0;
 
     bool instantiateNeckSoftConstraint(const yarp::os::Searchable& config);
 
@@ -109,7 +113,7 @@ protected:
     double m_regularizationForceOffset;
 
     std::map<std::string, std::shared_ptr<Constraint>> m_constraints;
-    std::map<std::string, std::shared_ptr<CostFunctionElement>> m_costFunction;
+    std::map<std::string, std::shared_ptr<CostFunctionElement>> m_costFunctions;
 
     std::map<std::string, std::unique_ptr<Eigen::SparseMatrix<double>>> m_hessianMatrices;
     std::map<std::string, std::unique_ptr<Eigen::VectorXd>> m_gradientVectors;
@@ -177,6 +181,8 @@ public:
 
     bool setDesiredZMP(const iDynTree::Vector2& zmp);
 
+    bool setDesiredVRP(const iDynTree::Vector3& vrp);
+
     /**
      * Solve the optimization problem.
      * @return true/false in case of success/failure.
@@ -216,9 +222,18 @@ private:
 
     bool instantiateContactForcesConstraint(const yarp::os::Searchable& config) override;
 
+    bool instantiateLinearMomentumCostFunction(const yarp::os::Searchable& config) override;
+
     bool instantiateForceRegularizationConstraint(const yarp::os::Searchable& config) override;
 
     void setNumberOfVariables() override;
+
+    /**
+     * Instantiate the Linear momentum constraint.
+     * @param config configuration parameters.
+     */
+    void instantiateLinearMomentumConstraint(const yarp::os::Searchable& config) override;
+
 
 public:
     void setFeetState(const iDynTree::Transform& leftFootToWorldTransform,
@@ -259,9 +274,17 @@ class TaskBasedTorqueSolverSingleSupport : public TaskBasedTorqueSolver
 
     bool instantiateContactForcesConstraint(const yarp::os::Searchable& config) override;
 
+    bool instantiateLinearMomentumCostFunction(const yarp::os::Searchable& config) override;
+
     bool instantiateForceRegularizationConstraint(const yarp::os::Searchable& config) override;
 
     void setNumberOfVariables() override;
+
+    /**
+     * Instantiate the Linear momentum constraint.
+     * @param config configuration parameters.
+     */
+    void instantiateLinearMomentumConstraint(const yarp::os::Searchable& config) override;
 
 public:
     bool setDesiredFeetTrajectory(const iDynTree::Transform& swingFootToWorldTransform,
