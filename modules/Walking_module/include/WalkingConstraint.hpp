@@ -23,15 +23,15 @@
 
 #include <TimeProfiler.hpp>
 
-/** Cartesian Element Type */
-enum class CartesianElementType {POSE, POSITION, ORIENTATION, ONE_DIMENSION, CONTACT};
 
 /**
  * Generic Cartesian Element
  */
 class CartesianElement
 {
-
+public:
+    /** Cartesian Element Type */
+    enum class Type {POSE, POSITION, ORIENTATION, ONE_DIMENSION, CONTACT};
 protected:
     iDynTree::VectorDynSize const * m_biasAcceleration; /**< Bias acceleration J \nu. */
     iDynTree::MatrixDynSize const * m_roboticJacobian; /**< Robotic Jacobian in mixed representation. */
@@ -40,7 +40,7 @@ protected:
     std::unordered_map<std::string, std::shared_ptr<CartesianPID>> m_controllers; /**< Set of
                                                                                      controllers. */
 
-    CartesianElementType m_elementType; /**< Type of the Cartesian element */
+    Type m_elementType; /**< Type of the Cartesian element */
 
     /**
      * Evaluate the desired acceleration. It depends on the type of constraint (Positional,
@@ -53,7 +53,7 @@ public:
      * Constructor of the CartesianElement class
      * @param elementType type of Cartesian element it can be POSE, POSITION, ORIENTATION, ONE_DIMENSION, CONTACT
      */
-    CartesianElement(const CartesianElementType& elementType);
+    CartesianElement(const Type& elementType);
 
     /**
      * Set bias acceleration
@@ -198,7 +198,7 @@ class CartesianConstraint : public LinearConstraint, public CartesianElement
 
 public:
 
-    CartesianConstraint(const CartesianElementType& elementType);
+    CartesianConstraint(const Type& elementType);
 
     /**
      * Evaluate the constraint jacobian
@@ -328,20 +328,35 @@ public:
     void evaluateJacobian(Eigen::SparseMatrix<double>& jacobian) override;
 };
 
+class LinearMomentumElement
+{
+public:
+    enum class Type {SINGLE_SUPPORT, DOUBLE_SUPPORT};
+
+protected:
+    Type m_elementType;
+    double m_robotMass;
+    iDynTree::Position m_comPosition;
+    iDynTree::Vector3 m_desiredVRPPosition;
+
+public:
+    LinearMomentumElement(const Type& elementType) : m_elementType(elementType){};
+
+    void setRobotMass(const double& robotMass){m_robotMass = robotMass;};
+
+    void setCoMPosition(const iDynTree::Position& comPosition){m_comPosition = comPosition;};
+
+    void setDesiredVRP(const iDynTree::Vector3& desiredVRPPosition){m_desiredVRPPosition = desiredVRPPosition;};
+};
+
 /**
  * Please do not use me! I am not implemented yet!
  */
-class LinearMomentumConstraint : public LinearConstraint
+class LinearMomentumConstraint : public LinearConstraint, public LinearMomentumElement
 {
-    double m_robotMass;
-
-    std::shared_ptr<LinearPID> m_controller;
-
 public:
 
-    LinearMomentumConstraint();
-
-    void setRobotMass(const double& robotMass){m_robotMass = robotMass;};
+    LinearMomentumConstraint(const Type& elementType);
 
     /**
      * Evaluate the jacobian
@@ -352,8 +367,6 @@ public:
      * Evaluate the lower and upper bounds
      */
     void evaluateBounds(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds) override;
-
-    std::shared_ptr<LinearPID> controller() {return m_controller;};
 };
 
 class AngularMomentumConstraint : public LinearConstraint
@@ -503,12 +516,12 @@ class CartesianCostFunction : public QuadraticCostFunction,
     Eigen::MatrixXd m_gradientSubMatrix;
 
 public:
-    CartesianCostFunction(const CartesianElementType& elementType);
+    CartesianCostFunction(const Type& elementType);
 
     /**
      * Evaluate the gradient vector
      */
-    void evaluateGradient(Eigen::VectorXd& gradient);
+    void evaluateGradient(Eigen::VectorXd& gradient) override;
 
     /**
      * Evaluate the Hessian matrix
@@ -551,7 +564,7 @@ public:
     void evaluateHessian(Eigen::SparseMatrix<double>& hessian) override;
 
     /**
-     * Evaluate the Hessian matrix
+     * Evaluate the Gradient vector
      */
     void evaluateGradient(Eigen::VectorXd& gradient) override;
 };
@@ -567,4 +580,20 @@ public:
      */
     void evaluateHessian(Eigen::SparseMatrix<double>& hessian) override;
 };
+
+class LinearMomentumCostFunction : public QuadraticCostFunction,
+                                   public LinearMomentumElement
+{
+public:
+
+    LinearMomentumCostFunction(const Type &elemetType);
+
+    void setHessianConstantElements(Eigen::SparseMatrix<double>& hessian) override;
+
+    /**
+     * Evaluate the Gradient vector
+     */
+    void evaluateGradient(Eigen::VectorXd& gradient) override;
+};
+
 #endif

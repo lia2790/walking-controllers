@@ -40,36 +40,36 @@ void OptimizationElement::setSubMatricesStartingPosition(const int& startingRow,
 }
 
 
-CartesianElement::CartesianElement(const CartesianElementType& elementType)
+CartesianElement::CartesianElement(const Type& elementType)
 {
     switch(elementType)
     {
-    case CartesianElementType::POSE:
+    case Type::POSE:
         m_controllers.insert({"position_pid", std::make_shared<LinearPID>()});
         m_controllers.insert({"orientation_pid", std::make_shared<RotationalPID>()});
         m_desiredAcceleration.resize(6);
         m_desiredAcceleration.zero();
         break;
 
-    case CartesianElementType::POSITION:
+    case Type::POSITION:
         m_controllers.insert({"position_pid", std::make_shared<LinearPID>()});
         m_desiredAcceleration.resize(3);
         m_desiredAcceleration.zero();
         break;
 
-    case CartesianElementType::ORIENTATION:
+    case Type::ORIENTATION:
         m_controllers.insert({"orientation_pid", std::make_shared<RotationalPID>()});
         m_desiredAcceleration.resize(3);
         m_desiredAcceleration.zero();
         break;
 
-    case CartesianElementType::ONE_DIMENSION:
+    case Type::ONE_DIMENSION:
         m_controllers.insert({"position_pid", std::make_shared<LinearPID>()});
         m_desiredAcceleration.resize(1);
         m_desiredAcceleration.zero();
         break;
 
-    case CartesianElementType::CONTACT:
+    case Type::CONTACT:
         m_desiredAcceleration.resize(6);
         m_desiredAcceleration.zero();
         break;
@@ -104,7 +104,7 @@ void CartesianElement::evaluateDesiredAcceleration()
 {
     switch(m_elementType)
     {
-    case CartesianElementType::POSE:
+    case Type::POSE:
         m_controllers["position_pid"]->evaluateControl();
         iDynTree::toEigen(m_desiredAcceleration).block(0, 0, 3, 1)
             = iDynTree::toEigen(m_controllers["position_pid"]->getControllerOutput());
@@ -114,50 +114,50 @@ void CartesianElement::evaluateDesiredAcceleration()
             = iDynTree::toEigen(m_controllers["orientation_pid"]->getControllerOutput());
         break;
 
-    case CartesianElementType::POSITION:
+    case Type::POSITION:
         m_controllers["position_pid"]->evaluateControl();
         iDynTree::toEigen(m_desiredAcceleration)
             = iDynTree::toEigen(m_controllers["position_pid"]->getControllerOutput());
         break;
 
-    case CartesianElementType::ORIENTATION:
+    case Type::ORIENTATION:
         m_controllers["orientation_pid"]->evaluateControl();
         iDynTree::toEigen(m_desiredAcceleration)
             = iDynTree::toEigen(m_controllers["orientation_pid"]->getControllerOutput());
         break;
 
-    case CartesianElementType::ONE_DIMENSION:
+    case Type::ONE_DIMENSION:
         m_controllers["position_pid"]->evaluateControl();
         m_desiredAcceleration(0) = m_controllers["position_pid"]->getControllerOutput()(2);
         break;
 
-    case CartesianElementType::CONTACT:
+    case Type::CONTACT:
         break;
     }
 }
 
-CartesianConstraint::CartesianConstraint(const CartesianElementType& elementType)
+CartesianConstraint::CartesianConstraint(const Type& elementType)
     :CartesianElement(elementType)
 {
     switch(elementType)
     {
-    case CartesianElementType::POSE:
+    case Type::POSE:
         m_sizeOfElement = 6;
         break;
 
-    case CartesianElementType::POSITION:
+    case Type::POSITION:
         m_sizeOfElement = 3;
         break;
 
-    case CartesianElementType::ORIENTATION:
+    case Type::ORIENTATION:
         m_sizeOfElement = 3;
         break;
 
-    case CartesianElementType::ONE_DIMENSION:
+    case Type::ONE_DIMENSION:
         m_sizeOfElement = 1;
         break;
 
-    case CartesianElementType::CONTACT:
+    case Type::CONTACT:
         m_sizeOfElement = 6;
         break;
     }
@@ -387,13 +387,12 @@ void SystemDynamicConstraintSingleSupport::evaluateJacobian(Eigen::SparseMatrix<
                         jacobian);
 }
 
-LinearMomentumConstraint::LinearMomentumConstraint()
+
+LinearMomentumConstraint::LinearMomentumConstraint(const Type& elementType)
+    :LinearMomentumElement(elementType)
 {
     m_sizeOfElement = 3;
-    m_controller = std::make_shared<LinearPID>();
 }
-
-
 
 void LinearMomentumConstraint::setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian)
 {
@@ -403,9 +402,12 @@ void LinearMomentumConstraint::setJacobianConstantElements(Eigen::SparseMatrix<d
     jacobian.insert(m_jacobianStartingRow + 1, m_jacobianStartingColumn + 1) = 1;
     jacobian.insert(m_jacobianStartingRow + 2, m_jacobianStartingColumn + 2) = 1;
 
-    jacobian.insert(m_jacobianStartingRow + 0, m_jacobianStartingColumn + 0 + 6) = 1;
-    jacobian.insert(m_jacobianStartingRow + 1, m_jacobianStartingColumn + 1 + 6) = 1;
-    jacobian.insert(m_jacobianStartingRow + 2, m_jacobianStartingColumn + 2 + 6) = 1;
+    if(m_elementType == Type::DOUBLE_SUPPORT)
+    {
+        jacobian.insert(m_jacobianStartingRow + 0, m_jacobianStartingColumn + 0 + 6) = 1;
+        jacobian.insert(m_jacobianStartingRow + 1, m_jacobianStartingColumn + 1 + 6) = 1;
+        jacobian.insert(m_jacobianStartingRow + 2, m_jacobianStartingColumn + 2 + 6) = 1;
+    }
 }
 
 void LinearMomentumConstraint::evaluateBounds(Eigen::VectorXd &upperBounds,
@@ -413,14 +415,16 @@ void LinearMomentumConstraint::evaluateBounds(Eigen::VectorXd &upperBounds,
 {
     iDynTree::Vector3 weight;
     weight.zero();
-    weight(2) = m_robotMass * 9.81;
+    weight(2) = -m_robotMass * 9.81;
 
-    m_controller->evaluateControl();
+    double omega = 9.81 / m_comPosition(2);
 
-    upperBounds.block(m_jacobianStartingRow, 0, 3, 1) = iDynTree::toEigen(m_controller->getControllerOutput())
-        + iDynTree::toEigen(weight);
-    lowerBounds.block(m_jacobianStartingRow, 0, 3, 1) = iDynTree::toEigen(m_controller->getControllerOutput())
-        + iDynTree::toEigen(weight);
+    upperBounds.block(m_jacobianStartingRow, 0, 3, 1) = -iDynTree::toEigen(weight) +
+        m_robotMass * omega * (iDynTree::toEigen(m_comPosition) -
+                               iDynTree::toEigen(m_desiredVRPPosition));
+
+    lowerBounds.block(m_jacobianStartingRow, 0, 3, 1)
+        = upperBounds.block(m_jacobianStartingRow, 0, 3, 1);
 }
 
 AngularMomentumConstraint::AngularMomentumConstraint()
@@ -495,25 +499,29 @@ void RateOfChangeConstraint::evaluateBounds(Eigen::VectorXd &upperBounds, Eigen:
     }
 }
 
-CartesianCostFunction::CartesianCostFunction(const CartesianElementType& elementType)
+CartesianCostFunction::CartesianCostFunction(const Type& elementType)
     :CartesianElement(elementType)
 {
     switch(elementType)
     {
-    case CartesianElementType::POSE:
+    case Type::POSE:
         m_sizeOfElement = 6;
         break;
 
-    case CartesianElementType::POSITION:
+    case Type::POSITION:
         m_sizeOfElement = 3;
         break;
 
-    case CartesianElementType::ORIENTATION:
+    case Type::ORIENTATION:
         m_sizeOfElement = 3;
         break;
 
-    case CartesianElementType::ONE_DIMENSION:
+    case Type::ONE_DIMENSION:
         m_sizeOfElement = 1;
+        break;
+
+    case Type::CONTACT:
+        throw "Invalid element type";
         break;
     }
 }
@@ -562,4 +570,56 @@ void InputRegularizationTerm::evaluateHessian(Eigen::SparseMatrix<double>& hessi
 {
     for(int i = 0; i < m_sizeOfElement; i++)
         hessian.coeffRef(m_hessianStartingRow + i, m_hessianStartingColumn + i) = m_weight(i);
+}
+
+LinearMomentumCostFunction::LinearMomentumCostFunction(const Type &elemetType)
+    : LinearMomentumElement(elemetType)
+{
+    m_sizeOfElement = 3;
+}
+
+void LinearMomentumCostFunction::setHessianConstantElements(Eigen::SparseMatrix<double>& hessian)
+{
+    // suppose that the weight is a diagonal matrix.
+    // in case of double support the hessian sub-matrix is given by
+    // hessian = [weight   0   weight   0
+    //            weight   0   weight   0]
+    // in case of single support the hessian sub-matrix is given by
+    // hessian = [weight    0
+    //               0      0]
+
+    for(int i = 0; i < m_sizeOfElement; i++)
+        hessian.insert(m_hessianStartingRow + i, m_hessianStartingColumn + i) = m_weight(i);
+
+    if(m_elementType == Type::DOUBLE_SUPPORT)
+    {
+        for(int i = 0; i < m_sizeOfElement; i++)
+        {
+            hessian.insert(m_hessianStartingRow + i + 6, m_hessianStartingColumn + i) = m_weight(i);
+            hessian.insert(m_hessianStartingRow + i, m_hessianStartingColumn + i + 6) = m_weight(i);
+            hessian.insert(m_hessianStartingRow + i + 6, m_hessianStartingColumn + i + 6) = m_weight(i);
+        }
+    }
+}
+
+void LinearMomentumCostFunction::evaluateGradient(Eigen::VectorXd& gradient)
+{
+    iDynTree::Vector3 weight;
+    weight.zero();
+    weight(2) = -m_robotMass * 9.81;
+
+    double omegaSquare = 9.81 / m_comPosition(2);
+
+    gradient.block(m_hessianStartingRow, 0, m_sizeOfElement, 1) =
+        (-iDynTree::toEigen(m_weight)).asDiagonal() *
+        (iDynTree::toEigen(weight) +
+         m_robotMass * omegaSquare * (iDynTree::toEigen(m_comPosition) -
+                                      iDynTree::toEigen(m_desiredVRPPosition))
+         -iDynTree::toEigen(weight));
+
+    if(m_elementType == Type::DOUBLE_SUPPORT)
+    {
+        gradient.block(m_hessianStartingRow, 0, m_sizeOfElement, 1)
+            = gradient.block(m_hessianStartingRow + 6, 0, m_sizeOfElement, 1);
+    }
 }
