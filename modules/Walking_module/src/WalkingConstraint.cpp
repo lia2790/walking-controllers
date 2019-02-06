@@ -413,15 +413,18 @@ void LinearMomentumConstraint::setJacobianConstantElements(Eigen::SparseMatrix<d
 void LinearMomentumConstraint::evaluateBounds(Eigen::VectorXd &upperBounds,
                                               Eigen::VectorXd &lowerBounds)
 {
-    iDynTree::Vector3 weight;
-    weight.zero();
-    weight(2) = -m_robotMass * 9.81;
+    iDynTree::Vector3 weightForce;
+    weightForce.zero();
+    weightForce(2) = -m_robotMass * 9.81;
 
-    double omega = 9.81 / m_comPosition(2);
+    yInfo() << m_robotMass;
 
-    upperBounds.block(m_jacobianStartingRow, 0, 3, 1) = -iDynTree::toEigen(weight) +
-        m_robotMass * omega * (iDynTree::toEigen(m_comPosition) -
-                               iDynTree::toEigen(m_desiredVRPPosition));
+    // TODO remove magic number
+    double omegaSquare = 9.81 / 0.53;
+
+    upperBounds.block(m_jacobianStartingRow, 0, 3, 1) = -iDynTree::toEigen(weightForce) +
+        m_robotMass * omegaSquare * (iDynTree::toEigen(m_comPosition) -
+                                     iDynTree::toEigen(m_desiredVRPPosition));
 
     lowerBounds.block(m_jacobianStartingRow, 0, 3, 1)
         = upperBounds.block(m_jacobianStartingRow, 0, 3, 1);
@@ -604,22 +607,22 @@ void LinearMomentumCostFunction::setHessianConstantElements(Eigen::SparseMatrix<
 
 void LinearMomentumCostFunction::evaluateGradient(Eigen::VectorXd& gradient)
 {
-    iDynTree::Vector3 weight;
-    weight.zero();
-    weight(2) = -m_robotMass * 9.81;
+    iDynTree::Vector3 weightForce;
+    weightForce.zero();
+    weightForce(2) = -m_robotMass * 9.81;
 
-    double omegaSquare = 9.81 / m_comPosition(2);
+    // TODO remove magic number
+    double omegaSquare = 9.81 / 0.53;
 
     gradient.block(m_hessianStartingRow, 0, m_sizeOfElement, 1) =
         (-iDynTree::toEigen(m_weight)).asDiagonal() *
-        (iDynTree::toEigen(weight) +
-         m_robotMass * omegaSquare * (iDynTree::toEigen(m_comPosition) -
+        (m_robotMass * omegaSquare * (iDynTree::toEigen(m_comPosition) -
                                       iDynTree::toEigen(m_desiredVRPPosition))
-         -iDynTree::toEigen(weight));
+         -iDynTree::toEigen(weightForce));
 
     if(m_elementType == Type::DOUBLE_SUPPORT)
     {
-        gradient.block(m_hessianStartingRow, 0, m_sizeOfElement, 1)
-            = gradient.block(m_hessianStartingRow + 6, 0, m_sizeOfElement, 1);
+        gradient.block(m_hessianStartingRow + 6, 0, m_sizeOfElement, 1)
+            = gradient.block(m_hessianStartingRow, 0, m_sizeOfElement, 1);
     }
 }
