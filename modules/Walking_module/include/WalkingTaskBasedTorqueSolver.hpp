@@ -282,6 +282,9 @@ class TaskBasedTorqueSolverSingleSupport : public TaskBasedTorqueSolver
 
     void setNumberOfVariables() override;
 
+    bool m_useSwingFootAsConstraint;
+    bool m_useSwingFootAsCostFunction;
+
     /**
      * Instantiate the Linear momentum constraint.
      * @param config configuration parameters.

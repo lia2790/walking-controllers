@@ -213,9 +213,7 @@ bool TaskBasedTorqueSolver::instantiateNeckSoftConstraint(const yarp::os::Search
     ptr->orientationController()->setGains(c0, kd, kp);
 
     m_costFunctions.insert(std::make_pair("neck", ptr));
-
     m_hessianMatrices.insert(std::make_pair("neck", std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
-
     m_gradientVectors.insert(std::make_pair("neck", std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
 
     return true;
@@ -980,6 +978,26 @@ bool TaskBasedTorqueSolver::solve()
     {
         if(!m_optimizer->initSolver())
         {
+
+            Eigen::MatioFile file("data.mat");
+            file.write_mat("hessian", Eigen::MatrixXd(m_hessianEigen));
+            file.write_mat("gradient", Eigen::MatrixXd(m_gradient));
+            file.write_mat("constraint", Eigen::MatrixXd(m_constraintMatrix));
+            file.write_mat("lowerBound", Eigen::MatrixXd(m_lowerBound));
+            file.write_mat("upperBound", Eigen::MatrixXd(m_upperBound));
+            file.write_mat("massMatrix", iDynTree::toEigen(m_massMatrix));
+            file.write_mat("comJacobian", iDynTree::toEigen(m_comJacobian));
+
+            for(const auto& element: m_costFunctions)
+            {
+                std::string key = element.first;
+                std::string hessianKey = key + "_hessian";
+                std::string gradientKey = key + "_gradient";
+                file.write_mat(hessianKey.c_str(), Eigen::MatrixXd(*(m_hessianMatrices.at(key))));
+                file.write_mat(gradientKey.c_str(), Eigen::MatrixXd(*(m_gradientVectors.at(key))));
+            }
+
+
             yError() << "[solve] Unable to initialize the solver";
             return false;
         }
@@ -1450,8 +1468,8 @@ bool TaskBasedTorqueSolverDoubleSupport::instantiateLinearMomentumCostFunction(c
 
         m_hessianMatrices.insert(std::make_pair("linear_momentum_costFunction",
                                                 std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
-    m_gradientVectors.insert(std::make_pair("linear_momentum_costFunction",
-                                            std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
+        m_gradientVectors.insert(std::make_pair("linear_momentum_costFunction",
+                                                std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
     }
     return true;
 }
@@ -1540,6 +1558,9 @@ iDynTree::Vector2 TaskBasedTorqueSolverDoubleSupport::getZMP()
 
 bool TaskBasedTorqueSolverSingleSupport::instantiateFeetConstraint(const yarp::os::Searchable& config)
 {
+    m_useSwingFootAsConstraint = config.check("useAsConstraint", yarp::os::Value("False")).asBool();
+    m_useSwingFootAsCostFunction = config.check("useAsCostFunction", yarp::os::Value("False")).asBool();
+
     // TODO remove this line
     m_isSingleSupport = true;
     if(config.isNull())
@@ -1606,33 +1627,36 @@ bool TaskBasedTorqueSolverSingleSupport::instantiateFeetConstraint(const yarp::o
     }
 
     // swing foot
-    auto ptrCostFunction = std::make_shared<CartesianCostFunction>(CartesianElement::Type::POSE);
-    ptrCostFunction->setSubMatricesStartingPosition(0, 0);
-    ptrCostFunction->setWeight(weight);
-    ptrCostFunction->setRoboticJacobian(m_swingFootJacobian);
-    ptrCostFunction->setBiasAcceleration(m_swingFootBiasAcceleration);
-    ptrCostFunction->positionController()->setGains(kpLinear, kdLinear);
-    ptrCostFunction->orientationController()->setGains(c0, kdAngular, kpAngular);
-    m_costFunctions.insert(std::make_pair("swing_foot_costFunction", ptrCostFunction));
-    m_hessianMatrices.insert(std::make_pair("swing_foot_costFunction",
-                                            std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
-    m_gradientVectors.insert(std::make_pair("swing_foot_costFunction",
-                                            std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
-
-    // resize quantities
     m_swingFootBiasAcceleration.resize(6);
     m_swingFootJacobian.resize(6, m_actuatedDOFs + 6);
 
+    if(m_useSwingFootAsCostFunction)
+    {
+        auto ptrCostFunction = std::make_shared<CartesianCostFunction>(CartesianElement::Type::POSE);
+        ptrCostFunction->setSubMatricesStartingPosition(0, 0);
+        ptrCostFunction->setWeight(weight);
+        ptrCostFunction->setRoboticJacobian(m_swingFootJacobian);
+        ptrCostFunction->setBiasAcceleration(m_swingFootBiasAcceleration);
+        ptrCostFunction->positionController()->setGains(kpLinear, kdLinear);
+        ptrCostFunction->orientationController()->setGains(c0, kdAngular, kpAngular);
+        m_costFunctions.insert(std::make_pair("swing_foot_costFunction", ptrCostFunction));
+        m_hessianMatrices.insert(std::make_pair("swing_foot_costFunction",
+                                                std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
+        m_gradientVectors.insert(std::make_pair("swing_foot_costFunction",
+                                                std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
+    }
 
-    // ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 0);
-    // ptr->positionController()->setGains(kpLinear, kdLinear);
-    // ptr->orientationController()->setGains(c0, kdAngular, kpAngular);
-    // ptr->setRoboticJacobian(m_swingFootJacobian);
-    // ptr->setBiasAcceleration(m_swingFootBiasAcceleration);
-
-    // m_constraints.insert(std::make_pair("swing_foot", ptr));
-    // m_numberOfConstraints += ptr->getNumberOfConstraints();
-
+    if(m_useSwingFootAsConstraint)
+    {
+        auto ptrConstraint = std::make_shared<CartesianConstraint>(CartesianElement::Type::POSE);
+        ptrConstraint->setSubMatricesStartingPosition(m_numberOfConstraints, 0);
+        ptrConstraint->positionController()->setGains(kpLinear, kdLinear);
+        ptrConstraint->orientationController()->setGains(c0, kdAngular, kpAngular);
+        ptrConstraint->setRoboticJacobian(m_swingFootJacobian);
+        ptrConstraint->setBiasAcceleration(m_swingFootBiasAcceleration);
+        m_constraints.insert(std::make_pair("swing_foot_constraint", ptrConstraint));
+        m_numberOfConstraints += ptrConstraint->getNumberOfConstraints();
+    }
     return true;
 }
 
@@ -1858,8 +1882,8 @@ bool TaskBasedTorqueSolverSingleSupport::instantiateLinearMomentumCostFunction(c
 
         m_hessianMatrices.insert(std::make_pair("linear_momentum_costFunction",
                                                 std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
-    m_gradientVectors.insert(std::make_pair("linear_momentum_costFunction",
-                                            std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
+        m_gradientVectors.insert(std::make_pair("linear_momentum_costFunction",
+                                                std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
     }
     return true;
 }
@@ -1879,37 +1903,52 @@ bool TaskBasedTorqueSolverSingleSupport::setDesiredFeetTrajectory(const iDynTree
                                                                   const iDynTree::Twist& swingFootAcceleration)
 {
     // save left foot trajectory
-    // auto constraint = m_constraints.find("swing_foot");
-    // if(constraint == m_constraints.end())
-    // {
-    //     yError() << "[setDesiredFeetTrajectory] unable to find the swing foot constraint. "
-    //              << "Please call 'initialize()' method";
-    //     return false;
-    // }
-
-    auto costFunction = m_costFunctions.find("swing_foot_costFunction");
-    if(costFunction == m_costFunctions.end())
-    {
-        yError() << "[setDesiredFeetTrajectory] unable to find the swing foot cost function. "
-                 << "Please call 'initialize()' method";
-        return false;
-    }
 
     iDynTree::Vector3 dummy;
     dummy.zero();
-    auto ptr = std::static_pointer_cast<CartesianCostFunction>(costFunction->second);
-    ptr->positionController()->setDesiredTrajectory(dummy,
-                                                    swingFootTwist.getLinearVec3(),
-                                                    swingFootToWorldTransform.getPosition());
+
+    if(m_useSwingFootAsConstraint)
+    {
+        auto constraint = m_constraints.find("swing_foot_constraint");
+        if(constraint == m_constraints.end())
+        {
+            yError() << "[setDesiredFeetTrajectory] unable to find the swing foot constraint. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+
+        auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
+        ptr->positionController()->setDesiredTrajectory(dummy,
+                                                        swingFootTwist.getLinearVec3(),
+                                                        swingFootToWorldTransform.getPosition());
 
 
-    ptr->orientationController()->setDesiredTrajectory(dummy,
-                                                       swingFootTwist.getAngularVec3(),
-                                                       swingFootToWorldTransform.getRotation());
+        ptr->orientationController()->setDesiredTrajectory(dummy,
+                                                           swingFootTwist.getAngularVec3(),
+                                                           swingFootToWorldTransform.getRotation());
+    }
 
-    // yInfo() << swingFootToWorldTransform.toString();
-    // yInfo() << swingFootTwist.toString();
+    if(m_useSwingFootAsCostFunction)
+    {
+        auto costFunction = m_costFunctions.find("swing_foot_costFunction");
+        if(costFunction == m_costFunctions.end())
+        {
+            yError() << "[setDesiredFeetTrajectory] unable to find the swing foot cost function. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
 
+
+        auto ptr = std::static_pointer_cast<CartesianCostFunction>(costFunction->second);
+        ptr->positionController()->setDesiredTrajectory(dummy,
+                                                        swingFootTwist.getLinearVec3(),
+                                                        swingFootToWorldTransform.getPosition());
+
+
+        ptr->orientationController()->setDesiredTrajectory(dummy,
+                                                           swingFootTwist.getAngularVec3(),
+                                                           swingFootToWorldTransform.getRotation());
+    }
     return true;
 }
 
@@ -1919,21 +1958,40 @@ bool TaskBasedTorqueSolverSingleSupport::setFeetState(const iDynTree::Transform&
 {
     m_stanceFootToWorldTransform = stanceFootToWorldTransform;
 
-    // left foot
-    auto costFunction = m_costFunctions.find("swing_foot_costFunction");
-    if(costFunction == m_costFunctions.end())
+    // swing foot
+    if(m_useSwingFootAsCostFunction)
     {
-        yError() << "[setFeetState] unable to find the swing foot constraint. "
-                 << "Please call 'initialize()' method";
-        return false;
+        auto costFunction = m_costFunctions.find("swing_foot_costFunction");
+        if(costFunction == m_costFunctions.end())
+        {
+            yError() << "[setFeetState] unable to find the swing foot constraint. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+        auto ptr = std::static_pointer_cast<CartesianCostFunction>(costFunction->second);
+        ptr->positionController()->setFeedback(swingFootTwist.getLinearVec3(),
+                                               swingFootToWorldTransform.getPosition());
+
+        ptr->orientationController()->setFeedback(swingFootTwist.getAngularVec3(),
+                                                  swingFootToWorldTransform.getRotation());
     }
-    auto ptr = std::static_pointer_cast<CartesianCostFunction>(costFunction->second);
-    ptr->positionController()->setFeedback(swingFootTwist.getLinearVec3(),
-                                           swingFootToWorldTransform.getPosition());
 
-    ptr->orientationController()->setFeedback(swingFootTwist.getAngularVec3(),
-                                              swingFootToWorldTransform.getRotation());
+    if(m_useSwingFootAsConstraint)
+    {
+        auto constraint = m_constraints.find("swing_foot_constraint");
+        if(constraint == m_constraints.end())
+        {
+            yError() << "[setFeetState] unable to find the swing foot constraint. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+        auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
+        ptr->positionController()->setFeedback(swingFootTwist.getLinearVec3(),
+                                               swingFootToWorldTransform.getPosition());
 
+        ptr->orientationController()->setFeedback(swingFootTwist.getAngularVec3(),
+                                                  swingFootToWorldTransform.getRotation());
+    }
     return true;
 }
 
