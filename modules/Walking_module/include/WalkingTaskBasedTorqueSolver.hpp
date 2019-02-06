@@ -60,7 +60,6 @@ protected:
     iDynTree::VectorDynSize m_comBiasAcceleration;
     iDynTree::Position m_comPosition ; // used by angular momentum
 
-
     /**
      * Instantiate the CoM constraint.
      * @param config configuration parameters.
@@ -107,6 +106,9 @@ protected:
     bool isSolutionFeasible();
 
     virtual void setNumberOfVariables() = 0;
+
+    // TODO remove
+    bool m_isSingleSupport;
 
 protected:
     double m_regularizationForceScale;
