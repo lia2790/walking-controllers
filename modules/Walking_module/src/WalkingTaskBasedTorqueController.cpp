@@ -469,6 +469,27 @@ bool WalkingTaskBasedTorqueController::setDesiredZMP(const iDynTree::Vector2 &zm
     return true;
 }
 
+bool WalkingTaskBasedTorqueController::setDesiredVRP(const iDynTree::Vector3 &vrp)
+{
+    if(m_isDoubleSupportPhase)
+    {
+        if(!m_doubleSupportSolver->setDesiredVRP(vrp))
+        {
+            yError() << "[setDesiredVRP] Unable to set the desired VRP (DS)";
+            return false;
+        }
+    }
+    else
+    {
+        if(!m_singleSupportSolver->setDesiredVRP(vrp))
+        {
+            yError() << "[setDesiredVRP] Unable to set the desired VRP (SS)";
+            return false;
+        }
+    }
+    return true;
+}
+
 bool WalkingTaskBasedTorqueController::setFeetWeightPercentage(const double &weightInLeft,
                                                                const double &weightInRight)
 {

@@ -179,6 +179,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
                         const iDynTree::Vector3& desiredCoMVelocity,
                         const iDynTree::Vector3& desiredCoMAcceleration,
                         const iDynTree::Vector2& desiredZMPPosition,
+                        const iDynTree::Vector3& desiredVRPPosition,
                         iDynTree::VectorDynSize &output);
 
 
