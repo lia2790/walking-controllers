@@ -1561,6 +1561,8 @@ bool TaskBasedTorqueSolverSingleSupport::instantiateFeetConstraint(const yarp::o
     m_useSwingFootAsConstraint = config.check("useAsConstraint", yarp::os::Value("False")).asBool();
     m_useSwingFootAsCostFunction = config.check("useAsCostFunction", yarp::os::Value("False")).asBool();
 
+    yInfo() << "m_useSwingFootAsConstraint " << m_useSwingFootAsConstraint;
+
     // TODO remove this line
     m_isSingleSupport = true;
     if(config.isNull())
@@ -2044,10 +2046,16 @@ iDynTree::Vector2 TaskBasedTorqueSolverSingleSupport::getZMP()
 bool TaskBasedTorqueSolverSingleSupport::tempPrint()
 {
 
-    Eigen::VectorXd swingFootAcceleration = iDynTree::toEigen(m_swingFootJacobian)
-        * m_solution.block(0,0,m_actuatedDOFs + 6, 1);
+    // Eigen::VectorXd swingFootAcceleration = iDynTree::toEigen(m_swingFootJacobian)
+    //     * m_solution.block(0,0,m_actuatedDOFs + 6, 1);
 
-    std::cerr << "swingFootAcceleration (asked by the qp) "<< swingFootAcceleration << "\n";
+    // auto constraint = m_constraints.find("swing_foot_constraint");
+    // auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
+
+    // std::cerr << "swingFootAcceleration (asked by the user) " <<  m_upperBound.block(ptr->getJacobianStartingRow(), 0, 6, 1) << "\n";
+
+
+    // std::cerr << "swingFootAcceleration (asked by the qp) "<< swingFootAcceleration << "\n";
 
 
     // Eigen::MatioFile file("data.mat");

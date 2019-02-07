@@ -26,7 +26,14 @@
 #include <WalkingModule.hpp>
 #include <Utils.hpp>
 
+// TODO
 int indexDummy = 0;
+
+iDynTree::Position m_desiredCoMPosition;
+iDynTree::Vector3 m_desiredDCMPosition;
+iDynTree::Vector3 m_desiredDCMVelocity;
+iDynTree::Transform m_desiredLeftFootToWorldTransform;
+
 
 void WalkingModule::propagateTime()
 {
@@ -468,7 +475,9 @@ bool WalkingModule::solveTaskBased(const iDynTree::Rotation& desiredNeckOrientat
                                    iDynTree::VectorDynSize &output)
 {
     // do at the beginning!
+    // TODO
     m_taskBasedTorqueSolver->setFeetState(m_leftInContact.front(), m_rightInContact.front());
+    // m_taskBasedTorqueSolver->setFeetState(false, true);
 
     iDynTree::VectorDynSize dummyJoint(m_robotControlHelper->getActuatedDoFs());
     dummyJoint.zero();
@@ -515,6 +524,41 @@ bool WalkingModule::solveTaskBased(const iDynTree::Rotation& desiredNeckOrientat
         return false;
     }
     m_taskBasedTorqueSolver->setNeckBiasAcceleration(m_FKSolver->getNeckBiasAcceleration());
+
+
+     // feet
+    // TODO
+// iDynTree::Twist dummyTwist, twistLeft, accelerationLeft;
+    // dummyTwist.zero();
+    // twistLeft.zero();
+    // accelerationLeft.zero();
+    // iDynTree::Transform trans;
+    // iDynTree::Position dummyPos;
+    // dummyPos.zero();
+    // trans.setRotation(iDynTree::Rotation::Identity());
+    // trans.setPosition(dummyPos);
+
+    // double amplitude = 0.0;
+    // double omega = 0.2;
+    // double frequency = 2 * M_PI * omega;
+    // iDynTree::Transform desiredLeftFootToWorldTransformOffset = m_desiredLeftFootToWorldTransform;
+    // iDynTree::Position desiredLeftFootPosition = m_desiredLeftFootToWorldTransform.getPosition();
+    // desiredLeftFootPosition(2) += amplitude * std::sin(frequency * m_time);
+    // desiredLeftFootToWorldTransformOffset.setPosition(desiredLeftFootPosition);
+
+    // twistLeft.getLinearVec3()(2) += amplitude * frequency * std::cos(frequency * m_time);
+    // accelerationLeft.getLinearVec3()(2) += -amplitude * frequency * frequency *  std::sin(frequency * m_time);
+
+    // yInfo() << desiredLeftFootToWorldTransformOffset.toString();
+
+    // if(!m_taskBasedTorqueSolver->setDesiredFeetTrajectory(desiredLeftFootToWorldTransformOffset,
+    //                                                       trans,
+    //                                                       twistLeft, dummyTwist, accelerationLeft, dummyTwist))
+    // {
+    //     yError() << "[solveTaskbased] Unable to set the desired feet trajectory";
+    //     return false;
+    // }
+
 
     iDynTree::Twist dummyTwist;
     dummyTwist.zero();
@@ -614,7 +658,8 @@ bool WalkingModule::updateModule()
 
     if(m_robotState == WalkingFSM::Preparing)
     {
-        bool motionDone = false;
+        // TODO
+        bool motionDone = true;
         if(!m_robotControlHelper->checkMotionDone(motionDone))
         {
             yError() << "[updateModule] Unable to check if the motion is done";
@@ -625,28 +670,33 @@ bool WalkingModule::updateModule()
         }
         if(motionDone)
         {
-            if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION_DIRECT))
+            if(!m_useTorque)
             {
-                yError() << "[updateModule] Failed in setting POSITION DIRECT mode.";
-                yInfo() << "[updateModule] Try to prepare again";
-                reset();
-                m_robotState = WalkingFSM::Stopped;
-                return true;
-            }
+                if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION_DIRECT))
+                {
+                    yError() << "[updateModule] Failed in setting POSITION DIRECT mode.";
+                    yInfo() << "[updateModule] Try to prepare again";
+                    reset();
+                    m_robotState = WalkingFSM::Stopped;
+                    return true;
+                }
 
-            // send the reference again in order to reduce error
-            if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
-            {
-                yError() << "[prepareRobot] Error while setting the initial position using "
-                         << "POSITION DIRECT mode.";
-                yInfo() << "[updateModule] Try to prepare again";
-                reset();
-                m_robotState = WalkingFSM::Stopped;
-                return true;
+                // send the reference again in order to reduce error
+                if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+                {
+                    yError() << "[prepareRobot] Error while setting the initial position using "
+                             << "POSITION DIRECT mode.";
+                    yInfo() << "[updateModule] Try to prepare again";
+                    reset();
+                    m_robotState = WalkingFSM::Stopped;
+                    return true;
+                }
+
             }
 
             yarp::sig::Vector buffer(m_qDesired.size());
             iDynTree::toYarp(m_qDesired, buffer);
+
             // instantiate Integrator object
             m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, buffer);
 
@@ -654,6 +704,7 @@ bool WalkingModule::updateModule()
             m_walkingZMPController->reset(m_DCMPositionDesired.front());
             m_stableDCMModel->reset(m_DCMPositionDesired.front());
 
+            // TODO
             if(m_useTorque)
             {
                 iDynTree::VectorDynSize dummy(m_robotControlHelper->getActuatedDoFs());
@@ -833,24 +884,30 @@ bool WalkingModule::updateModule()
         else
         {
             m_walkingDCMReactiveController->setFeedback(m_FKSolver->getDCM());
-            // DCMPositionDesired(0) = m_DCMPositionDesired.front()(0);
-            // DCMPositionDesired(1) = m_DCMPositionDesired.front()(1);
-            // DCMPositionDesired(2) = m_comHeightTrajectory.front();
-            // DCMVelocityDesired(0) = m_DCMVelocityDesired.front()(0);
-            // DCMVelocityDesired(1) = m_DCMVelocityDesired.front()(1);
-            // DCMVelocityDesired(2) = m_comHeightVelocity.front();
-
-            double a = 0.05;
-            double frequency = 0.2;
 
             DCMPositionDesired(0) = m_DCMPositionDesired.front()(0);
-            DCMPositionDesired(1) = a * sin(2 * M_PI * frequency * m_time);
+            DCMPositionDesired(1) = m_DCMPositionDesired.front()(1);
             DCMPositionDesired(2) = m_comHeightTrajectory.front();
+
             DCMVelocityDesired(0) = m_DCMVelocityDesired.front()(0);
-            DCMVelocityDesired(1)= 2 * M_PI * frequency *  a * cos(2 * M_PI * frequency * m_time);
+            DCMVelocityDesired(1) = m_DCMVelocityDesired.front()(1);
             DCMVelocityDesired(2) = m_comHeightVelocity.front();
 
+            // TODO
+            // Left and right
+            // double a = 0.07;
+            // double frequency = 0.4;
+
+            // DCMPositionDesired(0) = m_DCMPositionDesired.front()(0);
+            // DCMPositionDesired(1) = a * sin(2 * M_PI * frequency * m_time);
+            // DCMPositionDesired(2) = m_comHeightTrajectory.front();
+            // DCMVelocityDesired(0) = m_DCMVelocityDesired.front()(0);
+            // DCMVelocityDesired(1)= 2 * M_PI * frequency *  a * cos(2 * M_PI * frequency * m_time)
+            // DCMVelocityDesired(2) = m_comHeightVelocity.front();
+
             m_walkingDCMReactiveController->setReferenceSignal(DCMPositionDesired, DCMVelocityDesired);
+
+            // m_walkingDCMReactiveController->setReferenceSignal(m_desiredDCMPosition, m_desiredDCMVelocity);
 
             if(!m_walkingDCMReactiveController->evaluateControl())
             {
@@ -989,7 +1046,6 @@ bool WalkingModule::updateModule()
         }
         else
         {
-
             // x and y are not tacking into account
             desiredCoMPosition(0) = desiredCoMPositionXY(0);
             desiredCoMPosition(1) = desiredCoMPositionXY(1);
@@ -1020,13 +1076,12 @@ bool WalkingModule::updateModule()
             }
             m_profiler->setEndTime("IK");
 
-
-            m_profiler->setInitTime("Torque");
-
-
             desiredCoMVelocity(0) = 0;
             desiredCoMVelocity(1) = 0;
             desiredCoMVelocity(2) = 0;
+
+            m_profiler->setInitTime("Torque");
+
 
             iDynTree::Vector3 desiredCoMAcceleration;
             desiredCoMAcceleration.zero();
@@ -1114,6 +1169,30 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         yError() << "[prepareRobot] Unable to get the feedback.";
         return false;
     }
+
+    // TODO
+    // if(!updateFKSolver())
+    //     return false;
+
+    // if(!m_FKSolver->evaluateCoM())
+    // {
+    //     yError() << "[evaluateCoM] Unable to evaluate the CoM.";
+    //     return false;
+    // }
+
+    // m_FKSolver->evaluateDCM();
+
+    // m_desiredCoMPosition = m_FKSolver->getCoMPosition();
+    // m_desiredDCMPosition = m_FKSolver->getDCM();
+
+    // m_desiredDCMVelocity.zero();
+    // m_desiredLeftFootToWorldTransform = m_FKSolver->getLeftFootToWorldTransform();
+    // m_desiredLeftFootToWorldTransform.setRotation(iDynTree::Rotation::Identity());
+
+    // m_qDesired = m_robotControlHelper->getJointPosition();
+
+    // m_robotState = WalkingFSM::Preparing;
+    // return true;
 
     if(onTheFly)
     {
@@ -1369,7 +1448,7 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
 
 bool WalkingModule::updateFKSolver()
 {
-
+    // TODO
     // bool leftFixed = true;
     // if( indexDummy = 100 )
     // {
@@ -1382,7 +1461,8 @@ bool WalkingModule::updateFKSolver()
     if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
                                                       m_rightTrajectory.front(),
                                                       //leftFixed))
-                                                      m_isLeftFixedFrame.front()))
+                                                      //m_isLeftFixedFrame.front()))
+                                                      false))
     {
         yError() << "[updateFKSolver] Unable to evaluate the world to base transformation.";
         return false;
@@ -1394,6 +1474,28 @@ bool WalkingModule::updateFKSolver()
         yError() << "[updateFKSolver] Unable to evaluate the CoM.";
         return false;
     }
+
+    // Todo
+    // // dummy transformation only for testing
+    // iDynTree::Transform trans;
+    // iDynTree::Position dummy;
+    // dummy.zero();
+    // trans.setRotation(iDynTree::Rotation::Identity());
+    // trans.setPosition(dummy);
+    // if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
+    //                                                   trans,
+    //                                                   false))
+    // {
+    //     yError() << "[updateFKSolver] Unable to evaluate the world to base transformation.";
+    //     return false;
+    // }
+
+    // if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+    //                                       m_robotControlHelper->getJointVelocity()))
+    // {
+    //     yError() << "[updateFKSolver] Unable to set the internal robot state.";
+    //     return false;
+    // }
 
     return true;
 }
