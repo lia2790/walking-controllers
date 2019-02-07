@@ -62,6 +62,8 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
     bool okLeftWrench = false;
     bool okRightWrench = false;
 
+    bool okBaseEstimation = false;
+
     unsigned int attempt = 0;
     do
     {
@@ -92,6 +94,30 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
                 okRightWrench = true;
             }
         }
+
+        if(m_useExternalRobotBase)
+        {
+            if(!okBaseEstimation)
+            {
+                yarp::sig::Vector *base = NULL;
+                base = m_robotBasePort.read(false);
+                if(base != NULL)
+                {
+                    m_robotBaseTransform.setPosition(iDynTree::Position((*base)(0),
+                                                                       (*base)(1),
+                                                                       (*base)(2)));
+
+                    m_robotBaseTransform.setRotation(iDynTree::Rotation::RPY((*base)(3),
+                                                                            (*base)(4),
+                                                                            (*base)(5)));
+
+                    m_robotBaseTwist.setLinearVec3(iDynTree::Vector3(base->getFirst() + 6, 3));
+                    m_robotBaseTwist.setAngularVec3(iDynTree::Vector3(base->getFirst() + 6 + 3, 3));
+                    okBaseEstimation = true;
+                }
+            }
+        }
+
 
         if(okPosition && okVelocity && okLeftWrench && okRightWrench)
         {
@@ -312,6 +338,18 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
         }
 
         m_jointsVelocityLimit(i) = iDynTree::deg2rad(max);
+    }
+
+    m_useExternalRobotBase = config.check("use_external_robot_base", yarp::os::Value("False")).asBool();
+    if(m_useExternalRobotBase)
+    {
+        m_robotBasePort.open("/" + name + "/robotBase:i");
+        // connect port
+        if(!yarp::os::Network::connect("/icubSim/floating_base/state:o", "/" + name + "/robotBase:i"))
+        {
+            yError() << "Unable to connect to port " << "/icubSim/floating_base/state:o";
+            return false;
+        }
     }
     return true;
 }
@@ -744,4 +782,19 @@ int RobotHelper::getActuatedDoFs()
 WalkingPIDHandler& RobotHelper::getPIDHandler()
 {
     return *m_PIDHandler;
+}
+
+const iDynTree::Transform& RobotHelper::getBaseTransform() const
+{
+    return m_robotBaseTransform;
+}
+
+const iDynTree::Twist& RobotHelper::getBaseTwist() const
+{
+    return m_robotBaseTwist;
+}
+
+bool RobotHelper::isExternalRobotBaseUsed()
+{
+    return m_useExternalRobotBase;
 }

@@ -28,6 +28,8 @@
 
 #include <iDynTree/Core/VectorDynSize.h>
 #include <iDynTree/Core/Wrench.h>
+#include <iDynTree/Core/Twist.h>
+#include <iDynTree/Core/Transform.h>
 
 #include <WalkingPIDHandler.hpp>
 
@@ -86,6 +88,10 @@ class RobotHelper
     double m_startingPositionControlTime;
     bool m_positionMoveSkipped;
 
+    bool m_useExternalRobotBase;
+    iDynTree::Transform m_robotBaseTransform;
+    iDynTree::Twist m_robotBaseTwist;
+    yarp::os::BufferedPort<yarp::sig::Vector> m_robotBasePort; /**< Right foot wrench port. */
     /**
      * Get the higher position error among all joints.
      * @param desiredJointPositionsRad desired joint position in radiants;
@@ -177,6 +183,12 @@ public:
     const std::vector<std::string>& getAxesList() const;
 
     int getActuatedDoFs();
+
+    const iDynTree::Transform& getBaseTransform() const;
+
+    const iDynTree::Twist&getBaseTwist() const;
+
+    bool isExternalRobotBaseUsed();
 
     WalkingPIDHandler& getPIDHandler();
 };
