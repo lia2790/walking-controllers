@@ -274,7 +274,7 @@ void TrajectoryGenerator::computeThread()
     }
 }
 
-bool TrajectoryGenerator::generateFirstTrajectories()
+bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Position& initialRobotPosition)
 {
     // check if this step is the first one
     {
@@ -299,11 +299,11 @@ bool TrajectoryGenerator::generateFirstTrajectories()
     double endTime = initTime + m_plannerHorizon;
 
     // at the beginning iCub has to stop
-    m_desiredPoint(0) = m_referencePointDistance(0);
-    m_desiredPoint(1) = m_referencePointDistance(1);
+    m_desiredPoint(0) = m_referencePointDistance(0) + initialRobotPosition(0);
+    m_desiredPoint(1) = m_referencePointDistance(1) + initialRobotPosition(1);
 
     // add the initial point
-    if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_referencePointDistance))
+    if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_desiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the first reference.";
         return false;
