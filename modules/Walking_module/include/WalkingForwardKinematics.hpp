@@ -11,6 +11,7 @@
 
 // std
 #include <memory>
+#include <unordered_map>
 
 // YARP
 #include <yarp/os/Searchable.h>
@@ -21,9 +22,14 @@
 
 // iCub-ctrl
 #include <iCub/ctrl/filters.h>
+
+
+
 class WalkingFK
 {
     iDynTree::KinDynComputations m_kinDyn; /**< KinDynComputations solver. */
+
+    bool m_useExternalRobotBase;
 
     bool m_prevContactLeft; /**< Boolean is the previous contact foot the left one? */
 
@@ -34,12 +40,10 @@ class WalkingFK
     iDynTree::FrameIndex m_frameRootIndex; /**< Index of the frame attached to the root_link. */
     iDynTree::FrameIndex m_frameNeckIndex; /**< Index of the frame attached to the neck_2. */
 
-    std::string m_baseFrameLeft; /**< Name of the left base frame. */
-    std::string m_baseFrameRight;  /**< Name of the right base frame. */
 
-    iDynTree::Transform m_frameHlinkLeft; /**< Transformation between the l_sole and the l_foot frame (l_ankle_2?!). */
-    iDynTree::Transform m_frameHlinkRight; /**< Transformation between the l_sole and the l_foot frame (l_ankle_2?!). */
+    std::unordered_map<std::string, std::pair<const std::string, const iDynTree::Transform>> m_baseFrames;
     iDynTree::Transform m_worldToBaseTransform; /**< World to base transformation. */
+    iDynTree::Twist m_baseTwist;
 
     iDynTree::Position m_comPosition; /**< Position of the CoM. */
     iDynTree::Vector3 m_comVelocity; /**< Velocity of the CoM. */
@@ -63,14 +67,13 @@ class WalkingFK
     bool setRobotModel(const iDynTree::Model& model);
 
     /**
-     * Set The base frames.
-     * @note: During the walking task the frame shift from the left to the right foot.
-     * In general the base link is coincident to the stance foot.
-     * @param lFootFrame name of the frame attached to the left foot;
-     * @param tFootFrame name of the frame attached to the right foot;
+     * Set The base frame.
+     * @param baseFrame name of the frame attached to the base;
+     * @param name key used to store the frame. Notice that multiple base frame can be used when
+     * the robot base is not retrived from an external estimator.
      * @return true/false in case of success/failure.
      */
-    bool setBaseFrames(const std::string& lFootFrame, const std::string& rFootFrame);
+    bool setBaseFrame(const std::string& baseFrame, const std::string& name);
 
 public:
 
@@ -84,23 +87,17 @@ public:
                     const iDynTree::Model& model);
 
     /**
-     * Evaluate the first world to base transformation.
-     * @note: The The first reference frame is always the left foot.
-     * @note: please use this method only with evaluateWorldToBaseTransformation(const bool& isLeftFixedFrame);
-     * @param leftFootTransform transformation from the world to the left foot frame (l_sole);
-     * @return true/false in case of success/failure.
-     */
-    bool evaluateFirstWorldToBaseTransformation(const iDynTree::Transform& leftFootTransform);
-
-    /**
      * Evaluate the world to base transformation
      * @note: During the walking task the frame shift from the left to the right foot.
      * the new base frame is attached where the foot is.
-     * @note: please use this method only with evaluateFirstWorldToBaseTransformation();
-     * @param isLeftFixedFrame true if the main frame of the left foot is fixed one.
+     * @note: please use this method only when the pose and the base velocity are evaluated by
+     * an external estimator.
+     * @param rootTransform world_T_root transformation
+     * @param rootTWist root twist expressed in mixed representation
      * @return true/false in case of success/failure.
      */
-    bool evaluateWorldToBaseTransformation(const bool& isLeftFixedFrame);
+    void evaluateWorldToBaseTransformation(const iDynTree::Transform& rootTransform,
+                                           const iDynTree::Twist& rootTwist);
 
     /**
      * Evaluate the world to base transformation

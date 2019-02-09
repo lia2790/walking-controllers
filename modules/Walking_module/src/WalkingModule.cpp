@@ -26,9 +26,6 @@
 #include <WalkingModule.hpp>
 #include <Utils.hpp>
 
-// TODO
-int indexDummy = 0;
-
 iDynTree::Position m_desiredCoMPosition;
 iDynTree::Vector3 m_desiredDCMPosition;
 iDynTree::Vector3 m_desiredDCMVelocity;
@@ -1332,11 +1329,21 @@ bool WalkingModule::generateFirstTrajectories()
         return false;
     }
 
-    if(!m_trajectoryGenerator->generateFirstTrajectories())
+    // If the base is retrieved from an external source the robot may not start from (0, 0)
+    if(m_robotControlHelper->isExternalRobotBaseUsed())
     {
-        yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
-        return false;
+        if(!m_trajectoryGenerator->generateFirstTrajectories(m_robotControlHelper->getBaseTransform().getPosition()))
+        {
+            yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+            return false;
+        }
     }
+    else
+        if(!m_trajectoryGenerator->generateFirstTrajectories())
+        {
+            yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+            return false;
+        }
 
     if(!updateTrajectories(0))
     {
@@ -1448,24 +1455,21 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
 
 bool WalkingModule::updateFKSolver()
 {
-    // TODO
-    // bool leftFixed = true;
-    // if( indexDummy = 100 )
-    // {
-    //     yInfo() << "switch frame";
-    //     leftFixed = !leftFixed;
-    //     indexDummy = 0;
-    // }
-    // indexDummy++;
-
-    if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
-                                                      m_rightTrajectory.front(),
-                                                      //leftFixed))
-                                                      //m_isLeftFixedFrame.front()))
-                                                      false))
+    if(m_robotControlHelper->isExternalRobotBaseUsed())
     {
-        yError() << "[updateFKSolver] Unable to evaluate the world to base transformation.";
-        return false;
+        m_FKSolver->evaluateWorldToBaseTransformation(m_robotControlHelper->getBaseTransform(),
+                                                      m_robotControlHelper->getBaseTwist());
+    }
+    else
+    {
+        if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
+                                                          m_rightTrajectory.front(),
+                                                          m_isLeftFixedFrame.front()))
+        {
+            yError() << "[updateFKSolver] Unable to evaluate the world to base transformation.";
+            return false;
+        }
+
     }
 
     if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
