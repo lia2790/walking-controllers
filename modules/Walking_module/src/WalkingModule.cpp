@@ -710,6 +710,26 @@ bool WalkingModule::updateModule()
             }
             m_robotState = WalkingFSM::Prepared;
 
+                    // get feedbacks and evaluate useful quantities
+            if(!m_robotControlHelper->getFeedbacks(10))
+            {
+                yError() << "[updateModule] Unable to get the feedback.";
+                return false;
+            }
+
+            if(!updateFKSolver())
+            {
+                yError() << "[updateModule] Unable to update the FK solver.";
+                return false;
+            }
+
+
+            double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
+                                   + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
+
+            yInfo() << heightOffset;
+            m_robotControlHelper->setHeightOffset(heightOffset);
+
             yInfo() << "[updateModule] The robot is prepared.";
         }
     }
@@ -1043,35 +1063,35 @@ bool WalkingModule::updateModule()
         }
         else
         {
-            // x and y are not tacking into account
-            desiredCoMPosition(0) = desiredCoMPositionXY(0);
-            desiredCoMPosition(1) = desiredCoMPositionXY(1);
-            desiredCoMPosition(2) = m_comHeightTrajectory.front();
+            // // x and y are not tacking into account
+            // desiredCoMPosition(0) = desiredCoMPositionXY(0);
+            // desiredCoMPosition(1) = desiredCoMPositionXY(1);
+            // desiredCoMPosition(2) = m_comHeightTrajectory.front();
 
-            m_profiler->setInitTime("IK");
+            // m_profiler->setInitTime("IK");
 
-            if(m_IKSolver->usingAdditionalRotationTarget())
-            {
-                if(!m_IKSolver->updateIntertiaToWorldFrameRotation(modifiedInertial))
-                {
-                    yError() << "[updateModule] Error updating the inertia to world frame rotation.";
-                    return false;
-                }
+            // if(m_IKSolver->usingAdditionalRotationTarget())
+            // {
+            //     if(!m_IKSolver->updateIntertiaToWorldFrameRotation(modifiedInertial))
+            //     {
+            //         yError() << "[updateModule] Error updating the inertia to world frame rotation.";
+            //         return false;
+            //     }
 
-                if(!m_IKSolver->setFullModelFeedBack(m_robotControlHelper->getJointPosition()))
-                {
-                    yError() << "[updateModule] Error while setting the feedback to the inverse Kinematics.";
-                    return false;
-                }
+            //     if(!m_IKSolver->setFullModelFeedBack(m_robotControlHelper->getJointPosition()))
+            //     {
+            //         yError() << "[updateModule] Error while setting the feedback to the inverse Kinematics.";
+            //         return false;
+            //     }
 
-                if(!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
-                                          desiredCoMPosition, m_qDesired))
-                {
-                    yError() << "[updateModule] Error during the inverse Kinematics iteration.";
-                    return false;
-                }
-            }
-            m_profiler->setEndTime("IK");
+            //     if(!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
+            //                               desiredCoMPosition, m_qDesired))
+            //     {
+            //         yError() << "[updateModule] Error during the inverse Kinematics iteration.";
+            //         return false;
+            //     }
+            // }
+            // m_profiler->setEndTime("IK");
 
             desiredCoMVelocity(0) = 0;
             desiredCoMVelocity(1) = 0;
@@ -1121,12 +1141,13 @@ bool WalkingModule::updateModule()
             // }
 
             iDynTree::Wrench left, right;
-            m_taskBasedTorqueSolver->getWrenches(left, right);
+            // m_taskBasedTorqueSolver->getWrenches(left, right);
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
             m_walkingLogger->sendData(m_FKSolver->getDCM(),
                                       DCMPositionDesired, DCMVelocityDesired,
                                       m_FKSolver->getZMP(), desiredVRP, m_FKSolver->getCoMPosition(),
+                                      desiredCoMPositionXY, desiredCoMPosition,
                                       leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
                                       rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
@@ -1339,11 +1360,13 @@ bool WalkingModule::generateFirstTrajectories()
         }
     }
     else
+    {
         if(!m_trajectoryGenerator->generateFirstTrajectories())
         {
             yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
             return false;
         }
+    }
 
     if(!updateTrajectories(0))
     {
@@ -1516,12 +1539,37 @@ bool WalkingModule::startWalking()
 
     if(m_dumpData)
     {
+        // m_walkingLogger->startRecord({"record","dcm_x", "dcm_y", "dcm_z",
+        //             "dcm_des_x", "dcm_des_y", "dcm_des_z",
+        //             "dcm_des_dx", "dcm_des_dy", "dcm_des_dz",
+        //             "zmp_x", "zmp_y",
+        //             "vrp_des_x", "vrp_des_y", "vrp_des_z",
+        //             "com_x", "com_y", "com_z",
+        //             "lf_x", "lf_y", "lf_z",
+        //             "lf_roll", "lf_pitch", "lf_yaw",
+        //             "rf_x", "rf_y", "rf_z",
+        //             "rf_roll", "rf_pitch", "rf_yaw",
+        //             "lf_des_x", "lf_des_y", "lf_des_z",
+        //             "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
+        //             "rf_des_x", "rf_des_y", "rf_des_z",
+        //             "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
+        //             "lf_force_x", "lf_force_y", "lf_force_z",
+        //             "lf_torque_x", "lf_torque_y", "lf_torque_z",
+        //             "rf_force_x", "rf_force_y", "rf_force_z",
+        //             "rf_torque_x", "rf_torque_y", "rf_torque_z",
+        //             "lf_force_des_x", "lf_force_des_y", "lf_force_des_z",
+        //             "lf_torque_des_x", "lf_torque_des_y", "lf_torque_des_z",
+        //             "rf_force_des_x", "rf_force_des_y", "rf_force_des_z",
+        //             "rf_torque_des_x", "rf_torque_des_y", "rf_torque_des_z"} );
+
         m_walkingLogger->startRecord({"record","dcm_x", "dcm_y", "dcm_z",
                     "dcm_des_x", "dcm_des_y", "dcm_des_z",
                     "dcm_des_dx", "dcm_des_dy", "dcm_des_dz",
                     "zmp_x", "zmp_y",
                     "vrp_des_x", "vrp_des_y", "vrp_des_z",
                     "com_x", "com_y", "com_z",
+                    "com_des_x", "com_des_y",
+                    "com_des_ik_x", "com_des_ik_y", "com_des_ik_z",
                     "lf_x", "lf_y", "lf_z",
                     "lf_roll", "lf_pitch", "lf_yaw",
                     "rf_x", "rf_y", "rf_z",
