@@ -122,7 +122,7 @@ bool StableDCMModel::reset(const iDynTree::Vector2& initialValue)
         return false;
     }
 
-    yarp::sig::Vector buffer;
+    yarp::sig::Vector buffer(2);
     iDynTree::toYarp(initialValue, buffer);
 
     m_comIntegrator->reset(buffer);
