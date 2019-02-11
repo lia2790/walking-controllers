@@ -62,7 +62,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
     bool okLeftWrench = false;
     bool okRightWrench = false;
 
-    bool okBaseEstimation = false;
+    bool okBaseEstimation = !m_useExternalRobotBase;
 
     unsigned int attempt = 0;
     do
@@ -104,12 +104,12 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
                 if(base != NULL)
                 {
                     m_robotBaseTransform.setPosition(iDynTree::Position((*base)(0),
-                                                                       (*base)(1),
-                                                                       (*base)(2)));
+                                                                        (*base)(1),
+                                                                        (*base)(2) - m_heightOffset));
 
                     m_robotBaseTransform.setRotation(iDynTree::Rotation::RPY((*base)(3),
-                                                                            (*base)(4),
-                                                                            (*base)(5)));
+                                                                             (*base)(4),
+                                                                             (*base)(5)));
 
                     m_robotBaseTwist.setLinearVec3(iDynTree::Vector3(base->getFirst() + 6, 3));
                     m_robotBaseTwist.setAngularVec3(iDynTree::Vector3(base->getFirst() + 6 + 3, 3));
@@ -119,7 +119,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
         }
 
 
-        if(okPosition && okVelocity && okLeftWrench && okRightWrench)
+        if(okPosition && okVelocity && okLeftWrench && okRightWrench && okBaseEstimation)
         {
             for(unsigned j = 0 ; j < m_actuatedDOFs; j++)
             {
@@ -155,6 +155,9 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
 
     if(!okRightWrench)
         yError() << "\t - Right wrench";
+
+    if(!okBaseEstimation)
+        yError() << "\t - Base estimation";
 
     return false;
 }
@@ -345,11 +348,14 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
     {
         m_robotBasePort.open("/" + name + "/robotBase:i");
         // connect port
+        // TODO MOVE IN THE CONFIG
         if(!yarp::os::Network::connect("/icubSim/floating_base/state:o", "/" + name + "/robotBase:i"))
         {
             yError() << "Unable to connect to port " << "/icubSim/floating_base/state:o";
             return false;
         }
+
+        m_heightOffset = 0;
     }
     return true;
 }
@@ -797,4 +803,9 @@ const iDynTree::Twist& RobotHelper::getBaseTwist() const
 bool RobotHelper::isExternalRobotBaseUsed()
 {
     return m_useExternalRobotBase;
+}
+
+void RobotHelper::setHeightOffset(const double& offset)
+{
+    m_heightOffset = offset;
 }

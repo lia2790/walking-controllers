@@ -92,6 +92,8 @@ class RobotHelper
     iDynTree::Transform m_robotBaseTransform;
     iDynTree::Twist m_robotBaseTwist;
     yarp::os::BufferedPort<yarp::sig::Vector> m_robotBasePort; /**< Right foot wrench port. */
+    double m_heightOffset;
+
     /**
      * Get the higher position error among all joints.
      * @param desiredJointPositionsRad desired joint position in radiants;
@@ -167,6 +169,8 @@ public:
      * @return true in case of success and false otherwise.
      */
     bool setTorqueReferences(const iDynTree::VectorDynSize& desiredTorque);
+
+    void setHeightOffset(const double& offset);
 
     bool resetFilters();
 
