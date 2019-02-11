@@ -111,8 +111,8 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
                                                                              (*base)(4),
                                                                              (*base)(5)));
 
-                    m_robotBaseTwist.setLinearVec3(iDynTree::Vector3(base->getFirst() + 6, 3));
-                    m_robotBaseTwist.setAngularVec3(iDynTree::Vector3(base->getFirst() + 6 + 3, 3));
+                    m_robotBaseTwist.setLinearVec3(iDynTree::Vector3(base->data() + 6, 3));
+                    m_robotBaseTwist.setAngularVec3(iDynTree::Vector3(base->data() + 6 + 3, 3));
                     okBaseEstimation = true;
                 }
             }
@@ -348,8 +348,15 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
     {
         m_robotBasePort.open("/" + name + "/robotBase:i");
         // connect port
-        // TODO MOVE IN THE CONFIG
-        if(!yarp::os::Network::connect("/icubSim/floating_base/state:o", "/" + name + "/robotBase:i"))
+
+        std::string floatingBasePortName;
+        if(!YarpHelper::getStringFromSearchable(config, "floatingBasePortName", floatingBasePortName))
+        {
+            yError() << "[RobotHelper::configureForceTorqueSensors] Unable to get the string from searchable.";
+            return false;
+        }
+
+        if(!yarp::os::Network::connect(floatingBasePortName, "/" + name + "/robotBase:i"))
         {
             yError() << "Unable to connect to port " << "/icubSim/floating_base/state:o";
             return false;
