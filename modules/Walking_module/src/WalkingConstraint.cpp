@@ -417,8 +417,6 @@ void LinearMomentumConstraint::evaluateBounds(Eigen::VectorXd &upperBounds,
     weightForce.zero();
     weightForce(2) = -m_robotMass * 9.81;
 
-    yInfo() << m_robotMass;
-
     // TODO remove magic number
     double omegaSquare = 9.81 / 0.53;
 
