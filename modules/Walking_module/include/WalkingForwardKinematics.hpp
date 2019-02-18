@@ -295,6 +295,8 @@ public:
      */
     iDynTree::Vector6 getRightFootBiasAcceleration();
 
+    iDynTree::Transform getLeftFootToRightFoot();
+
     /**
      * Get the neck bias acceleration.
      * @return the neck bias acceleration.

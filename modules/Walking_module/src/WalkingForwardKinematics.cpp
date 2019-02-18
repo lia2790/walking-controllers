@@ -471,6 +471,11 @@ iDynTree::Transform WalkingFK::getLeftFootToWorldTransform()
     return m_kinDyn.getWorldTransform(m_frameLeftIndex);
 }
 
+iDynTree::Transform WalkingFK::getLeftFootToRightFoot()
+{
+    return m_kinDyn.getRelativeTransform(m_frameLeftIndex, m_frameRightIndex);
+}
+
 iDynTree::Twist WalkingFK::getLeftFootVelocity()
 {
     return m_kinDyn.getFrameVel(m_frameLeftIndex);
