@@ -22,7 +22,7 @@ find_package(qpOASES REQUIRED)
 find_package(Threads REQUIRED)
 
 
-find_package(EigenMatio CONFIG REQUIRED)
+# find_package(EigenMatio CONFIG REQUIRED)
 
 
 include(FindPackageHandleStandardArgs)
@@ -102,8 +102,8 @@ target_link_libraries(${EXE_TARGET_NAME}
   OsqpEigen::OsqpEigen
   osqp::osqp
   Threads::Threads
-  ${qpOASES_LIBRARIES}
-  EigenMatio
-  "-lmatio")
+  ${qpOASES_LIBRARIES})
+  # EigenMatio
+  # "-lmatio")
 
 install(TARGETS ${EXE_TARGET_NAME} DESTINATION bin)

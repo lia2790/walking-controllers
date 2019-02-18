@@ -15,7 +15,7 @@
 #include <WalkingTaskBasedTorqueSolver.hpp>
 #include <Utils.hpp>
 
-#include <EigenMatio/EigenMatio.hpp>
+// #include <EigenMatio/EigenMatio.hpp>
 
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXd;
 
@@ -979,23 +979,23 @@ bool TaskBasedTorqueSolver::solve()
         if(!m_optimizer->initSolver())
         {
 
-            Eigen::MatioFile file("data.mat");
-            file.write_mat("hessian", Eigen::MatrixXd(m_hessianEigen));
-            file.write_mat("gradient", Eigen::MatrixXd(m_gradient));
-            file.write_mat("constraint", Eigen::MatrixXd(m_constraintMatrix));
-            file.write_mat("lowerBound", Eigen::MatrixXd(m_lowerBound));
-            file.write_mat("upperBound", Eigen::MatrixXd(m_upperBound));
-            file.write_mat("massMatrix", iDynTree::toEigen(m_massMatrix));
-            file.write_mat("comJacobian", iDynTree::toEigen(m_comJacobian));
+            // Eigen::MatioFile file("data.mat");
+            // file.write_mat("hessian", Eigen::MatrixXd(m_hessianEigen));
+            // file.write_mat("gradient", Eigen::MatrixXd(m_gradient));
+            // file.write_mat("constraint", Eigen::MatrixXd(m_constraintMatrix));
+            // file.write_mat("lowerBound", Eigen::MatrixXd(m_lowerBound));
+            // file.write_mat("upperBound", Eigen::MatrixXd(m_upperBound));
+            // file.write_mat("massMatrix", iDynTree::toEigen(m_massMatrix));
+            // file.write_mat("comJacobian", iDynTree::toEigen(m_comJacobian));
 
-            for(const auto& element: m_costFunctions)
-            {
-                std::string key = element.first;
-                std::string hessianKey = key + "_hessian";
-                std::string gradientKey = key + "_gradient";
-                file.write_mat(hessianKey.c_str(), Eigen::MatrixXd(*(m_hessianMatrices.at(key))));
-                file.write_mat(gradientKey.c_str(), Eigen::MatrixXd(*(m_gradientVectors.at(key))));
-            }
+            // for(const auto& element: m_costFunctions)
+            // {
+            //     std::string key = element.first;
+            //     std::string hessianKey = key + "_hessian";
+            //     std::string gradientKey = key + "_gradient";
+            //     file.write_mat(hessianKey.c_str(), Eigen::MatrixXd(*(m_hessianMatrices.at(key))));
+            //     file.write_mat(gradientKey.c_str(), Eigen::MatrixXd(*(m_gradientVectors.at(key))));
+            // }
 
 
             yError() << "[solve] Unable to initialize the solver";
@@ -1005,23 +1005,23 @@ bool TaskBasedTorqueSolver::solve()
 
     if(!m_optimizer->solve())
     {
-        Eigen::MatioFile file("data.mat");
-        file.write_mat("hessian", Eigen::MatrixXd(m_hessianEigen));
-        file.write_mat("gradient", Eigen::MatrixXd(m_gradient));
-        file.write_mat("constraint", Eigen::MatrixXd(m_constraintMatrix));
-        file.write_mat("lowerBound", Eigen::MatrixXd(m_lowerBound));
-        file.write_mat("upperBound", Eigen::MatrixXd(m_upperBound));
-        file.write_mat("massMatrix", iDynTree::toEigen(m_massMatrix));
-        file.write_mat("comJacobian", iDynTree::toEigen(m_comJacobian));
+        // Eigen::MatioFile file("data.mat");
+        // file.write_mat("hessian", Eigen::MatrixXd(m_hessianEigen));
+        // file.write_mat("gradient", Eigen::MatrixXd(m_gradient));
+        // file.write_mat("constraint", Eigen::MatrixXd(m_constraintMatrix));
+        // file.write_mat("lowerBound", Eigen::MatrixXd(m_lowerBound));
+        // file.write_mat("upperBound", Eigen::MatrixXd(m_upperBound));
+        // file.write_mat("massMatrix", iDynTree::toEigen(m_massMatrix));
+        // file.write_mat("comJacobian", iDynTree::toEigen(m_comJacobian));
 
-        for(const auto& element: m_costFunctions)
-        {
-            std::string key = element.first;
-            std::string hessianKey = key + "_hessian";
-            std::string gradientKey = key + "_gradient";
-            file.write_mat(hessianKey.c_str(), Eigen::MatrixXd(*(m_hessianMatrices.at(key))));
-            file.write_mat(gradientKey.c_str(), Eigen::MatrixXd(*(m_gradientVectors.at(key))));
-        }
+        // for(const auto& element: m_costFunctions)
+        // {
+        //     std::string key = element.first;
+        //     std::string hessianKey = key + "_hessian";
+        //     std::string gradientKey = key + "_gradient";
+        //     file.write_mat(hessianKey.c_str(), Eigen::MatrixXd(*(m_hessianMatrices.at(key))));
+        //     file.write_mat(gradientKey.c_str(), Eigen::MatrixXd(*(m_gradientVectors.at(key))));
+        // }
 
 
         yError() << "[solve] Unable to solve the problem.";
