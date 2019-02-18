@@ -31,7 +31,8 @@ iDynTree::Vector3 m_desiredDCMPosition;
 iDynTree::Vector3 m_desiredDCMVelocity;
 iDynTree::Transform m_desiredLeftFootToWorldTransform;
 
-
+int dummyIndex = 0;
+bool leftBase = true;
 void WalkingModule::propagateTime()
 {
     // propagate time
@@ -188,6 +189,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    // debug port
+    std::string floatingBasePortName = "/" + getName() + "/floating_base:o";
+    if(!m_floatingBasePort.open(floatingBasePortName))
+    {
+        yError() << "[configure] Could not open" << floatingBasePortName << " port.";
+        return false;
+    }
+
     // initialize the trajectory planner
     m_trajectoryGenerator = std::make_unique<TrajectoryGenerator>();
     yarp::os::Bottle& trajectoryPlannerOptions = rf.findGroup("TRAJECTORY_PLANNER");
@@ -297,6 +306,15 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     yarp::os::Bottle& forwardKinematicsSolverOptions = rf.findGroup("FORWARD_KINEMATICS_SOLVER");
     forwardKinematicsSolverOptions.append(generalOptions);
     if(!m_FKSolver->initialize(forwardKinematicsSolverOptions, m_loader.model()))
+    {
+        yError() << "[configure] Failed to configure the fk solver";
+        return false;
+    }
+
+    // debug
+    forwardKinematicsSolverOptions.find("use_external_robot_base") = yarp::os::Value(false);
+    m_FKSolverDebug = std::make_unique<WalkingFK>();
+    if(!m_FKSolverDebug->initialize(forwardKinematicsSolverOptions, m_loader.model()))
     {
         yError() << "[configure] Failed to configure the fk solver";
         return false;
@@ -711,7 +729,7 @@ bool WalkingModule::updateModule()
             m_robotState = WalkingFSM::Prepared;
 
                     // get feedbacks and evaluate useful quantities
-            if(!m_robotControlHelper->getFeedbacks(10))
+            if(!m_robotControlHelper->getFeedbacks(100))
             {
                 yError() << "[updateModule] Unable to get the feedback.";
                 return false;
@@ -801,7 +819,7 @@ bool WalkingModule::updateModule()
         }
 
         // get feedbacks and evaluate useful quantities
-        if(!m_robotControlHelper->getFeedbacks(10))
+        if(!m_robotControlHelper->getFeedbacks(100))
         {
             yError() << "[updateModule] Unable to get the feedback.";
             return false;
@@ -1121,6 +1139,24 @@ bool WalkingModule::updateModule()
 
         // print timings
         m_profiler->profiling();
+
+        // debug
+        yarp::sig::Vector& temp =  m_floatingBasePort.prepare();
+        temp.clear();
+        //temp.push_back(        m_FKSolverDebug->getRootLinkToWorldTransform().getPosition()
+        YarpHelper::mergeSigVector(temp,
+                                   m_FKSolverDebug->getRootLinkToWorldTransform().getPosition(),
+                                   m_FKSolverDebug->getRootLinkToWorldTransform().getRotation().asRPY(),
+                                   m_FKSolverDebug->getRootLinkVelocity());
+
+        m_floatingBasePort.write();
+
+        yInfo() << "debug " << m_FKSolverDebug->getLeftFootToRightFoot().getPosition().toString() << " " <<
+            m_FKSolverDebug->getLeftFootToRightFoot().getRotation().asRPY().toString();
+
+        yInfo() << "gazebo " << m_FKSolver->getLeftFootToRightFoot().getPosition().toString() << " " <<
+            m_FKSolver->getLeftFootToRightFoot().getRotation().asRPY().toString();
+
 
         // send data to the WalkingLogger
         if(m_dumpData)
@@ -1478,6 +1514,15 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
 
 bool WalkingModule::updateFKSolver()
 {
+    dummyIndex++;
+    if(dummyIndex == 100)
+    {
+        dummyIndex = 0;
+        leftBase = !leftBase;
+        yInfo() << " leftBase " << leftBase;
+    }
+
+
     if(m_robotControlHelper->isExternalRobotBaseUsed())
     {
         m_FKSolver->evaluateWorldToBaseTransformation(m_robotControlHelper->getBaseTransform(),
@@ -1485,6 +1530,7 @@ bool WalkingModule::updateFKSolver()
     }
     else
     {
+
         if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
                                                           m_rightTrajectory.front(),
                                                           m_isLeftFixedFrame.front()))
@@ -1497,6 +1543,22 @@ bool WalkingModule::updateFKSolver()
 
     if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
                                           m_robotControlHelper->getJointVelocity()))
+    {
+        yError() << "[updateFKSolver] Unable to evaluate the CoM.";
+        return false;
+    }
+
+    // TODO leftBase is only for testing
+    if(!m_FKSolverDebug->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
+                                                           m_rightTrajectory.front(),
+                                                           leftBase))
+    {
+        yError() << "[updateFKSolver] Unable to evaluate the world to base transformation.";
+        return false;
+    }
+
+    if(!m_FKSolverDebug->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+                                               m_robotControlHelper->getJointVelocity()))
     {
         yError() << "[updateFKSolver] Unable to evaluate the CoM.";
         return false;

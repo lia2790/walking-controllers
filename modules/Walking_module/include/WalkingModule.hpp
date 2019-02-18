@@ -79,6 +79,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::unique_ptr<WalkingLogger> m_walkingLogger; /**< Pointer to the Walking Logger object. */
     std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
 
+    std::unique_ptr<WalkingFK> m_FKSolverDebug; /**< Pointer to the forward kinematics solver. */
+
     double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
     double m_desiredJointsWeight; /**< Desired joint weight matrix. */
     yarp::sig::Vector m_desiredJointInRadYarp; /**< Desired joint position (regularization task). */
@@ -113,6 +115,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     yarp::os::Port m_rpcPort; /**< Remote Procedure Call port. */
     yarp::os::BufferedPort<yarp::sig::Vector> m_desiredUnyciclePositionPort; /**< Desired robot position port. */
+
+    yarp::os::BufferedPort<yarp::sig::Vector> m_floatingBasePort; /**< Desired robot position port. */
 
     bool m_newTrajectoryRequired; /**< if true a new trajectory will be merged soon. (after m_newTrajectoryMergeCounter - 2 cycles). */
     size_t m_newTrajectoryMergeCounter; /**< The new trajectory will be merged after m_newTrajectoryMergeCounter - 2 cycles. */
