@@ -457,7 +457,7 @@ bool RobotHelper::configurePIDHandler(const yarp::os::Bottle& config)
 
 bool RobotHelper::resetFilters()
 {
-    if(!getFeedbacksRaw(true))
+    if(!getFeedbacksRaw(false))
     {
         yError() << "[RobotHelper::getFeedbacks] Unable to get the feedback from the robot";
         return false;

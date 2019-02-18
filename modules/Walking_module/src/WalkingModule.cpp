@@ -379,11 +379,11 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     portNameBaseEst = "/" + name + "/base-est/rpc";
     m_rpcBaseEstPort.open(portNameBaseEst);
     yarp::os::Network::connect(portNameBaseEst, "/base-estimator/rpc");
-    
+
     yInfo() << "[configure] Ready to play!";
 
-    
-    
+
+
     return true;
 }
 
@@ -549,7 +549,7 @@ bool WalkingModule::solveTaskBased(const iDynTree::Rotation& desiredNeckOrientat
     m_taskBasedTorqueSolver->setNeckBiasAcceleration(m_FKSolver->getNeckBiasAcceleration());
 
 
-     // feet
+    // feet
     // TODO
 // iDynTree::Twist dummyTwist, twistLeft, accelerationLeft;
     // dummyTwist.zero();
@@ -1266,8 +1266,8 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // evaluate the first trajectory. The robot does not move! So the first trajectory
     if(!generateFirstTrajectories())
     {
-         yError() << "[prepareRobot] Failed to evaluate the first trajectories.";
-	 return false;
+        yError() << "[prepareRobot] Failed to evaluate the first trajectories.";
+        return false;
     }
     // }
 
@@ -1395,9 +1395,9 @@ bool WalkingModule::generateFirstTrajectories()
     if(!m_trajectoryGenerator->generateFirstTrajectories())
     {
         yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
-	return false;
+        return false;
     }
-    
+
     if(!updateTrajectories(0))
     {
         yError() << "[generateFirstTrajectories] Unable to update the trajectory.";
@@ -1649,48 +1649,48 @@ bool WalkingModule::startWalking()
         m_robotControlHelper->resetFilters();
 
     // TODO in a better way (remove magic numbers)
-    yarp::os::Bottle cmd, outcome;	
+    iDynTree::Transform stanceFoot_T_world = m_rightTrajectory.front().inverse();
+    yarp::os::Bottle cmd, outcome;
     cmd.addString("resetLeggedOdometryWithRefFrame");
     cmd.addString("r_sole");
-    cmd.addDouble(m_rightTrajectory.front().getPosition()(0));
-    cmd.addDouble(m_rightTrajectory.front().getPosition()(1));
-    cmd.addDouble(m_rightTrajectory.front().getPosition()(2));
-    cmd.addDouble(m_rightTrajectory.front().getRotation().asRPY()(0));
-    cmd.addDouble(m_rightTrajectory.front().getRotation().asRPY()(1));	
-    cmd.addDouble(m_rightTrajectory.front().getRotation().asRPY()(2));
+    cmd.addDouble(stanceFoot_T_world.getPosition()(0));
+    cmd.addDouble(stanceFoot_T_world.getPosition()(1));
+    cmd.addDouble(stanceFoot_T_world.getPosition()(2));
+    cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(0));
+    cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(1));
+    cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(2));
     m_rpcBaseEstPort.write(cmd,outcome);
-    
+
     if(!outcome.get(0).asBool())
-      {
-	yError() << "[startWalking] Unable reset the odometry.";
-	return false;
-      }
-    
-    
+    {
+        yError() << "[startWalking] Unable reset the odometry.";
+        return false;
+    }
+
     // get feedbacks and evaluate useful quantities
     if(!m_robotControlHelper->getFeedbacks(100))
-      {
-	yError() << "[updateModule] Unable to get the feedback.";
-	return false;
-      }
+    {
+        yError() << "[updateModule] Unable to get the feedback.";
+        return false;
+    }
 
     if(!updateFKSolver())
-      {
-	yError() << "[updateModule] Unable to update the FK solver.";
-	return false;
-      }
-    
+    {
+        yError() << "[updateModule] Unable to update the FK solver.";
+        return false;
+    }
+
     double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
-			   + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
-    
+                           + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
+
     yInfo() << heightOffset;
     m_robotControlHelper->setHeightOffset(heightOffset);
-    
+
     if (m_useTorque)
-    {	       
+    {
         if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_TORQUE))
         {
-	    yError() << "[prepareRobot] Error while setting the torque control.";
+            yError() << "[prepareRobot] Error while setting the torque control.";
             return false;
         }
     }
