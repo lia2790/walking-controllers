@@ -43,7 +43,15 @@ bool TaskBasedTorqueSolver::instantiateCoMConstraint(const yarp::os::Searchable&
 
     iDynTree::Vector3 kd;
     if(useDefaultKd)
-        iDynTree::toEigen(kd) = 2 * iDynTree::toEigen(kp).array().sqrt();
+    {
+        double scaling;
+        if(!YarpHelper::getNumberFromSearchable(config, "scaling", scaling))
+        {
+            yError() << "[initialize] Unable to get the scaling factor.";
+            return false;
+        }
+        iDynTree::toEigen(kd) = 2 / scaling * iDynTree::toEigen(kp).array().sqrt();
+    }
     else
     {
         tempValue = config.find("kd");
@@ -187,7 +195,15 @@ bool TaskBasedTorqueSolver::instantiateNeckSoftConstraint(const yarp::os::Search
 
     bool useDefaultKd = config.check("useDefaultKd", yarp::os::Value("False")).asBool();
     if(useDefaultKd)
-        kd = 2 * std::sqrt(kp);
+    {
+        double scaling;
+        if(!YarpHelper::getNumberFromSearchable(config, "scaling", scaling))
+        {
+            yError() << "[initialize] Unable to get the scaling factor.";
+            return false;
+        }
+        kd = 2 / scaling * std::sqrt(kp);
+    }
     else
     {
         if(!YarpHelper::getNumberFromSearchable(config, "kd", kd))
@@ -268,7 +284,17 @@ bool TaskBasedTorqueSolver::instantiateRegularizationTaskConstraint(const yarp::
     bool useDefaultKd = config.check("useDefaultKd", yarp::os::Value("False")).asBool();
 
     if(useDefaultKd)
-        iDynTree::toEigen(derivativeGains) = 2 * iDynTree::toEigen(proportionalGains).array().sqrt();
+    {
+        double scaling;
+        if(!YarpHelper::getNumberFromSearchable(config, "scaling", scaling))
+        {
+            yError() << "[initialize] Unable to get the scaling factor.";
+            return false;
+        }
+
+        iDynTree::toEigen(derivativeGains) = 2 / scaling
+            * iDynTree::toEigen(proportionalGains).array().sqrt();
+    }
     else
     {
         tempValue = config.find("derivativeGains");
@@ -1582,7 +1608,16 @@ bool TaskBasedTorqueSolverSingleSupport::instantiateFeetConstraint(const yarp::o
 
     double kdLinear;
     if(useDefaultKd)
-        kdLinear = 2 * std::sqrt(kpLinear);
+    {
+        double scaling;
+        if(!YarpHelper::getNumberFromSearchable(config, "scaling", scaling))
+        {
+            yError() << "[initialize] Unable to get the scaling factor.";
+            return false;
+        }
+
+        kdLinear = 2 / scaling * std::sqrt(kpLinear);
+    }
     else
     {
         if(!YarpHelper::getNumberFromSearchable(config, "kdLinear", kdLinear))
@@ -1600,7 +1635,16 @@ bool TaskBasedTorqueSolverSingleSupport::instantiateFeetConstraint(const yarp::o
         return false;
 
     if(useDefaultKd)
-        kdAngular = 2 * std::sqrt(kpAngular);
+    {
+        double scaling;
+        if(!YarpHelper::getNumberFromSearchable(config, "scaling", scaling))
+        {
+            yError() << "[initialize] Unable to get the scaling factor.";
+            return false;
+        }
+
+        kdAngular = 2 / scaling * std::sqrt(kpAngular);
+    }
     else
     {
         if(!YarpHelper::getNumberFromSearchable(config, "kdAngular", kdAngular))
