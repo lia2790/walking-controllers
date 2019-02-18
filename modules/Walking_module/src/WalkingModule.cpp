@@ -374,8 +374,16 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_torqueDesired.resize(m_robotControlHelper->getActuatedDoFs());
 
+    // TODO move in the config
+    std::string portNameBaseEst;
+    portNameBaseEst = "/" + name + "/base-est/rpc";
+    m_rpcBaseEstPort.open(portNameBaseEst);
+    yarp::os::Network::connect(portNameBaseEst, "/base-estimator/rpc");
+    
     yInfo() << "[configure] Ready to play!";
 
+    
+    
     return true;
 }
 
@@ -727,26 +735,6 @@ bool WalkingModule::updateModule()
                 m_taskBasedTorqueSolver->setDesiredJointTrajectory(m_qDesired, dummy, dummy);
             }
             m_robotState = WalkingFSM::Prepared;
-
-                    // get feedbacks and evaluate useful quantities
-            if(!m_robotControlHelper->getFeedbacks(100))
-            {
-                yError() << "[updateModule] Unable to get the feedback.";
-                return false;
-            }
-
-            if(!updateFKSolver())
-            {
-                yError() << "[updateModule] Unable to update the FK solver.";
-                return false;
-            }
-
-
-            double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
-                                   + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
-
-            yInfo() << heightOffset;
-            m_robotControlHelper->setHeightOffset(heightOffset);
 
             yInfo() << "[updateModule] The robot is prepared.";
         }
@@ -1218,7 +1206,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // get the current state of the robot
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
-    if(!m_robotControlHelper->getFeedbacksRaw(10))
+    if(!m_robotControlHelper->getFeedbacksRaw(false, 10))
     {
         yError() << "[prepareRobot] Unable to get the feedback.";
         return false;
@@ -1248,40 +1236,40 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // m_robotState = WalkingFSM::Preparing;
     // return true;
 
-    if(onTheFly)
+    // if(onTheFly)
+    // {
+    //     if(!m_FKSolver->setBaseOnTheFly())
+    //     {
+    //         yError() << "[prepareRobot] Unable to set the onTheFly base.";
+    //         return false;
+    //     }
+
+    //     if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+    //                                           m_robotControlHelper->getJointVelocity()))
+    //     {
+    //         yError() << "[prepareRobot] Unable to evaluate the CoM.";
+    //         return false;
+    //     }
+
+    //     // evaluate the left to right transformation, the inertial frame is on the left foot
+    //     leftToRightTransform = m_FKSolver->getRightFootToWorldTransform();
+
+    //     // evaluate the first trajectory. The robot does not move!
+    //     if(!generateFirstTrajectories(leftToRightTransform))
+    //     {
+    //         yError() << "[prepareRobot] Failed to evaluate the first trajectories.";
+    //         return false;
+    //     }
+    // }
+    // else
+    // {
+    // evaluate the first trajectory. The robot does not move! So the first trajectory
+    if(!generateFirstTrajectories())
     {
-        if(!m_FKSolver->setBaseOnTheFly())
-        {
-            yError() << "[prepareRobot] Unable to set the onTheFly base.";
-            return false;
-        }
-
-        if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
-                                              m_robotControlHelper->getJointVelocity()))
-        {
-            yError() << "[prepareRobot] Unable to evaluate the CoM.";
-            return false;
-        }
-
-        // evaluate the left to right transformation, the inertial frame is on the left foot
-        leftToRightTransform = m_FKSolver->getRightFootToWorldTransform();
-
-        // evaluate the first trajectory. The robot does not move!
-        if(!generateFirstTrajectories(leftToRightTransform))
-        {
-            yError() << "[prepareRobot] Failed to evaluate the first trajectories.";
-            return false;
-        }
+         yError() << "[prepareRobot] Failed to evaluate the first trajectories.";
+	 return false;
     }
-    else
-    {
-        // evaluate the first trajectory. The robot does not move! So the first trajectory
-        if(!generateFirstTrajectories())
-        {
-            yError() << "[prepareRobot] Failed to evaluate the first trajectories.";
-            return false;
-        }
-    }
+    // }
 
     // reset the gains
     if (m_robotControlHelper->getPIDHandler().usingGainScheduling())
@@ -1386,24 +1374,30 @@ bool WalkingModule::generateFirstTrajectories()
         return false;
     }
 
-    // If the base is retrieved from an external source the robot may not start from (0, 0)
-    if(m_robotControlHelper->isExternalRobotBaseUsed())
-    {
-        if(!m_trajectoryGenerator->generateFirstTrajectories(m_robotControlHelper->getBaseTransform().getPosition()))
-        {
-            yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
-            return false;
-        }
-    }
-    else
-    {
-        if(!m_trajectoryGenerator->generateFirstTrajectories())
-        {
-            yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
-            return false;
-        }
-    }
+    // // If the base is retrieved from an external source the robot may not start from (0, 0)
+    // if(m_robotControlHelper->isExternalRobotBaseUsed())
+    // {
+    //     if(!m_trajectoryGenerator->generateFirstTrajectories(m_robotControlHelper->getBaseTransform().getPosition()))
+    //     {
+    //         yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+    //         return false;
+    //     }
+    // }
+    // else
+    // {
+    //     if(!m_trajectoryGenerator->generateFirstTrajectories())
+    //     {
+    //         yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+    //         return false;
+    //     }
+    // }
 
+    if(!m_trajectoryGenerator->generateFirstTrajectories())
+    {
+        yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+	return false;
+    }
+    
     if(!updateTrajectories(0))
     {
         yError() << "[generateFirstTrajectories] Unable to update the trajectory.";
@@ -1654,15 +1648,55 @@ bool WalkingModule::startWalking()
     if(m_robotState == WalkingFSM::Prepared)
         m_robotControlHelper->resetFilters();
 
-    m_robotState = WalkingFSM::Walking;
-    m_firstStep = true;
+    // TODO in a better way (remove magic numbers)
+    yarp::os::Bottle cmd, outcome;	
+    cmd.addString("resetLeggedOdometryWithRefFrame");
+    cmd.addString("r_sole");
+    cmd.addDouble(m_rightTrajectory.front().getPosition()(0));
+    cmd.addDouble(m_rightTrajectory.front().getPosition()(1));
+    cmd.addDouble(m_rightTrajectory.front().getPosition()(2));
+    cmd.addDouble(m_rightTrajectory.front().getRotation().asRPY()(0));
+    cmd.addDouble(m_rightTrajectory.front().getRotation().asRPY()(1));	
+    cmd.addDouble(m_rightTrajectory.front().getRotation().asRPY()(2));
+    m_rpcBaseEstPort.write(cmd,outcome);
+    
+    if(!outcome.get(0).asBool())
+      {
+	yError() << "[startWalking] Unable reset the odometry.";
+	return false;
+      }
+    
+    
+    // get feedbacks and evaluate useful quantities
+    if(!m_robotControlHelper->getFeedbacks(100))
+      {
+	yError() << "[updateModule] Unable to get the feedback.";
+	return false;
+      }
 
+    if(!updateFKSolver())
+      {
+	yError() << "[updateModule] Unable to update the FK solver.";
+	return false;
+      }
+    
+    double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
+			   + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
+    
+    yInfo() << heightOffset;
+    m_robotControlHelper->setHeightOffset(heightOffset);
+    
     if (m_useTorque)
+    {	       
         if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_TORQUE))
         {
-            yError() << "[prepareRobot] Error while setting the torque control.";
+	    yError() << "[prepareRobot] Error while setting the torque control.";
             return false;
         }
+    }
+
+    m_robotState = WalkingFSM::Walking;
+    m_firstStep = true;
 
     return true;
 }

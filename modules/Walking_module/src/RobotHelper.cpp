@@ -48,7 +48,7 @@ bool RobotHelper::getWorstError(const iDynTree::VectorDynSize& desiredJointPosit
     return true;
 }
 
-bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
+bool RobotHelper::getFeedbacksRaw(bool getBaseEst, unsigned int maxAttempts)
 {
     if(!m_encodersInterface)
     {
@@ -62,7 +62,9 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
     bool okLeftWrench = false;
     bool okRightWrench = false;
 
-    bool okBaseEstimation = !m_useExternalRobotBase;
+    bool okBaseEstimation = true;
+    if(getBaseEst)
+      okBaseEstimation = !m_useExternalRobotBase;
 
     unsigned int attempt = 0;
     do
@@ -455,7 +457,7 @@ bool RobotHelper::configurePIDHandler(const yarp::os::Bottle& config)
 
 bool RobotHelper::resetFilters()
 {
-    if(!getFeedbacksRaw())
+    if(!getFeedbacksRaw(true))
     {
         yError() << "[RobotHelper::getFeedbacks] Unable to get the feedback from the robot";
         return false;
@@ -478,7 +480,7 @@ bool RobotHelper::resetFilters()
 
 bool RobotHelper::getFeedbacks(unsigned int maxAttempts)
 {
-    if(!getFeedbacksRaw(maxAttempts))
+  if(!getFeedbacksRaw(true, maxAttempts))
     {
         yError() << "[RobotHelper::getFeedbacks] Unable to get the feedback from the robot";
         return false;

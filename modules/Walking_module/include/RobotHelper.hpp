@@ -129,7 +129,7 @@ public:
      */
     bool getFeedbacks(unsigned int maxAttempts = 1);
 
-    bool getFeedbacksRaw(unsigned int maxAttempts = 1);
+  bool getFeedbacksRaw( bool useBaseEst, unsigned int maxAttempts = 1);
 
     /**
      * Switch the control mode.
