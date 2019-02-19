@@ -109,6 +109,8 @@ public:
     void getWrenches(iDynTree::Wrench& left, iDynTree::Wrench& right);
 
     void getZMP(iDynTree::Vector2& zmp);
+
+    iDynTree::Vector3 getDesiredNeckOrientation();
 };
 
 #endif

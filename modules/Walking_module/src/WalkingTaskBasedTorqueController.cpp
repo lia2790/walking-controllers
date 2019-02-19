@@ -566,3 +566,11 @@ void WalkingTaskBasedTorqueController::getZMP(iDynTree::Vector2& zmp)
     else
         zmp = m_singleSupportSolver->getZMP();
 }
+
+iDynTree::Vector3 WalkingTaskBasedTorqueController::getDesiredNeckOrientation()
+{
+    if(m_isDoubleSupportPhase)
+        return m_doubleSupportSolver->getDesiredNeckOrientation();
+    else
+        return m_singleSupportSolver->getDesiredNeckOrientation();
+}
