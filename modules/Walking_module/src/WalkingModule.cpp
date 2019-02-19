@@ -1139,11 +1139,11 @@ bool WalkingModule::updateModule()
 
         m_floatingBasePort.write();
 
-        yInfo() << "debug " << m_FKSolverDebug->getLeftFootToRightFoot().getPosition().toString() << " " <<
-            m_FKSolverDebug->getLeftFootToRightFoot().getRotation().asRPY().toString();
+        // yInfo() << "debug " << m_FKSolverDebug->getLeftFootToRightFoot().getPosition().toString() << " " <<
+        //     m_FKSolverDebug->getLeftFootToRightFoot().getRotation().asRPY().toString();
 
-        yInfo() << "gazebo " << m_FKSolver->getLeftFootToRightFoot().getPosition().toString() << " " <<
-            m_FKSolver->getLeftFootToRightFoot().getRotation().asRPY().toString();
+        // yInfo() << "gazebo " << m_FKSolver->getLeftFootToRightFoot().getPosition().toString() << " " <<
+        //     m_FKSolver->getLeftFootToRightFoot().getRotation().asRPY().toString();
 
 
         // send data to the WalkingLogger
@@ -1165,7 +1165,7 @@ bool WalkingModule::updateModule()
             // }
 
             iDynTree::Wrench left, right;
-            // m_taskBasedTorqueSolver->getWrenches(left, right);
+            m_taskBasedTorqueSolver->getWrenches(left, right);
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
             m_walkingLogger->sendData(m_FKSolver->getDCM(),
