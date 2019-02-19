@@ -26,6 +26,7 @@ protected:
     bool m_useLinearMomentumCostFunction;
     bool m_useAngularMomentumConstraint;
     bool m_controlOnlyCoMHeight;
+    bool m_useMotorReflectedInertia;
 
     //todo
     std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
@@ -60,6 +61,8 @@ protected:
     iDynTree::VectorDynSize m_comBiasAcceleration;
     iDynTree::Position m_comPosition ; // used by angular momentum
 
+    iDynTree::MatrixDynSize m_reflectedInertia;
+
     /**
      * Instantiate the CoM constraint.
      * @param config configuration parameters.
@@ -68,6 +71,7 @@ protected:
 
     // bool instantiateAngularMomentumConstraint(const yarp::os::Searchable& config);
 
+    bool instantiateMotorReflectedInertia(const yarp::os::Searchable& config);
 
     /**
      * Instantiate the Linear momentum constraint.

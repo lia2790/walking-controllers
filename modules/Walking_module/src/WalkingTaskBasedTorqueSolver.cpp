@@ -168,6 +168,107 @@ bool TaskBasedTorqueSolver::instantiateRateOfChangeConstraint(const yarp::os::Se
     return true;
 }
 
+bool TaskBasedTorqueSolver::instantiateMotorReflectedInertia(const yarp::os::Searchable& config)
+{
+    yarp::os::Value tempValue;
+
+    if(config.isNull())
+    {
+        yWarning() << "[instantiateMotorReflectedInertia] Motor reflected inertia will not be used.";
+        m_useMotorReflectedInertia = false;
+        return true;
+    }
+
+    m_useMotorReflectedInertia = true;
+
+    tempValue = config.find("gamma");
+    iDynTree::VectorDynSize gamma(m_actuatedDOFs);
+    if(!YarpHelper::yarpListToiDynTreeVectorDynSize(tempValue, gamma))
+    {
+        yError() << "Initialization failed while reading gamma vector.";
+        return false;
+    }
+
+    tempValue = config.find("motors_inertia");
+    iDynTree::VectorDynSize motorsInertia(m_actuatedDOFs);
+    if(!YarpHelper::yarpListToiDynTreeVectorDynSize(tempValue, motorsInertia))
+    {
+        yError() << "Initialization failed while reading motors_inertia vector.";
+        return false;
+    }
+
+    bool useHarmonicDriveInertia = config.check("use_harmonic_drive", yarp::os::Value("False")).asBool();
+    if (useHarmonicDriveInertia)
+    {
+        tempValue = config.find("harmonic_drive_inertia");
+        iDynTree::VectorDynSize harmonicDriveInertia(m_actuatedDOFs);
+        if(!YarpHelper::yarpListToiDynTreeVectorDynSize(tempValue, harmonicDriveInertia))
+        {
+            yError() << "Initialization failed while reading motors_inertia vector.";
+            return false;
+        }
+
+        iDynTree::toEigen(motorsInertia) += iDynTree::toEigen(harmonicDriveInertia);
+    }
+    else
+        yWarning() << "[instantiateMotorReflectedInertia] Harmonic drive inertia is not used.";
+
+    // parameters for coupling matrices. Updated according to the wiki:
+    // http://wiki.icub.org/wiki/ICub_coupled_joints
+    // and corrected according to https://github.com/robotology/robots-configuration/issues/39
+    double t, r, R;
+    if(!YarpHelper::getNumberFromSearchable(config, "t", t ))
+    {
+        yError() << "[instantiateMotorReflectedInertia] Unable to find the 't' parameters";
+        return false;
+    }
+
+    if(!YarpHelper::getNumberFromSearchable(config, "r", r ))
+    {
+        yError() << "[instantiateMotorReflectedInertia] Unable to find the 'r' parameters";
+        return false;
+    }
+
+    if(!YarpHelper::getNumberFromSearchable(config, "R", R ))
+    {
+        yError() << "[instantiateMotorReflectedInertia] Unable to find the 'R' parameters";
+        return false;
+    }
+
+    iDynTree::MatrixDynSize couplingMatrix(m_actuatedDOFs, m_actuatedDOFs);
+    for(int i = 0; i < m_actuatedDOFs; i++)
+        couplingMatrix(i, i) = 1;
+
+    // TODO do in a better way (HARD CODED JOINTS)
+    iDynTree::toEigen(couplingMatrix).block(0, 0, 3, 3) <<   0.5,    -0.5,     0,
+                                                             0.5,     0.5,     0,
+                                                             r/(2*R), r/(2*R), r/R;
+
+    iDynTree::toEigen(couplingMatrix).block(3, 3, 3, 3) << -1, 0, 0,
+                                                           -1, -t, 0,
+                                                            0, t, -t;
+
+
+    iDynTree::toEigen(couplingMatrix).block(7, 7, 3, 3) << 1, 0, 0,
+                                                           1, t, 0,
+                                                           0, -t, t;
+
+    // TODO
+    // if(!YarpHelper::getNumberFromSearchable(config, "k_ff", m_kFF))
+    // {
+    //     yError() << "[instantiateMotorReflectedInertia] Unable to find the k_ff parameter";
+    //     return false;
+    // }
+
+    m_reflectedInertia.resize(6 + m_actuatedDOFs, 6 + m_actuatedDOFs);
+    iDynTree::toEigen(m_reflectedInertia).block(6, 6, m_actuatedDOFs, m_actuatedDOFs)  =
+        (iDynTree::toEigen(couplingMatrix) * iDynTree::toEigen(gamma).asDiagonal()).inverse().transpose() *
+        iDynTree::toEigen(motorsInertia).asDiagonal() *
+        (iDynTree::toEigen(couplingMatrix) * iDynTree::toEigen(gamma).asDiagonal()).inverse();
+
+    return true;
+}
+
 bool TaskBasedTorqueSolver::instantiateNeckSoftConstraint(const yarp::os::Searchable& config)
 {
     yarp::os::Value tempValue;
@@ -477,6 +578,13 @@ bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
+    yarp::os::Bottle& motorReflectedInertiaOption = config.findGroup("MOTOR_REFLECTED_INERTIA");
+    if(!instantiateMotorReflectedInertia(motorReflectedInertiaOption))
+    {
+        yError() << "[initialize] Unable to get the instantiate the motor reflected inertia.";
+        return false;
+    }
+
     // resize
     // sparse matrix
     m_hessianEigen.resize(m_numberOfVariables, m_numberOfVariables);
@@ -520,9 +628,14 @@ bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
     return true;
 }
 
+
+
 bool TaskBasedTorqueSolver::setMassMatrix(const iDynTree::MatrixDynSize& massMatrix)
 {
-    m_massMatrix = massMatrix;
+    if(m_useMotorReflectedInertia)
+        iDynTree::toEigen(m_massMatrix) = iDynTree::toEigen(massMatrix) + iDynTree::toEigen(m_reflectedInertia);
+    else
+        m_massMatrix = massMatrix;
 
     if(m_useLinearMomentumConstraint)
     {
