@@ -1069,10 +1069,10 @@ bool WalkingModule::updateModule()
         }
         else
         {
-            // // x and y are not tacking into account
-            // desiredCoMPosition(0) = desiredCoMPositionXY(0);
-            // desiredCoMPosition(1) = desiredCoMPositionXY(1);
-            // desiredCoMPosition(2) = m_comHeightTrajectory.front();
+            // x and y are not tacking into account
+            desiredCoMPosition(0) = desiredCoMPositionXY(0);
+            desiredCoMPosition(1) = desiredCoMPositionXY(1);
+            desiredCoMPosition(2) = m_comHeightTrajectory.front();
 
             // m_profiler->setInitTime("IK");
 
