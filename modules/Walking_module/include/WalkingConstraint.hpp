@@ -265,6 +265,8 @@ class ZMPConstraint : public LinearConstraint
 protected:
 
     iDynTree::Vector2 m_desiredZMP;
+    iDynTree::Vector2 m_measuredZMP;
+    iDynTree::Vector2 m_kp;
 
 public:
     ZMPConstraint();
@@ -274,6 +276,15 @@ public:
      * @param zmp desired ZMP
      */
     void setDesiredZMP(const iDynTree::Vector2& zmp){m_desiredZMP = zmp;};
+
+    /**
+     * Set the measured ZMP
+     * @param zmp measured ZMP
+     */
+    void setMeasuredZMP(const iDynTree::Vector2& zmp){m_measuredZMP = zmp;};
+
+
+    void setKp(const iDynTree::Vector2& kp){m_kp = kp;};
 
     /**
      * Evaluate the lower and upper bounds

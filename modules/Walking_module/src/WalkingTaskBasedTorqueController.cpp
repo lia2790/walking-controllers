@@ -469,6 +469,27 @@ bool WalkingTaskBasedTorqueController::setDesiredZMP(const iDynTree::Vector2 &zm
     return true;
 }
 
+bool WalkingTaskBasedTorqueController::setMeasuredZMP(const iDynTree::Vector2 &zmp)
+{
+    if(m_isDoubleSupportPhase)
+    {
+        if(!m_doubleSupportSolver->setMeasuredZMP(zmp))
+        {
+            yError() << "[setDesiredZMP] Unable to set the desired ZMP (DS)";
+            return false;
+        }
+    }
+    else
+    {
+        if(!m_singleSupportSolver->setMeasuredZMP(zmp))
+        {
+            yError() << "[setDesiredZMP] Unable to set the desired ZMP (SS)";
+            return false;
+        }
+    }
+    return true;
+}
+
 bool WalkingTaskBasedTorqueController::setDesiredVRP(const iDynTree::Vector3 &vrp)
 {
     if(m_isDoubleSupportPhase)

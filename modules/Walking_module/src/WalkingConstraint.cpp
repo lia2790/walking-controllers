@@ -303,6 +303,11 @@ void ZMPConstraint::setBoundsConstantElements(Eigen::VectorXd &upperBounds, Eige
 
 void ZMPConstraintDoubleSupport::evaluateJacobian(Eigen::SparseMatrix<double>& jacobian)
 {
+    iDynTree::Vector2 desiredZMP;
+    iDynTree::toEigen(desiredZMP) = iDynTree::toEigen(m_desiredZMP)
+        + iDynTree::toEigen(m_kp).asDiagonal() * (iDynTree::toEigen(m_desiredZMP) -
+                                                  iDynTree::toEigen(m_measuredZMP));
+
     double xL = m_leftFootToWorldTransform->getPosition()(0);
     double yL = m_leftFootToWorldTransform->getPosition()(1);
 
@@ -310,29 +315,34 @@ void ZMPConstraintDoubleSupport::evaluateJacobian(Eigen::SparseMatrix<double>& j
     double yR = m_rightFootToWorldTransform->getPosition()(1);
 
     // left
-    jacobian.coeffRef(m_jacobianStartingRow, m_jacobianStartingColumn + 2) = m_desiredZMP(0) - xL;
+    jacobian.coeffRef(m_jacobianStartingRow, m_jacobianStartingColumn + 2) = desiredZMP(0) - xL;
     jacobian.coeffRef(m_jacobianStartingRow, m_jacobianStartingColumn + 4) = 1;
-    jacobian.coeffRef(m_jacobianStartingRow + 1, m_jacobianStartingColumn + 2) = m_desiredZMP(1) - yL;
+    jacobian.coeffRef(m_jacobianStartingRow + 1, m_jacobianStartingColumn + 2) = desiredZMP(1) - yL;
     jacobian.coeffRef(m_jacobianStartingRow + 1, m_jacobianStartingColumn + 3) = -1;
 
     // right
-    jacobian.coeffRef(m_jacobianStartingRow, m_jacobianStartingColumn + 2 + 6) = m_desiredZMP(0) - xR;
+    jacobian.coeffRef(m_jacobianStartingRow, m_jacobianStartingColumn + 2 + 6) = desiredZMP(0) - xR;
     jacobian.coeffRef(m_jacobianStartingRow, m_jacobianStartingColumn + 4 + 6) = 1;
-    jacobian.coeffRef(m_jacobianStartingRow + 1, m_jacobianStartingColumn + 2 + 6) = m_desiredZMP(1) - yR;
+    jacobian.coeffRef(m_jacobianStartingRow + 1, m_jacobianStartingColumn + 2 + 6) = desiredZMP(1) - yR;
     jacobian.coeffRef(m_jacobianStartingRow + 1, m_jacobianStartingColumn + 3 + 6) = -1;
 }
 
 void ZMPConstraintSingleSupport::evaluateJacobian(Eigen::SparseMatrix<double>& jacobian)
 {
+    iDynTree::Vector2 desiredZMP;
+    iDynTree::toEigen(desiredZMP) = iDynTree::toEigen(m_desiredZMP)
+        + iDynTree::toEigen(m_kp).asDiagonal() * (iDynTree::toEigen(m_desiredZMP) -
+                                                  iDynTree::toEigen(m_measuredZMP));
+
     double x = m_stanceFootToWorldTransform->getPosition()(0);
     double y = m_stanceFootToWorldTransform->getPosition()(1);
 
     // x
-    jacobian.coeffRef(m_jacobianStartingRow, m_jacobianStartingColumn + 2) = m_desiredZMP(0) - x;
+    jacobian.coeffRef(m_jacobianStartingRow, m_jacobianStartingColumn + 2) = desiredZMP(0) - x;
     jacobian.coeffRef(m_jacobianStartingRow, m_jacobianStartingColumn + 4) = 1;
 
     // y
-    jacobian.coeffRef(m_jacobianStartingRow + 1, m_jacobianStartingColumn + 2) = m_desiredZMP(1) -y;
+    jacobian.coeffRef(m_jacobianStartingRow + 1, m_jacobianStartingColumn + 2) = desiredZMP(1) - y;
     jacobian.coeffRef(m_jacobianStartingRow + 1, m_jacobianStartingColumn + 3) = -1;
 }
 

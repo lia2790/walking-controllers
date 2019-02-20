@@ -94,6 +94,8 @@ public:
 
     bool setDesiredVRP(const iDynTree::Vector3& vrp);
 
+    bool setMeasuredZMP(const iDynTree::Vector2& zmp);
+
     /**
      * Solve the optimization problem.
      * @return true/false in case of success/failure.

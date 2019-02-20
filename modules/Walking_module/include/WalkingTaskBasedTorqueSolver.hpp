@@ -81,7 +81,7 @@ protected:
 
     virtual bool instantiateFeetConstraint(const yarp::os::Searchable& config) = 0;
 
-    virtual void instantiateZMPConstraint(const yarp::os::Searchable& config) = 0;
+    virtual bool instantiateZMPConstraint(const yarp::os::Searchable& config) = 0;
 
     virtual void instantiateSystemDynamicsConstraint() = 0;
 
@@ -189,6 +189,8 @@ public:
 
     bool setDesiredVRP(const iDynTree::Vector3& vrp);
 
+    bool setMeasuredZMP(const iDynTree::Vector2& zmp);
+
     /**
      * Solve the optimization problem.
      * @return true/false in case of success/failure.
@@ -222,7 +224,7 @@ private:
     iDynTree::VectorDynSize m_rightFootBiasAcceleration;
 
     bool instantiateFeetConstraint(const yarp::os::Searchable& config) override;
-    void instantiateZMPConstraint(const yarp::os::Searchable& config) override;
+    bool instantiateZMPConstraint(const yarp::os::Searchable& config) override;
 
     void instantiateSystemDynamicsConstraint() override;
 
@@ -274,7 +276,7 @@ class TaskBasedTorqueSolverSingleSupport : public TaskBasedTorqueSolver
     iDynTree::VectorDynSize m_swingFootBiasAcceleration;
 
     bool instantiateFeetConstraint(const yarp::os::Searchable& config) override;
-    void instantiateZMPConstraint(const yarp::os::Searchable& config) override;
+    bool instantiateZMPConstraint(const yarp::os::Searchable& config) override;
 
     void instantiateSystemDynamicsConstraint() override;
 

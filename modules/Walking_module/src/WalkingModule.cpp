@@ -650,6 +650,13 @@ bool WalkingModule::solveTaskBased(const iDynTree::Rotation& desiredNeckOrientat
         return false;
     }
 
+    if(!m_taskBasedTorqueSolver->setMeasuredZMP(m_FKSolver->getZMP()))
+    {
+        yError() << "[solveTaskBased] Unable to set the feet state.";
+        return false;
+    }
+
+
     if(!m_taskBasedTorqueSolver->setDesiredVRP(desiredVRPPosition))
     {
         yError() << "[solveTaskBased] Unable to set the feet state.";

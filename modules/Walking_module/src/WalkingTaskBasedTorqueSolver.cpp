@@ -531,7 +531,11 @@ bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
     }
 
     yarp::os::Bottle& ZMPConstraintOptions = config.findGroup("ZMP");
-    instantiateZMPConstraint(ZMPConstraintOptions);
+    if(!instantiateZMPConstraint(ZMPConstraintOptions))
+    {
+        yError() << "[initialize] Unable the instantiate the zmp constraints.";
+        return false;
+    }
 
     yarp::os::Bottle& contactForcesOption = config.findGroup("CONTACT_FORCES");
     if(!instantiateContactForcesConstraint(contactForcesOption))
@@ -907,6 +911,25 @@ bool TaskBasedTorqueSolver::setDesiredZMP(const iDynTree::Vector2 &zmp)
         }
         ptr = std::static_pointer_cast<ZMPConstraint>(constraint->second);
         ptr->setDesiredZMP(zmp);
+    }
+    return true;
+}
+
+bool TaskBasedTorqueSolver::setMeasuredZMP(const iDynTree::Vector2 &zmp)
+{
+    if(m_useZMPConstraint)
+    {
+        std::shared_ptr<ZMPConstraint> ptr;
+
+        auto constraint = m_constraints.find("zmp");
+        if(constraint == m_constraints.end())
+        {
+            yError() << "[setDesiredZMP] Unable to find the zmp constraint. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+        ptr = std::static_pointer_cast<ZMPConstraint>(constraint->second);
+        ptr->setMeasuredZMP(zmp);
     }
     return true;
 }
@@ -1378,24 +1401,35 @@ bool TaskBasedTorqueSolverDoubleSupport::instantiateFeetConstraint(const yarp::o
     return true;
 }
 
-void TaskBasedTorqueSolverDoubleSupport::instantiateZMPConstraint(const yarp::os::Searchable& config)
+bool TaskBasedTorqueSolverDoubleSupport::instantiateZMPConstraint(const yarp::os::Searchable& config)
 {
     if(config.isNull())
     {
         yInfo() << "[instantiateZMPConstraint] Empty configuration file. The ZMP Constraint will not be used";
         m_useZMPConstraint = false;
-        return;
+        return true;
     }
     m_useZMPConstraint = true;
+
+    iDynTree::Vector2 kp;
+    yarp::os::Value tempValue = config.find("kp");
+    if(!YarpHelper::yarpListToiDynTreeVectorFixSize(tempValue, kp))
+    {
+        yError() << "[TaskBasedTorqueSolverDoubleSupport::instantiateZMPConstraint] Initialization failed while reading kp vector.";
+        return false;
+    }
 
     auto ptr = std::make_shared<ZMPConstraintDoubleSupport>();
     ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6 + m_actuatedDOFs + m_actuatedDOFs);
     ptr->setLeftFootToWorldTransform(m_leftFootToWorldTransform);
     ptr->setRightFootToWorldTransform(m_rightFootToWorldTransform);
+    ptr->setKp(kp);
 
     m_constraints.insert(std::make_pair("zmp", ptr));
 
     m_numberOfConstraints += ptr->getNumberOfConstraints();
+
+    return true;
 }
 
 void TaskBasedTorqueSolverDoubleSupport::instantiateSystemDynamicsConstraint()
@@ -1819,22 +1853,33 @@ bool TaskBasedTorqueSolverSingleSupport::instantiateFeetConstraint(const yarp::o
     return true;
 }
 
-void TaskBasedTorqueSolverSingleSupport::instantiateZMPConstraint(const yarp::os::Searchable& config)
+bool TaskBasedTorqueSolverSingleSupport::instantiateZMPConstraint(const yarp::os::Searchable& config)
 {
     if(config.isNull())
     {
         yInfo() << "[instantiateZMPConstraint] Empty configuration file. The ZMP Constraint will not be used";
         m_useZMPConstraint = false;
-        return;
+        return true;
     }
     m_useZMPConstraint = true;
+
+    iDynTree::Vector2 kp;
+    yarp::os::Value tempValue = config.find("kp");
+    if(!YarpHelper::yarpListToiDynTreeVectorFixSize(tempValue, kp))
+    {
+        yError() << "[TaskBasedTorqueSolverSingleSupport::instantiateZMPConstraint] Initialization failed while reading kp vector.";
+        return false;
+    }
 
     auto ptr = std::make_shared<ZMPConstraintSingleSupport>();
     ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6 + m_actuatedDOFs + m_actuatedDOFs);
     ptr->setStanceFootToWorldTransform(m_stanceFootToWorldTransform);
+    ptr->setKp(kp);
 
     m_constraints.insert(std::make_pair("zmp", ptr));
     m_numberOfConstraints += ptr->getNumberOfConstraints();
+
+    return true;
 }
 
 void TaskBasedTorqueSolverSingleSupport::instantiateSystemDynamicsConstraint()
