@@ -174,6 +174,11 @@ public:
      */
     bool getFeetTwist(std::vector<iDynTree::Twist>& lFootTwist,
                       std::vector<iDynTree::Twist>& rFootTwist);
+
+    bool getFeetAcceleration(std::vector<iDynTree::Vector6>& lFootAccleration,
+                             std::vector<iDynTree::Vector6>& rFootAcceleration);
+
+
     /**
      * Get the when the main frame of the left foot is the fix frame.
      * @param isLeftFixedFrame vector containing when the main frame of

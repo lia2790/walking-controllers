@@ -2104,13 +2104,9 @@ void TaskBasedTorqueSolverSingleSupport::setNumberOfVariables()
 
 bool TaskBasedTorqueSolverSingleSupport::setDesiredFeetTrajectory(const iDynTree::Transform& swingFootToWorldTransform,
                                                                   const iDynTree::Twist& swingFootTwist,
-                                                                  const iDynTree::Twist& swingFootAcceleration)
+                                                                  const iDynTree::Vector6& swingFootAcceleration)
 {
     // save left foot trajectory
-
-    iDynTree::Vector3 dummy;
-    dummy.zero();
-
     if(m_useSwingFootAsConstraint)
     {
         auto constraint = m_constraints.find("swing_foot_constraint");
@@ -2122,12 +2118,20 @@ bool TaskBasedTorqueSolverSingleSupport::setDesiredFeetTrajectory(const iDynTree
         }
 
         auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
-        ptr->positionController()->setDesiredTrajectory(dummy,
+        iDynTree::Vector3 swingFootLinearAcceleration;
+        swingFootLinearAcceleration(0) = swingFootAcceleration(0);
+        swingFootLinearAcceleration(1) = swingFootAcceleration(1);
+        swingFootLinearAcceleration(2) = swingFootAcceleration(2);
+        ptr->positionController()->setDesiredTrajectory(swingFootLinearAcceleration,
                                                         swingFootTwist.getLinearVec3(),
                                                         swingFootToWorldTransform.getPosition());
 
 
-        ptr->orientationController()->setDesiredTrajectory(dummy,
+        iDynTree::Vector3 swingFootAngularAcceleration;
+        swingFootAngularAcceleration(0) = swingFootAcceleration(3);
+        swingFootAngularAcceleration(1) = swingFootAcceleration(4);
+        swingFootAngularAcceleration(2) = swingFootAcceleration(5);
+        ptr->orientationController()->setDesiredTrajectory(swingFootAngularAcceleration,
                                                            swingFootTwist.getAngularVec3(),
                                                            swingFootToWorldTransform.getRotation());
     }
@@ -2144,12 +2148,19 @@ bool TaskBasedTorqueSolverSingleSupport::setDesiredFeetTrajectory(const iDynTree
 
 
         auto ptr = std::static_pointer_cast<CartesianCostFunction>(costFunction->second);
-        ptr->positionController()->setDesiredTrajectory(dummy,
+        iDynTree::Vector3 swingFootLinearAcceleration;
+        swingFootLinearAcceleration(0) = swingFootAcceleration(0);
+        swingFootLinearAcceleration(1) = swingFootAcceleration(1);
+        swingFootLinearAcceleration(2) = swingFootAcceleration(2);
+        ptr->positionController()->setDesiredTrajectory(swingFootLinearAcceleration,
                                                         swingFootTwist.getLinearVec3(),
                                                         swingFootToWorldTransform.getPosition());
 
-
-        ptr->orientationController()->setDesiredTrajectory(dummy,
+        iDynTree::Vector3 swingFootAngularAcceleration;
+        swingFootAngularAcceleration(0) = swingFootAcceleration(3);
+        swingFootAngularAcceleration(1) = swingFootAcceleration(4);
+        swingFootAngularAcceleration(2) = swingFootAcceleration(5);
+        ptr->orientationController()->setDesiredTrajectory(swingFootAngularAcceleration,
                                                            swingFootTwist.getAngularVec3(),
                                                            swingFootToWorldTransform.getRotation());
     }

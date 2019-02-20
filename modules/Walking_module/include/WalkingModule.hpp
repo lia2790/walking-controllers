@@ -91,6 +91,10 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::deque<iDynTree::Twist> m_leftTwistTrajectory; /**< Deque containing the twist trajectory of the left foot. */
     std::deque<iDynTree::Twist> m_rightTwistTrajectory; /**< Deque containing the twist trajectory of the right foot. */
 
+    std::deque<iDynTree::Vector6> m_leftAccelerationTrajectory; /**< Deque containing the twist trajectory of the left foot. */
+    std::deque<iDynTree::Vector6> m_rightAccelerationTrajectory; /**< Deque containing the twist trajectory of the right foot. */
+
+
     std::deque<iDynTree::Vector2> m_DCMPositionDesired; /**< Deque containing the desired DCM position. */
     std::deque<iDynTree::Vector2> m_DCMVelocityDesired; /**< Deque containing the desired DCM velocity. */
     std::deque<bool> m_leftInContact; /**< Deque containing the left foot state. */
@@ -117,7 +121,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     yarp::os::BufferedPort<yarp::sig::Vector> m_desiredUnyciclePositionPort; /**< Desired robot position port. */
 
     yarp::os::RpcClient m_rpcBaseEstPort; /**< Remote Procedure Call port. */
-  
+
     yarp::os::BufferedPort<yarp::sig::Vector> m_floatingBasePort; /**< Desired robot position port. */
 
     bool m_newTrajectoryRequired; /**< if true a new trajectory will be merged soon. (after m_newTrajectoryMergeCounter - 2 cycles). */

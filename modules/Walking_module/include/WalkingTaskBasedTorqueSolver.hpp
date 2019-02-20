@@ -300,7 +300,7 @@ class TaskBasedTorqueSolverSingleSupport : public TaskBasedTorqueSolver
 public:
     bool setDesiredFeetTrajectory(const iDynTree::Transform& swingFootToWorldTransform,
                                   const iDynTree::Twist& swingFootTwist,
-                                  const iDynTree::Twist& swingFootAcceleration);
+                                  const iDynTree::Vector6& swingFootAcceleration);
 
     bool setFeetState(const iDynTree::Transform& stanceFootToWorldTransform,
                       const iDynTree::Transform& swingFootToWorldTransform,

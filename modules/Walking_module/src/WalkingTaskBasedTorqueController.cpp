@@ -249,8 +249,8 @@ bool WalkingTaskBasedTorqueController::setDesiredFeetTrajectory(const iDynTree::
                                                                 const iDynTree::Transform& rightFootToWorldTransform,
                                                                 const iDynTree::Twist& leftFootTwist,
                                                                 const iDynTree::Twist& rightFootTwist,
-                                                                const iDynTree::Twist& leftFootAcceleration,
-                                                                const iDynTree::Twist& rightFootAcceleration)
+                                                                const iDynTree::Vector6& leftFootAcceleration,
+                                                                const iDynTree::Vector6& rightFootAcceleration)
 {
     if(m_isDoubleSupportPhase)
         return true;

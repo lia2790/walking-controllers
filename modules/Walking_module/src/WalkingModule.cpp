@@ -66,6 +66,12 @@ bool WalkingModule::advanceReferenceSignals()
     m_leftTwistTrajectory.pop_front();
     m_leftTwistTrajectory.push_back(m_leftTwistTrajectory.back());
 
+    m_rightAccelerationTrajectory.pop_front();
+    m_rightAccelerationTrajectory.push_back(m_rightAccelerationTrajectory.back());
+
+    m_leftAccelerationTrajectory.pop_front();
+    m_leftAccelerationTrajectory.push_back(m_leftAccelerationTrajectory.back());
+
     m_rightInContact.pop_front();
     m_rightInContact.push_back(m_rightInContact.back());
 
@@ -582,14 +588,12 @@ bool WalkingModule::solveTaskBased(const iDynTree::Rotation& desiredNeckOrientat
     //     return false;
     // }
 
-
-    iDynTree::Twist dummyTwist;
-    dummyTwist.zero();
     if(!m_taskBasedTorqueSolver->setDesiredFeetTrajectory(m_leftTrajectory.front(),
                                                           m_rightTrajectory.front(),
                                                           m_leftTwistTrajectory.front(),
                                                           m_rightTwistTrajectory.front(),
-                                                          dummyTwist, dummyTwist))
+                                                          m_leftAccelerationTrajectory.front(),
+                                                          m_rightAccelerationTrajectory.front()))
     {
         yError() << "[solveTaskbased] Unable to set the desired feet trajectory";
         return false;
@@ -1462,6 +1466,8 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     std::vector<iDynTree::Transform> rightTrajectory;
     std::vector<iDynTree::Twist> leftTwistTrajectory;
     std::vector<iDynTree::Twist> rightTwistTrajectory;
+    std::vector<iDynTree::Vector6> leftAccelerationTrajectory;
+    std::vector<iDynTree::Vector6> rightAccelerationTrajectory;
     std::vector<iDynTree::Vector2> DCMPositionDesired;
     std::vector<iDynTree::Vector2> DCMVelocityDesired;
     std::vector<bool> rightInContact;
@@ -1480,6 +1486,8 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     // get feet trajectories
     m_trajectoryGenerator->getFeetTrajectories(leftTrajectory, rightTrajectory);
     m_trajectoryGenerator->getFeetTwist(leftTwistTrajectory, rightTwistTrajectory);
+    m_trajectoryGenerator->getFeetAcceleration(leftAccelerationTrajectory,
+                                               rightAccelerationTrajectory);
     m_trajectoryGenerator->getFeetStandingPeriods(leftInContact, rightInContact);
     m_trajectoryGenerator->getWhenUseLeftAsFixed(isLeftFixedFrame);
 
@@ -1498,6 +1506,8 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     StdHelper::appendVectorToDeque(rightTrajectory, m_rightTrajectory, mergePoint);
     StdHelper::appendVectorToDeque(leftTwistTrajectory, m_leftTwistTrajectory, mergePoint);
     StdHelper::appendVectorToDeque(rightTwistTrajectory, m_rightTwistTrajectory, mergePoint);
+    StdHelper::appendVectorToDeque(leftAccelerationTrajectory, m_leftAccelerationTrajectory, mergePoint);
+    StdHelper::appendVectorToDeque(rightAccelerationTrajectory, m_rightAccelerationTrajectory, mergePoint);
     StdHelper::appendVectorToDeque(isLeftFixedFrame, m_isLeftFixedFrame, mergePoint);
 
     StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionDesired, mergePoint);
