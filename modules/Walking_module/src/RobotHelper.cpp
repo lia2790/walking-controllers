@@ -58,6 +58,7 @@ bool RobotHelper::getFeedbacksRaw(bool getBaseEst, unsigned int maxAttempts)
 
     bool okPosition = false;
     bool okVelocity = false;
+    bool okTorque = false;
 
     bool okLeftWrench = false;
     bool okRightWrench = false;
@@ -74,6 +75,9 @@ bool RobotHelper::getFeedbacksRaw(bool getBaseEst, unsigned int maxAttempts)
 
         if(!okVelocity)
             okVelocity = m_encodersInterface->getEncoderSpeeds(m_velocityFeedbackDeg.data());
+
+        if(!okTorque)
+            okTorque = m_torqueInterface->getTorques(m_torqueFeedback.data());
 
         if(!okLeftWrench)
         {
@@ -121,7 +125,7 @@ bool RobotHelper::getFeedbacksRaw(bool getBaseEst, unsigned int maxAttempts)
         }
 
 
-        if(okPosition && okVelocity && okLeftWrench && okRightWrench && okBaseEstimation)
+        if(okPosition && okVelocity && okLeftWrench && okRightWrench && okBaseEstimation && okTorque)
         {
             for(unsigned j = 0 ; j < m_actuatedDOFs; j++)
             {
@@ -151,6 +155,9 @@ bool RobotHelper::getFeedbacksRaw(bool getBaseEst, unsigned int maxAttempts)
 
     if(!okVelocity)
         yError() << "\t - Velocity encoders";
+
+    if(!okTorque)
+        yError() << "\t - Joint torque";
 
     if(!okLeftWrench)
         yError() << "\t - Left wrench";
@@ -280,6 +287,7 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
     m_velocityFeedbackDeg.resize(m_actuatedDOFs, 0.0);
     m_positionFeedbackRad.resize(m_actuatedDOFs);
     m_velocityFeedbackRad.resize(m_actuatedDOFs);
+    m_torqueFeedback.resize(m_actuatedDOFs);
     m_desiredJointPositionRad.resize(m_actuatedDOFs);
     m_desiredJointValueDeg.resize(m_actuatedDOFs);
     m_jointsVelocityLimit.resize(m_actuatedDOFs);
@@ -768,6 +776,11 @@ const iDynTree::VectorDynSize& RobotHelper::getJointPosition() const
 const iDynTree::VectorDynSize& RobotHelper::getJointVelocity() const
 {
     return m_velocityFeedbackRad;
+}
+
+const iDynTree::VectorDynSize& RobotHelper::getJointTorque() const
+{
+    return m_torqueFeedback;
 }
 
 const iDynTree::Wrench& RobotHelper::getLeftWrench() const

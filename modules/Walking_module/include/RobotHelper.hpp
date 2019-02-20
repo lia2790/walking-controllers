@@ -60,6 +60,7 @@ class RobotHelper
     iDynTree::VectorDynSize m_positionFeedbackRad; /**< Current joint position [rad]. */
     iDynTree::VectorDynSize m_positionFeedbackRadPrevious; /**< Previous joint position [rad]. */
     iDynTree::VectorDynSize m_velocityFeedbackRad; /**< Current joint velocity [rad/s]. */
+    iDynTree::VectorDynSize m_torqueFeedback; /**< Current joint torque [Nm]. */
 
     iDynTree::VectorDynSize m_desiredJointPositionRad; /**< Desired Joint Position [rad]. */
     iDynTree::VectorDynSize m_desiredJointValueDeg; /**< Desired joint position or velocity [deg or deg/s]. */
@@ -178,6 +179,7 @@ public:
 
     const iDynTree::VectorDynSize& getJointPosition() const;
     const iDynTree::VectorDynSize& getJointVelocity() const;
+    const iDynTree::VectorDynSize& getJointTorque() const;
 
     const iDynTree::VectorDynSize& getVelocityLimits() const;
 

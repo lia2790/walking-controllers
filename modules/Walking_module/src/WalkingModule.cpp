@@ -1189,6 +1189,7 @@ bool WalkingModule::updateModule()
                                       m_taskBasedTorqueSolver->getDesiredNeckOrientation(),
                                       m_FKSolver->getNeckOrientation().asRPY(),
                                       m_torqueDesired,
+                                      m_robotControlHelper->getJointTorque(),
                                       m_robotControlHelper->getJointPosition(),
                                       m_robotControlHelper->getJointVelocity());
         }
@@ -1632,6 +1633,11 @@ bool WalkingModule::startWalking()
                     "rf_torque_des_x", "rf_torque_des_y", "rf_torque_des_z",
                     "torso_roll_cart_des", "torso_pitch_cart_des", "torso_yaw_cart_des",
                     "torso_roll_cart", "torso_pitch_cart", "torso_yaw_cart",
+                    "torso_pitch_des_trq", "torso_roll_des_trq", "torso_yaw_des_trq",
+                    "l_shoulder_pitch_des_trq", "l_shoulder_roll_des_trq", "l_shoulder_yaw_des_trq", "l_elbow_des_trq",
+                    "r_shoulder_pitch_des_trq", "r_shoulder_roll_des_trq", "r_shoulder_yaw_des_trq", "r_elbow_des_trq",
+                    "l_hip_pitch_des_trq", "l_hip_roll_des_trq", "l_hip_yaw_des_trq", "l_knee_des_trq", "l_ankle_pitch_des_trq", "l_ankle_roll_des_trq",
+                    "r_hip_pitch_des_trq", "r_hip_roll_des_trq", "r_hip_yaw_des_trq", "r_knee_des_trq", "r_ankle_pitch_des_trq", "r_ankle_roll_des_trq",
                     "torso_pitch_trq", "torso_roll_trq", "torso_yaw_trq",
                     "l_shoulder_pitch_trq", "l_shoulder_roll_trq", "l_shoulder_yaw_trq", "l_elbow_trq",
                     "r_shoulder_pitch_trq", "r_shoulder_roll_trq", "r_shoulder_yaw_trq", "r_elbow_trq",
