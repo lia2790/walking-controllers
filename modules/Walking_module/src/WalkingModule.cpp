@@ -318,7 +318,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     }
 
     // debug
-    forwardKinematicsSolverOptions.find("use_external_robot_base") = yarp::os::Value(false);
+    bool useExternalRobotBase = forwardKinematicsSolverOptions.find("use_external_robot_base").asBool();
+    forwardKinematicsSolverOptions.find("use_external_robot_base") = yarp::os::Value(!useExternalRobotBase);
     m_FKSolverDebug = std::make_unique<WalkingFK>();
     if(!m_FKSolverDebug->initialize(forwardKinematicsSolverOptions, m_loader.model()))
     {
@@ -1195,7 +1196,11 @@ bool WalkingModule::updateModule()
                                       m_torqueDesired,
                                       m_robotControlHelper->getJointTorque(),
                                       m_robotControlHelper->getJointPosition(),
-                                      m_robotControlHelper->getJointVelocity());
+                                      m_robotControlHelper->getJointVelocity(),
+                                      m_FKSolver->getRootLinkToWorldTransform().getPosition(), m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
+                                      m_FKSolver->getRootLinkVelocity(),
+                                      m_FKSolverDebug->getRootLinkToWorldTransform().getPosition(), m_FKSolverDebug->getRootLinkToWorldTransform().getRotation().asRPY(),
+                                      m_FKSolverDebug->getRootLinkVelocity());
         }
 
         propagateTime();
@@ -1545,6 +1550,14 @@ bool WalkingModule::updateFKSolver()
     {
         m_FKSolver->evaluateWorldToBaseTransformation(m_robotControlHelper->getBaseTransform(),
                                                       m_robotControlHelper->getBaseTwist());
+
+        if(!m_FKSolverDebug->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
+                                                               m_rightTrajectory.front(),
+                                                               m_isLeftFixedFrame.front()))
+        {
+            yError() << "[updateFKSolver] Unable to evaluate the world to base transformation.";
+            return false;
+        }
     }
     else
     {
@@ -1557,21 +1570,15 @@ bool WalkingModule::updateFKSolver()
             return false;
         }
 
+        m_FKSolverDebug->evaluateWorldToBaseTransformation(m_robotControlHelper->getBaseTransform(),
+                                                      m_robotControlHelper->getBaseTwist());
+
     }
 
     if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
                                           m_robotControlHelper->getJointVelocity()))
     {
         yError() << "[updateFKSolver] Unable to evaluate the CoM.";
-        return false;
-    }
-
-    // TODO leftBase is only for testing
-    if(!m_FKSolverDebug->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
-                                                           m_rightTrajectory.front(),
-                                                           leftBase))
-    {
-        yError() << "[updateFKSolver] Unable to evaluate the world to base transformation.";
         return false;
     }
 
@@ -1662,7 +1669,11 @@ bool WalkingModule::startWalking()
                     "l_shoulder_pitch_vel", "l_shoulder_roll_vel", "l_shoulder_yaw_vel", "l_elbow_vel",
                     "r_shoulder_pitch_vel", "r_shoulder_roll_vel", "r_shoulder_yaw_vel", "r_elbow_vel",
                     "l_hip_pitch_vel", "l_hip_roll_vel", "l_hip_yaw_vel", "l_knee_vel", "l_ankle_pitch_vel", "l_ankle_roll_vel",
-                    "r_hip_pitch_vel", "r_hip_roll_vel", "r_hip_yaw_vel", "r_knee_vel", "r_ankle_pitch_vel", "r_ankle_roll_vel"});
+                    "r_hip_pitch_vel", "r_hip_roll_vel", "r_hip_yaw_vel", "r_knee_vel", "r_ankle_pitch_vel", "r_ankle_roll_vel",
+                    "base_x", "base_y", "base_z", "base_roll", "base_pitch", "base_yaw",
+                    "base_dx", "base_dy", "base_dz", "base_omega_x", "base_omega_y", "base_omega_z",
+                    "base_debug_x", "base_debug_y", "base_debug_z", "base_debug_roll", "base_debug_pitch", "base_debug_yaw",
+                    "base_debug_dx", "base_debug_dy", "base_debug_dz", "base_debug_omega_x", "base_debug_omega_y", "base_debug_omega_z"});
 
         // m_walkingLogger->startRecord({"record","dcm_x", "dcm_y", "dcm_z",
         //             "dcm_des_x", "dcm_des_y", "dcm_des_z",
