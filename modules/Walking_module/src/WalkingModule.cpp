@@ -1086,34 +1086,34 @@ bool WalkingModule::updateModule()
             desiredCoMPosition(1) = desiredCoMPositionXY(1);
             desiredCoMPosition(2) = m_comHeightTrajectory.front();
 
-            // m_profiler->setInitTime("IK");
+            m_profiler->setInitTime("IK");
 
-            // if(m_IKSolver->usingAdditionalRotationTarget())
-            // {
-            //     if(!m_IKSolver->updateIntertiaToWorldFrameRotation(modifiedInertial))
-            //     {
-            //         yError() << "[updateModule] Error updating the inertia to world frame rotation.";
-            //         return false;
-            //     }
+            if(m_IKSolver->usingAdditionalRotationTarget())
+            {
+                if(!m_IKSolver->updateIntertiaToWorldFrameRotation(modifiedInertial))
+                {
+                    yError() << "[updateModule] Error updating the inertia to world frame rotation.";
+                    return false;
+                }
 
-            //     if(!m_IKSolver->setFullModelFeedBack(m_robotControlHelper->getJointPosition()))
-            //     {
-            //         yError() << "[updateModule] Error while setting the feedback to the inverse Kinematics.";
-            //         return false;
-            //     }
+                if(!m_IKSolver->setFullModelFeedBack(m_robotControlHelper->getJointPosition()))
+                {
+                    yError() << "[updateModule] Error while setting the feedback to the inverse Kinematics.";
+                    return false;
+                }
 
-            //     if(!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
-            //                               desiredCoMPosition, m_qDesired))
-            //     {
-            //         yError() << "[updateModule] Error during the inverse Kinematics iteration.";
-            //         return false;
-            //     }
-            // }
-            // m_profiler->setEndTime("IK");
+                if(!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
+                                          desiredCoMPosition, m_qDesired))
+                {
+                    yError() << "[updateModule] Error during the inverse Kinematics iteration.";
+                    return false;
+                }
+            }
+            m_profiler->setEndTime("IK");
 
             desiredCoMVelocity(0) = 0;
             desiredCoMVelocity(1) = 0;
-            desiredCoMVelocity(2) = 0;
+            desiredCoMVelocity(2) = m_comHeightVelocity.front();
 
             m_profiler->setInitTime("Torque");
 
