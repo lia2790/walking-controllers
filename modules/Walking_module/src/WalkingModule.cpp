@@ -1111,8 +1111,8 @@ bool WalkingModule::updateModule()
             }
             m_profiler->setEndTime("IK");
 
-            desiredCoMVelocity(0) = 0;
-            desiredCoMVelocity(1) = 0;
+            desiredCoMVelocity(0) = desiredCoMVelocityXY(0);
+            desiredCoMVelocity(1) = desiredCoMVelocityXY(1);
             desiredCoMVelocity(2) = m_comHeightVelocity.front();
 
             m_profiler->setInitTime("Torque");
@@ -1183,6 +1183,7 @@ bool WalkingModule::updateModule()
 
             m_walkingLogger->sendData(m_FKSolver->getDCM(),
                                       DCMPositionDesired, DCMVelocityDesired,
+				      desiredCoMPositionXY,
                                       m_FKSolver->getZMP(), desiredVRP,
                                       m_FKSolver->getCoMPosition(),
                                       leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
@@ -1629,6 +1630,7 @@ bool WalkingModule::startWalking()
         m_walkingLogger->startRecord({"record","dcm_x", "dcm_y", "dcm_z",
                     "dcm_des_x", "dcm_des_y", "dcm_des_z",
                     "dcm_des_dx", "dcm_des_dy", "dcm_des_dz",
+	            "com_des_x", "com_des_y",
                     "zmp_x", "zmp_y",
                     "vrp_des_x", "vrp_des_y", "vrp_des_z",
                     "com_x", "com_y", "com_z",
