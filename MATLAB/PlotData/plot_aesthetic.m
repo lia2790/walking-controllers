@@ -55,7 +55,7 @@ set(h,'linewidth',1.2)
 if ~isempty(Title)
     tit = title(Title);
     set(tit,'FontSize', 20);
-    %set(tit,'Interpreter','latex');
+    set(tit,'Interpreter','latex');
 end
 
 % change font size
