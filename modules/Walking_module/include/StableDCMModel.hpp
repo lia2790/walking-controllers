@@ -32,8 +32,10 @@ class StableDCMModel
     std::unique_ptr<iCub::ctrl::Integrator> m_comIntegrator{nullptr}; /**< CoM integrator object. */
 
     iDynTree::Vector2 m_dcmPosition; /**< Position of the DCM. */
+    iDynTree::Vector2 m_zmpPosition; /**< Position of the DCM. */
     iDynTree::Vector2 m_comPosition; /**< Position of the CoM. */
     iDynTree::Vector2 m_comVelocity; /**< Velocity of the CoM. */
+    iDynTree::Vector2 m_comAcceleration; /**< Acceleration of the CoM. */
 
     bool m_isModelPropagated{false}; /**< True if the model is propagated. */
 
@@ -45,11 +47,18 @@ public:
      * @return true on success, false otherwise.
      */
     bool initialize(const yarp::os::Searchable& config);
+
     /**
      * Set the controlled input.
      * @param controlledInput of the 3D-LIPM (i.e. Position of the ZMP).
      */
-    void setInput(const iDynTree::Vector2& input);
+    void setDCMPosition(const iDynTree::Vector2& input);
+
+/**
+     * Set the controlled input.
+     * @param controlledInput of the 3D-LIPM (i.e. Position of the ZMP).
+     */
+    void setZMPPosition(const iDynTree::Vector2& input);
 
     /**
      * Integrate the model.
@@ -70,6 +79,13 @@ public:
      * @return true on success, false otherwise.
      */
     bool getCoMVelocity(iDynTree::Vector2& comVelocity);
+
+    /**
+     * Get the acceleration of the CoM.
+     * @param comAcceleration acceleration of the CoM.
+     * @return true on success, false otherwise.
+     */
+    bool getCoMAcceleration(iDynTree::Vector2& comAcceleration);
 
     /**
      * Reset the Model

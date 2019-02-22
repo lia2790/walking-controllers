@@ -87,6 +87,9 @@ bool WalkingModule::advanceReferenceSignals()
     m_DCMVelocityDesired.pop_front();
     m_DCMVelocityDesired.push_back(m_DCMVelocityDesired.back());
 
+    m_ZMPPositionDesired.pop_front();
+    m_ZMPPositionDesired.push_back(m_ZMPPositionDesired.back());
+
     m_comHeightTrajectory.pop_front();
     m_comHeightTrajectory.push_back(m_comHeightTrajectory.back());
 
@@ -847,7 +850,8 @@ bool WalkingModule::updateModule()
         }
 
         // evaluate 3D-LIPM reference signal
-        m_stableDCMModel->setInput(m_DCMPositionDesired.front());
+        m_stableDCMModel->setDCMPosition(m_DCMPositionDesired.front());
+        m_stableDCMModel->setZMPPosition(m_ZMPPositionDesired.front());
         if(!m_stableDCMModel->integrateModel())
         {
             yError() << "[updateModule] Unable to propagate the 3D-LIPM.";
@@ -865,6 +869,13 @@ bool WalkingModule::updateModule()
         if(!m_stableDCMModel->getCoMVelocity(desiredCoMVelocityXY))
         {
             yError() << "[updateModule] Unable to get the desired CoM velocity.";
+            return false;
+        }
+
+        iDynTree::Vector2 desiredCoMAccelerationXY;
+        if(!m_stableDCMModel->getCoMAcceleration(desiredCoMAccelerationXY))
+        {
+            yError() << "[updateModule] Unable to get the desired CoM acceleration.";
             return false;
         }
 
@@ -1120,6 +1131,8 @@ bool WalkingModule::updateModule()
 
             iDynTree::Vector3 desiredCoMAcceleration;
             desiredCoMAcceleration.zero();
+            desiredCoMAcceleration(0) = desiredCoMAccelerationXY(0);
+            desiredCoMAcceleration(1) = desiredCoMAccelerationXY(1);
 
             if(!solveTaskBased(yawRotation, desiredCoMPosition, desiredCoMVelocity,
                                desiredCoMAcceleration, desiredZMP, desiredVRP, m_torqueDesired))
@@ -1476,6 +1489,7 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     std::vector<iDynTree::Vector6> rightAccelerationTrajectory;
     std::vector<iDynTree::Vector2> DCMPositionDesired;
     std::vector<iDynTree::Vector2> DCMVelocityDesired;
+    std::vector<iDynTree::Vector2> ZMPPositionDesired;
     std::vector<bool> rightInContact;
     std::vector<bool> leftInContact;
     std::vector<double> comHeightTrajectory;
@@ -1488,6 +1502,7 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     // get dcm position and velocity
     m_trajectoryGenerator->getDCMPositionTrajectory(DCMPositionDesired);
     m_trajectoryGenerator->getDCMVelocityTrajectory(DCMVelocityDesired);
+    m_trajectoryGenerator->getZMPPositionTrajectory(ZMPPositionDesired);
 
     // get feet trajectories
     m_trajectoryGenerator->getFeetTrajectories(leftTrajectory, rightTrajectory);
@@ -1518,6 +1533,7 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
 
     StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionDesired, mergePoint);
     StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityDesired, mergePoint);
+    StdHelper::appendVectorToDeque(ZMPPositionDesired, m_ZMPPositionDesired, mergePoint);
 
     StdHelper::appendVectorToDeque(leftInContact, m_leftInContact, mergePoint);
     StdHelper::appendVectorToDeque(rightInContact, m_rightInContact, mergePoint);

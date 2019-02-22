@@ -55,9 +55,14 @@ bool StableDCMModel::initialize(const yarp::os::Searchable& config)
     return true;
 }
 
-void StableDCMModel::setInput(const iDynTree::Vector2& input)
+void StableDCMModel::setDCMPosition(const iDynTree::Vector2& input)
 {
     m_dcmPosition = input;
+}
+
+void StableDCMModel::setZMPPosition(const iDynTree::Vector2& input)
+{
+    m_zmpPosition = input;
 }
 
 bool StableDCMModel::integrateModel()
@@ -71,6 +76,10 @@ bool StableDCMModel::integrateModel()
         return false;
     }
 
+    // evaluate the acceleration of the CoM
+    yarp::sig::Vector comAccelerationYarp(2);
+    iDynTree::toEigen(comAccelerationYarp) = std::pow(m_omega,2) * (iDynTree::toEigen(m_comPosition) -
+                                                                    iDynTree::toEigen(m_zmpPosition));
     // evaluate the velocity of the CoM
     yarp::sig::Vector comVelocityYarp(2);
     iDynTree::toEigen(comVelocityYarp) = -m_omega * (iDynTree::toEigen(m_comPosition) -
@@ -81,6 +90,7 @@ bool StableDCMModel::integrateModel()
     comPositionYarp = m_comIntegrator->integrate(comVelocityYarp);
 
     // convert YARP vector into iDynTree vector
+    iDynTree::toiDynTree(comAccelerationYarp, m_comAcceleration);
     iDynTree::toiDynTree(comVelocityYarp, m_comVelocity);
     iDynTree::toiDynTree(comPositionYarp, m_comPosition);
 
@@ -110,6 +120,18 @@ bool StableDCMModel::getCoMVelocity(iDynTree::Vector2& comVelocity)
         return false;
     }
     comVelocity = m_comVelocity;
+    return true;
+}
+
+bool StableDCMModel::getCoMAcceleration(iDynTree::Vector2& comAcceleration)
+{
+    if(!m_isModelPropagated)
+    {
+        yError() << "[getCoMAcceleration] The Model is not prrpagated. "
+                 << "Please call 'propagateModel()' method.";
+        return false;
+    }
+    comAcceleration = m_comAcceleration;
     return true;
 }
 
