@@ -527,8 +527,8 @@ bool WalkingModule::solveTaskBased(const iDynTree::Rotation& desiredNeckOrientat
     if(!m_taskBasedTorqueSolver->setMassMatrix(massMatrix))
         return false;
 
-    // if(!m_taskBasedTorqueSolver->setLinearAngularMomentum(m_FKSolver->getLinearAngularMomentum()))
-    //    return false;
+    if(!m_taskBasedTorqueSolver->setCentroidalTotalMomentum(m_FKSolver->getCentroidalTotalMomentum()))
+       return false;
 
     iDynTree::VectorDynSize generalizedBiasForces(m_robotControlHelper->getActuatedDoFs() + 6);
     m_FKSolver->getGeneralizedBiasForces(generalizedBiasForces);

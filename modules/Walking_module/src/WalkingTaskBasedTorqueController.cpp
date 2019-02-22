@@ -87,26 +87,13 @@ bool WalkingTaskBasedTorqueController::setGeneralizedBiasForces(const iDynTree::
     return true;
 }
 
-// bool WalkingTaskBasedTorqueController::setLinearAngularMomentum(const iDynTree::SpatialMomentum& linearAngularMomentum)
-// {
-//     if(m_useAngularMomentumConstraint)
-//     {
-//         auto constraint = m_constraints.find("angular_momentum");
-//         if(constraint == m_constraints.end())
-//         {
-//             yError() << "[setLinearAngularMomentum] unable to find the linear constraint. "
-//                      << "Please call 'initialize()' method";
-//             return false;
-//         }
-
-//         // set angular momentum
-//         iDynTree::Vector3 dummy;
-//         dummy.zero();
-//         auto ptr = std::static_pointer_cast<AngularMomentumConstraint>(constraint->second);
-//         ptr->controller()->setFeedback(dummy, linearAngularMomentum.getAngularVec3());
-//     }
-//     return true;
-// }
+bool WalkingTaskBasedTorqueController::setCentroidalTotalMomentum(const iDynTree::SpatialMomentum& centroidalTotalMomentum)
+{
+    if(m_isDoubleSupportPhase)
+        return m_doubleSupportSolver->setCentroidalTotalMomentum(centroidalTotalMomentum);
+    else
+        return m_singleSupportSolver->setCentroidalTotalMomentum(centroidalTotalMomentum);
+}
 
 bool WalkingTaskBasedTorqueController::setDesiredJointTrajectory(const iDynTree::VectorDynSize& desiredJointPosition,
                                                                  const iDynTree::VectorDynSize& desiredJointVelocity,

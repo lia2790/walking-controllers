@@ -438,18 +438,19 @@ void LinearMomentumConstraint::evaluateBounds(Eigen::VectorXd &upperBounds,
         = upperBounds.block(m_jacobianStartingRow, 0, 3, 1);
 }
 
-AngularMomentumConstraint::AngularMomentumConstraint()
+iDynTree::Vector3 AngularMomentumElement::desiredAngularMomentumRateOfChange()
 {
-    m_sizeOfElement = 3;
-
-    m_controller = std::make_shared<LinearPID>();
-    // set the desired trajectory (it is constant)
-    iDynTree::Vector3 dummy;
-    dummy.zero();
-    m_controller->setDesiredTrajectory(dummy, dummy, dummy);
+    iDynTree::Vector3 angularMomentumRateOfChange;
+    iDynTree::toEigen(angularMomentumRateOfChange) = - m_kp * iDynTree::toEigen(m_angularMomentum);
+    return  angularMomentumRateOfChange;
 }
 
-void AngularMomentumConstraint::setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian)
+AngularMomentumConstraintDoubleSupport::AngularMomentumConstraintDoubleSupport()
+{
+    m_sizeOfElement = 3;
+}
+
+void AngularMomentumConstraintDoubleSupport::setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian)
 {
 
     jacobian.insert(m_jacobianStartingRow + 0, m_jacobianStartingColumn + 3) = 1;
@@ -461,14 +462,14 @@ void AngularMomentumConstraint::setJacobianConstantElements(Eigen::SparseMatrix<
     jacobian.insert(m_jacobianStartingRow + 2, m_jacobianStartingColumn + 5 + 6) = 1;
 }
 
-void AngularMomentumConstraint::evaluateJacobian(Eigen::SparseMatrix<double>& jacobian)
+void AngularMomentumConstraintDoubleSupport::evaluateJacobian(Eigen::SparseMatrix<double>& jacobian)
 {
     Eigen::Vector3d leftFootToCoMPosition, rightFootToCoMPosition;
     leftFootToCoMPosition = iDynTree::toEigen(m_leftFootToWorldTransform->getPosition())
-        - iDynTree::toEigen(*m_comPosition);
+        - iDynTree::toEigen(m_comPosition);
 
     rightFootToCoMPosition = iDynTree::toEigen(m_rightFootToWorldTransform->getPosition())
-        - iDynTree::toEigen(*m_comPosition);
+        - iDynTree::toEigen(m_comPosition);
 
     auto leftFootToCoMPositionSkew = iDynTree::skew(leftFootToCoMPosition);
     auto rightFootToCoMPositionSkew = iDynTree::skew(rightFootToCoMPosition);
@@ -480,13 +481,42 @@ void AngularMomentumConstraint::evaluateJacobian(Eigen::SparseMatrix<double>& ja
                         m_jacobianStartingColumn + 6, jacobian);
 }
 
-void AngularMomentumConstraint::evaluateBounds(Eigen::VectorXd &upperBounds,
-                                               Eigen::VectorXd &lowerBounds)
+void AngularMomentumConstraintDoubleSupport::evaluateBounds(Eigen::VectorXd &upperBounds,
+                                                            Eigen::VectorXd &lowerBounds)
 {
-    m_controller->evaluateControl();
+    upperBounds.block(m_jacobianStartingRow, 0, 3, 1) = iDynTree::toEigen(desiredAngularMomentumRateOfChange());
+    lowerBounds.block(m_jacobianStartingRow, 0, 3, 1) = iDynTree::toEigen(desiredAngularMomentumRateOfChange());
+}
 
-    upperBounds.block(m_jacobianStartingRow, 0, 3, 1) = iDynTree::toEigen(m_controller->getControllerOutput());
-    lowerBounds.block(m_jacobianStartingRow, 0, 3, 1) = iDynTree::toEigen(m_controller->getControllerOutput());
+AngularMomentumConstraintSingleSupport::AngularMomentumConstraintSingleSupport()
+{
+    m_sizeOfElement = 3;
+}
+
+void AngularMomentumConstraintSingleSupport::setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian)
+{
+    jacobian.insert(m_jacobianStartingRow + 0, m_jacobianStartingColumn + 3) = 1;
+    jacobian.insert(m_jacobianStartingRow + 1, m_jacobianStartingColumn + 4) = 1;
+    jacobian.insert(m_jacobianStartingRow + 2, m_jacobianStartingColumn + 5) = 1;
+}
+
+void AngularMomentumConstraintSingleSupport::evaluateJacobian(Eigen::SparseMatrix<double>& jacobian)
+{
+    Eigen::Vector3d stanceFootToCoMPosition;
+    stanceFootToCoMPosition = iDynTree::toEigen(m_stanceFootToWorldTransform->getPosition())
+        - iDynTree::toEigen(m_comPosition);
+
+    auto stanceFootToCoMPositionSkew = iDynTree::skew(stanceFootToCoMPosition);
+
+    copyDenseIntoSparse(stanceFootToCoMPositionSkew, m_jacobianStartingRow,
+                        m_jacobianStartingColumn,jacobian);
+}
+
+void AngularMomentumConstraintSingleSupport::evaluateBounds(Eigen::VectorXd &upperBounds,
+                                                            Eigen::VectorXd &lowerBounds)
+{
+    upperBounds.block(m_jacobianStartingRow, 0, 3, 1) = iDynTree::toEigen(desiredAngularMomentumRateOfChange());
+    lowerBounds.block(m_jacobianStartingRow, 0, 3, 1) = iDynTree::toEigen(desiredAngularMomentumRateOfChange());
 }
 
 RateOfChangeConstraint::RateOfChangeConstraint(const int& sizeOfTheConstraintVector)
@@ -633,4 +663,102 @@ void LinearMomentumCostFunction::evaluateGradient(Eigen::VectorXd& gradient)
         gradient.block(m_hessianStartingRow + 6, 0, m_sizeOfElement, 1)
             = gradient.block(m_hessianStartingRow, 0, m_sizeOfElement, 1);
     }
+}
+
+AngularMomentumCostFunctionDoubleSupport::AngularMomentumCostFunctionDoubleSupport()
+{
+    m_sizeOfElement = 3;
+}
+
+void AngularMomentumCostFunctionDoubleSupport::evaluateHessian(Eigen::SparseMatrix<double> &hessian)
+{
+
+    Eigen::Vector3d leftFootToCoMPosition, rightFootToCoMPosition;
+    leftFootToCoMPosition = iDynTree::toEigen(m_leftFootToWorldTransform->getPosition())
+        - iDynTree::toEigen(m_comPosition);
+
+    rightFootToCoMPosition = iDynTree::toEigen(m_rightFootToWorldTransform->getPosition())
+        - iDynTree::toEigen(m_comPosition);
+
+    auto leftFootToCoMPositionSkew = iDynTree::skew(leftFootToCoMPosition);
+    auto rightFootToCoMPositionSkew = iDynTree::skew(rightFootToCoMPosition);
+
+    Eigen::MatrixXd temp(3, 12);
+    temp.block(0,0,3,3) = leftFootToCoMPositionSkew;
+    temp.block(0,3,3,3) = Eigen::MatrixXd::Identity(3, 3);
+
+    temp.block(0,6,3,3) = rightFootToCoMPositionSkew;
+    temp.block(0,9,3,3) = Eigen::MatrixXd::Identity(3, 3);
+
+
+    Eigen::MatrixXd hessianDense = temp.transpose() * iDynTree::toEigen(m_weight).asDiagonal()
+        * temp;
+
+    copyDenseIntoSparse(hessianDense, m_hessianStartingRow,
+                        m_hessianStartingColumn, hessian);
+}
+
+void AngularMomentumCostFunctionDoubleSupport::evaluateGradient(Eigen::VectorXd &gradient)
+{
+    Eigen::Vector3d leftFootToCoMPosition, rightFootToCoMPosition;
+    leftFootToCoMPosition = iDynTree::toEigen(m_leftFootToWorldTransform->getPosition())
+        - iDynTree::toEigen(m_comPosition);
+
+    rightFootToCoMPosition = iDynTree::toEigen(m_rightFootToWorldTransform->getPosition())
+        - iDynTree::toEigen(m_comPosition);
+
+    auto leftFootToCoMPositionSkew = iDynTree::skew(leftFootToCoMPosition);
+    auto rightFootToCoMPositionSkew = iDynTree::skew(rightFootToCoMPosition);
+
+    Eigen::MatrixXd temp(3, 12);
+    temp.block(0,0,3,3) = leftFootToCoMPositionSkew;
+    temp.block(0,3,3,3) = Eigen::MatrixXd::Identity(3, 3);
+
+    temp.block(0,6,3,3) = rightFootToCoMPositionSkew;
+    temp.block(0,9,3,3) = Eigen::MatrixXd::Identity(3, 3);
+
+    gradient.block(m_hessianStartingRow, 0, m_sizeOfElement, 1) =
+        -temp * iDynTree::toEigen(m_weight).asDiagonal() *
+        iDynTree::toEigen(desiredAngularMomentumRateOfChange());
+}
+
+AngularMomentumCostFunctionSingleSupport::AngularMomentumCostFunctionSingleSupport()
+{
+    m_sizeOfElement = 3;
+}
+
+void AngularMomentumCostFunctionSingleSupport::evaluateHessian(Eigen::SparseMatrix<double> &hessian)
+{
+    Eigen::Vector3d stanceFootToCoMPosition;
+    stanceFootToCoMPosition = iDynTree::toEigen(m_stanceFootToWorldTransform->getPosition())
+        - iDynTree::toEigen(m_comPosition);
+
+    auto stanceFootToCoMPositionSkew = iDynTree::skew(stanceFootToCoMPosition);
+
+    Eigen::MatrixXd temp(3, 6);
+    temp.block(0,0,3,3) = stanceFootToCoMPositionSkew;
+    temp.block(0,3,3,3) = Eigen::MatrixXd::Identity(3, 3);
+
+    Eigen::MatrixXd hessianDense = temp.transpose() * iDynTree::toEigen(m_weight).asDiagonal()
+        * temp;
+
+    copyDenseIntoSparse(hessianDense, m_hessianStartingRow,
+                        m_hessianStartingColumn, hessian);
+}
+
+void AngularMomentumCostFunctionSingleSupport::evaluateGradient(Eigen::VectorXd &gradient)
+{
+    Eigen::Vector3d stanceFootToCoMPosition;
+    stanceFootToCoMPosition = iDynTree::toEigen(m_stanceFootToWorldTransform->getPosition())
+        - iDynTree::toEigen(m_comPosition);
+
+    auto stanceFootToCoMPositionSkew = iDynTree::skew(stanceFootToCoMPosition);
+
+    Eigen::MatrixXd temp(3, 6);
+    temp.block(0,0,3,3) = stanceFootToCoMPositionSkew;
+    temp.block(0,3,3,3) = Eigen::MatrixXd::Identity(3, 3);
+
+    gradient.block(m_hessianStartingRow, 0, m_sizeOfElement, 1) =
+        - temp * iDynTree::toEigen(m_weight).asDiagonal() *
+        iDynTree::toEigen(desiredAngularMomentumRateOfChange());
 }

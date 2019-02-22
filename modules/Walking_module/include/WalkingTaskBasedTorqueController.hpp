@@ -38,7 +38,7 @@ public:
 
     bool setGeneralizedBiasForces(const iDynTree::VectorDynSize& generalizedBiasForces);
 
-    // bool setLinearAngularMomentum(const iDynTree::SpatialMomentum& linearAngularMomentum);
+    bool setCentroidalTotalMomentum(const iDynTree::SpatialMomentum& centroidalTotalMomentum);
 
     bool setDesiredJointTrajectory(const iDynTree::VectorDynSize& desiredJointPosition,
                                    const iDynTree::VectorDynSize& desiredJointVelocity,

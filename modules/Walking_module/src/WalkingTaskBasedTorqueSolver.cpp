@@ -96,47 +96,6 @@ bool TaskBasedTorqueSolver::instantiateCoMConstraint(const yarp::os::Searchable&
     return true;
 }
 
-// bool TaskBasedTorqueSolver::instantiateAngularMomentumConstraint(const yarp::os::Searchable& config)
-// {
-//     if(config.isNull())
-//     {
-//         yInfo() << "[instantiateAngularMomentumConstraint] Empty configuration file. The angular momentum Constraint will not be used";
-//         m_useAngularMomentumConstraint = false;
-//         return true;
-//     }
-//     m_useAngularMomentumConstraint = true;
-
-//     double kp;
-//     if(!YarpHelper::getNumberFromSearchable(config, "kp", kp))
-//     {
-//         yError() << "[instantiateAngularMomentumConstraint] Unable to get proportional gain";
-//         return false;
-//     }
-
-//     // double kd;
-//     // if(!YarpHelper::getNumberFromSearchable(config, "kd", kd))
-//     // {
-//     //     yError() << "[instantiateCoMConstraint] Unable to get derivative gain";
-//     //     return false;
-//     // }
-
-//     // memory allocation
-//     std::shared_ptr<AngularMomentumConstraint> ptr;
-//     ptr = std::make_shared<AngularMomentumConstraint>();
-//     ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6 + m_actuatedDOFs + m_actuatedDOFs);
-
-//     ptr->controller()->setGains(kp, 0);
-
-//     ptr->setCoMPosition(m_comPosition);
-//     ptr->setLeftFootToWorldTransform(m_leftFootToWorldTransform);
-//     ptr->setRightFootToWorldTransform(m_rightFootToWorldTransform);
-
-//     m_constraints.insert(std::make_pair("angular_momentum", ptr));
-//     m_numberOfConstraints += ptr->getNumberOfConstraints();
-
-//     return true;
-// }
-
 bool TaskBasedTorqueSolver::instantiateRateOfChangeConstraint(const yarp::os::Searchable& config)
 {
     yarp::os::Value tempValue;
@@ -516,12 +475,18 @@ bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
-    // yarp::os::Bottle& angularMomentumConstraintOptions = config.findGroup("ANGULAR_MOMENTUM");
-    // if(!instantiateAngularMomentumConstraint(angularMomentumConstraintOptions))
-    // {
-    //     yError() << "[initialize] Unable to instantiate the Angular Momentum constraint.";
-    //     return false;
-    // }
+    yarp::os::Bottle& angularMomentumConstraintOptions = config.findGroup("ANGULAR_MOMENTUM");
+    if(!instantiateAngularMomentumConstraint(angularMomentumConstraintOptions))
+    {
+        yError() << "[initialize] Unable to instantiate the Angular Momentum constraint.";
+        return false;
+    }
+    if(!instantiateAngularMomentumCostFunction(angularMomentumConstraintOptions))
+    {
+        yError() << "[initialize] Unable to instantiate the Angular Momentum constraint.";
+        return false;
+    }
+
 
     yarp::os::Bottle& feetConstraintOptions = config.findGroup("FEET");
     if(!instantiateFeetConstraint(feetConstraintOptions))
@@ -686,26 +651,37 @@ void TaskBasedTorqueSolver::setGeneralizedBiasForces(const iDynTree::VectorDynSi
     m_generalizedBiasForces = generalizedBiasForces;
 }
 
-// bool TaskBasedTorqueSolver::setLinearAngularMomentum(const iDynTree::SpatialMomentum& linearAngularMomentum)
-// {
-//     if(m_useAngularMomentumConstraint)
-//     {
-//         auto constraint = m_constraints.find("angular_momentum");
-//         if(constraint == m_constraints.end())
-//         {
-//             yError() << "[setLinearAngularMomentum] unable to find the linear constraint. "
-//                      << "Please call 'initialize()' method";
-//             return false;
-//         }
+bool TaskBasedTorqueSolver::setCentroidalTotalMomentum(const iDynTree::SpatialMomentum& centroidalTotalMomentum)
+{
+    if(m_useAngularMomentumConstraint)
+    {
+        auto constraint = m_constraints.find("angular_momentum_constraint");
+        if(constraint == m_constraints.end())
+        {
+            yError() << "[setLinearAngularMomentum] unable to find the angular momentum constraint. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
 
-//         // set angular momentum
-//         iDynTree::Vector3 dummy;
-//         dummy.zero();
-//         auto ptr = std::static_pointer_cast<AngularMomentumConstraint>(constraint->second);
-//         ptr->controller()->setFeedback(dummy, linearAngularMomentum.getAngularVec3());
-//     }
-//     return true;
-// }
+        auto ptr = std::dynamic_pointer_cast<AngularMomentumElement>(constraint->second);
+        ptr->setAngularMomentum(centroidalTotalMomentum.getAngularVec3());
+    }
+
+    if(m_useAngularMomentumCostFunction)
+    {
+        auto costFunction = m_costFunctions.find("angular_momentum_costFunction");
+        if(costFunction == m_costFunctions.end())
+        {
+            yError() << "[setCoMState] unable to find the angular momentum costFunction. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+
+        auto ptr = std::dynamic_pointer_cast<AngularMomentumElement>(costFunction->second);
+        ptr->setAngularMomentum(centroidalTotalMomentum.getAngularVec3());
+    }
+    return true;
+}
 
 void TaskBasedTorqueSolver::setDesiredJointTrajectory(const iDynTree::VectorDynSize& desiredJointPosition,
                                                       const iDynTree::VectorDynSize& desiredJointVelocity,
@@ -840,6 +816,34 @@ bool TaskBasedTorqueSolver::setCoMState(const iDynTree::Position& comPosition,
         }
         auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
         ptr->positionController()->setFeedback(comVelocity, comPosition);
+    }
+
+    if(m_useAngularMomentumConstraint)
+    {
+        auto constraint = m_constraints.find("angular_momentum_constraint");
+        if(constraint == m_constraints.end())
+        {
+            yError() << "[setCoMState] unable to find the angular momentum constraint. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+
+        auto ptr = std::dynamic_pointer_cast<AngularMomentumElement>(constraint->second);
+        ptr->setCoMPosition(comPosition);
+    }
+
+    if(m_useAngularMomentumCostFunction)
+    {
+        auto costFunction = m_costFunctions.find("angular_momentum_costFunction");
+        if(costFunction == m_costFunctions.end())
+        {
+            yError() << "[setCoMState] unable to find the angular momentum costFunction. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+
+        auto ptr = std::dynamic_pointer_cast<AngularMomentumElement>(costFunction->second);
+        ptr->setCoMPosition(comPosition);
     }
     return true;
 }
@@ -2254,6 +2258,143 @@ iDynTree::Vector2 TaskBasedTorqueSolverSingleSupport::getZMP()
     zmp(1) = zmpPos(1);
 
     return zmp;
+}
+
+bool TaskBasedTorqueSolverSingleSupport::instantiateAngularMomentumConstraint(const yarp::os::Searchable& config)
+{
+    if(config.isNull())
+    {
+        yInfo() << "[instantiateAngularMomentumConstraint] Empty configuration file. The angular momentum Constraint will not be used";
+        m_useAngularMomentumConstraint = false;
+        return true;
+    }
+    m_useAngularMomentumConstraint = true;
+
+    double kp;
+    if(!YarpHelper::getNumberFromSearchable(config, "kp", kp))
+    {
+        yError() << "[instantiateAngularMomentumConstraint] Unable to get proportional gain";
+        return false;
+    }
+
+    std::shared_ptr<AngularMomentumConstraintSingleSupport> ptr;
+    ptr = std::make_shared<AngularMomentumConstraintSingleSupport>();
+    ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6 + m_actuatedDOFs + m_actuatedDOFs);
+    ptr->setKp(kp);
+
+    ptr->setStanceFootToWorldTransform(m_stanceFootToWorldTransform);
+
+    m_constraints.insert(std::make_pair("angular_momentum_constraint", ptr));
+    m_numberOfConstraints += ptr->getNumberOfConstraints();
+
+    return true;
+}
+
+bool TaskBasedTorqueSolverDoubleSupport::instantiateAngularMomentumConstraint(const yarp::os::Searchable& config)
+{
+    if(config.isNull())
+    {
+        yInfo() << "[instantiateAngularMomentumConstraint] Empty configuration file. The angular momentum Constraint will not be used";
+        m_useAngularMomentumConstraint = false;
+        return true;
+    }
+    m_useAngularMomentumConstraint = true;
+
+    double kp;
+    if(!YarpHelper::getNumberFromSearchable(config, "kp", kp))
+    {
+        yError() << "[instantiateAngularMomentumConstraint] Unable to get proportional gain";
+        return false;
+    }
+
+    std::shared_ptr<AngularMomentumConstraintDoubleSupport> ptr;
+    ptr = std::make_shared<AngularMomentumConstraintDoubleSupport>();
+    ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6 + m_actuatedDOFs + m_actuatedDOFs);
+    ptr->setKp(kp);
+
+    ptr->setLeftFootToWorldTransform(m_leftFootToWorldTransform);
+    ptr->setRightFootToWorldTransform(m_rightFootToWorldTransform);
+
+    m_constraints.insert(std::make_pair("angular_momentum_constraint", ptr));
+    m_numberOfConstraints += ptr->getNumberOfConstraints();
+
+    return true;
+}
+
+bool TaskBasedTorqueSolverSingleSupport::instantiateAngularMomentumCostFunction(const yarp::os::Searchable& config)
+{
+    m_useAngularMomentumCostFunction = config.check("useAsCostFunction", yarp::os::Value("False")).asBool();
+    if(m_useAngularMomentumCostFunction)
+    {
+        yarp::os::Value tempValue = config.find("weight");
+        iDynTree::VectorDynSize weight(3);
+        if(!YarpHelper::yarpListToiDynTreeVectorDynSize(tempValue, weight))
+        {
+            yError() << "[TaskBasedTorqueSolverSingleSupport::instantiateAngularMomentumCostFunction] Initialization failed while reading weight vector.";
+            return false;
+        }
+
+        double kp;
+        if(!YarpHelper::getNumberFromSearchable(config, "kp", kp))
+        {
+            yError() << "[instantiateAngularMomentumConstraint] Unable to get proportional gain";
+            return false;
+        }
+
+        auto ptr = std::make_shared<AngularMomentumCostFunctionSingleSupport>();
+        ptr->setSubMatricesStartingPosition(6 + m_actuatedDOFs + m_actuatedDOFs, 0);
+        ptr->setWeight(weight);
+        ptr->setKp(kp);
+
+        ptr->setStanceFootToWorldTransform(m_stanceFootToWorldTransform);
+
+        m_costFunctions.insert(std::make_pair("angular_momentum_costFunction", ptr));
+
+        m_hessianMatrices.insert(std::make_pair("angular_momentum_costFunction",
+                                                std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
+        m_gradientVectors.insert(std::make_pair("angular_momentum_costFunction",
+                                                std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
+    }
+    return true;
+}
+
+bool TaskBasedTorqueSolverDoubleSupport::instantiateAngularMomentumCostFunction(const yarp::os::Searchable& config)
+{
+    m_useAngularMomentumCostFunction = config.check("useAsCostFunction", yarp::os::Value("False")).asBool();
+    if(m_useAngularMomentumCostFunction)
+    {
+        yarp::os::Value tempValue = config.find("weight");
+        iDynTree::VectorDynSize weight(3);
+        if(!YarpHelper::yarpListToiDynTreeVectorDynSize(tempValue, weight))
+        {
+            yError() << "[TaskBasedTorqueSolverSingleSupport::instantiateAngularMomentumCostFunction] Initialization failed while reading weight vector.";
+            return false;
+        }
+
+        double kp;
+        if(!YarpHelper::getNumberFromSearchable(config, "kp", kp))
+        {
+            yError() << "[instantiateAngularMomentumConstraint] Unable to get proportional gain";
+            return false;
+        }
+
+        auto ptr = std::make_shared<AngularMomentumCostFunctionDoubleSupport>();
+        ptr->setSubMatricesStartingPosition(6 + m_actuatedDOFs + m_actuatedDOFs, 0);
+        ptr->setWeight(weight);
+        ptr->setKp(kp);
+
+
+        ptr->setLeftFootToWorldTransform(m_leftFootToWorldTransform);
+        ptr->setRightFootToWorldTransform(m_rightFootToWorldTransform);
+
+        m_costFunctions.insert(std::make_pair("angular_momentum_costFunction", ptr));
+
+        m_hessianMatrices.insert(std::make_pair("angular_momentum_costFunction",
+                                                std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
+        m_gradientVectors.insert(std::make_pair("angular_momentum_costFunction",
+                                                std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
+    }
+    return true;
 }
 
 bool TaskBasedTorqueSolverSingleSupport::tempPrint()

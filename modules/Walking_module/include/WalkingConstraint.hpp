@@ -360,9 +360,6 @@ public:
     void setDesiredVRP(const iDynTree::Vector3& desiredVRPPosition){m_desiredVRPPosition = desiredVRPPosition;};
 };
 
-/**
- * Please do not use me! I am not implemented yet!
- */
 class LinearMomentumConstraint : public LinearConstraint, public LinearMomentumElement
 {
 public:
@@ -380,31 +377,55 @@ public:
     void evaluateBounds(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds) override;
 };
 
-class AngularMomentumConstraint : public LinearConstraint
+class AngularMomentumElement
 {
-    std::shared_ptr<LinearPID> m_controller;
+protected:
+    iDynTree::Position m_comPosition;
+    double m_kp;
+    iDynTree::Vector3 m_angularMomentum;
 
-    iDynTree::Position const * m_comPosition; /**< . */
-    iDynTree::Transform const * m_leftFootToWorldTransform; /**< Left foot to world transformation*/
-    iDynTree::Transform const * m_rightFootToWorldTransform; /**< Right foot to world transformation. */
+    iDynTree::Vector3 desiredAngularMomentumRateOfChange();
+
+public:
+    void setKp(const double& kp){m_kp = kp;};
+
+    void setCoMPosition(const iDynTree::Position& comPosition){m_comPosition = comPosition;};
+
+    void setAngularMomentum(const iDynTree::Vector3& angularMomentum){m_angularMomentum = angularMomentum;};
+
+};
+
+class AngularMomentumElementSingleSupport : public AngularMomentumElement
+{
+protected:
+    iDynTree::Transform const * m_stanceFootToWorldTransform; /**< Left foot to world transformation*/
 
 public:
 
-    AngularMomentumConstraint();
+    void setStanceFootToWorldTransform(const iDynTree::Transform& stanceFootToWorldTransform){m_stanceFootToWorldTransform = &stanceFootToWorldTransform;};
+};
 
-    void setCoMPosition(const iDynTree::Position& comPosition){m_comPosition = &comPosition;};
+class AngularMomentumElementDoubleSupport : public AngularMomentumElement
+{
+protected:
+    iDynTree::Transform const * m_leftFootToWorldTransform; /**< Left foot to world transformation*/
+    iDynTree::Transform const * m_rightFootToWorldTransform; /**< Right foot to world transformation */
+public:
 
-    void setLeftFootToWorldTransform(const iDynTree::Transform& leftFootToWorldTransform){m_leftFootToWorldTransform = &leftFootToWorldTransform;};
+       void setLeftFootToWorldTransform(const iDynTree::Transform& leftFootToWorldTransform){m_leftFootToWorldTransform = &leftFootToWorldTransform;};
 
     void setRightFootToWorldTransform(const iDynTree::Transform& rightFootToWorldTransform){m_rightFootToWorldTransform = &rightFootToWorldTransform;};
 
-    std::shared_ptr<LinearPID> controller() {return m_controller;};
+};
 
+class AngularMomentumConstraintSingleSupport : public LinearConstraint, public AngularMomentumElementSingleSupport
+{
+public:
+    AngularMomentumConstraintSingleSupport();
     /**
      * Evaluate the jacobian
      */
     void setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian) override;
-
 
     /**
      * Evaluate the jacobian
@@ -417,6 +438,28 @@ public:
     void evaluateBounds(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds) override;
 };
 
+class AngularMomentumConstraintDoubleSupport : public LinearConstraint, public AngularMomentumElementDoubleSupport
+{
+
+public:
+    AngularMomentumConstraintDoubleSupport();
+
+
+    /**
+     * Evaluate the jacobian
+     */
+    void setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian) override;
+
+    /**
+     * Evaluate the jacobian
+     */
+    void evaluateJacobian(Eigen::SparseMatrix<double>& jacobian) override;
+
+    /**
+     * Evaluate the lower and upper bounds
+     */
+    void evaluateBounds(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds) override;
+};
 
 /**
  *
@@ -600,6 +643,38 @@ public:
     LinearMomentumCostFunction(const Type &elemetType);
 
     void setHessianConstantElements(Eigen::SparseMatrix<double>& hessian) override;
+
+    /**
+     * Evaluate the Gradient vector
+     */
+    void evaluateGradient(Eigen::VectorXd& gradient) override;
+};
+
+class AngularMomentumCostFunctionDoubleSupport : public QuadraticCostFunction,
+                                                 public AngularMomentumElementDoubleSupport
+{
+public:
+
+    AngularMomentumCostFunctionDoubleSupport();
+
+
+    void evaluateHessian(Eigen::SparseMatrix<double>& hessian) override;
+
+    /**
+     * Evaluate the Gradient vector
+     */
+    void evaluateGradient(Eigen::VectorXd& gradient) override;
+};
+
+
+class AngularMomentumCostFunctionSingleSupport : public QuadraticCostFunction,
+                                                 public AngularMomentumElementSingleSupport
+{
+public:
+
+    AngularMomentumCostFunctionSingleSupport();
+
+    void evaluateHessian(Eigen::SparseMatrix<double>& hessian) override;
 
     /**
      * Evaluate the Gradient vector

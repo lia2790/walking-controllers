@@ -25,6 +25,7 @@ protected:
     bool m_useLinearMomentumConstraint;
     bool m_useLinearMomentumCostFunction;
     bool m_useAngularMomentumConstraint;
+    bool m_useAngularMomentumCostFunction;
     bool m_controlOnlyCoMHeight;
     bool m_useMotorReflectedInertia;
 
@@ -69,8 +70,6 @@ protected:
      */
     bool instantiateCoMConstraint(const yarp::os::Searchable& config);
 
-    // bool instantiateAngularMomentumConstraint(const yarp::os::Searchable& config);
-
     bool instantiateMotorReflectedInertia(const yarp::os::Searchable& config);
 
     /**
@@ -78,6 +77,12 @@ protected:
      * @param config configuration parameters.
      */
     virtual void instantiateLinearMomentumConstraint(const yarp::os::Searchable& config) = 0;
+
+    virtual bool instantiateLinearMomentumCostFunction(const yarp::os::Searchable& config) = 0;
+
+    virtual bool instantiateAngularMomentumConstraint(const yarp::os::Searchable& config) = 0;
+
+    virtual bool instantiateAngularMomentumCostFunction(const yarp::os::Searchable& config) = 0;
 
     virtual bool instantiateFeetConstraint(const yarp::os::Searchable& config) = 0;
 
@@ -88,8 +93,6 @@ protected:
     bool instantiateRateOfChangeConstraint(const yarp::os::Searchable& config);
 
     virtual bool instantiateContactForcesConstraint(const yarp::os::Searchable& config) = 0;
-
-    virtual bool instantiateLinearMomentumCostFunction(const yarp::os::Searchable& config) = 0;
 
     bool instantiateNeckSoftConstraint(const yarp::os::Searchable& config);
 
@@ -147,7 +150,7 @@ public:
 
     void setGeneralizedBiasForces(const iDynTree::VectorDynSize& generalizedBiasForces);
 
-    // bool setLinearAngularMomentum(const iDynTree::SpatialMomentum& linearAngularMomentum);
+    bool setCentroidalTotalMomentum(const iDynTree::SpatialMomentum& linearAngularMomentum);
 
     void setDesiredJointTrajectory(const iDynTree::VectorDynSize& desiredJointPosition,
                                    const iDynTree::VectorDynSize& desiredJointVelocity,
@@ -232,6 +235,10 @@ private:
 
     bool instantiateLinearMomentumCostFunction(const yarp::os::Searchable& config) override;
 
+    bool instantiateAngularMomentumCostFunction(const yarp::os::Searchable& config) override;
+
+    bool instantiateAngularMomentumConstraint(const yarp::os::Searchable& config) override;
+
     bool instantiateForceRegularizationConstraint(const yarp::os::Searchable& config) override;
 
     void setNumberOfVariables() override;
@@ -283,6 +290,10 @@ class TaskBasedTorqueSolverSingleSupport : public TaskBasedTorqueSolver
     bool instantiateContactForcesConstraint(const yarp::os::Searchable& config) override;
 
     bool instantiateLinearMomentumCostFunction(const yarp::os::Searchable& config) override;
+
+    bool instantiateAngularMomentumCostFunction(const yarp::os::Searchable& config) override;
+
+    bool instantiateAngularMomentumConstraint(const yarp::os::Searchable& config) override;
 
     bool instantiateForceRegularizationConstraint(const yarp::os::Searchable& config) override;
 
