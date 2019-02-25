@@ -148,6 +148,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_useOSQP = rf.check("use_osqp", yarp::os::Value(false)).asBool();
     m_dumpData = rf.check("dump_data", yarp::os::Value(false)).asBool();
     m_useTorque = rf.check("use_torque_control", yarp::os::Value(false)).asBool();
+    m_useWaitCondition = rf.check("use_wait_condition", yarp::os::Value(false)).asBool();
 
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
     m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
@@ -390,9 +391,23 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_rpcBaseEstPort.open(portNameBaseEst);
     yarp::os::Network::connect(portNameBaseEst, "/base-estimator/rpc");
 
+    if(m_useWaitCondition)
+    {
+        if(!YarpHelper::getNumberFromSearchable(rf, "switch_in_threshold", m_switchInThreshold))
+        {
+            yError() << "[configure] Unable to get the double from searchable.";
+            return false;
+        }
+
+        if(!YarpHelper::getNumberFromSearchable(rf, "switch_out_threshold", m_switchOutThreshold))
+        {
+            yError() << "[configure] Unable to get the double from searchable.";
+            return false;
+        }
+    }
+    m_waitCondition = false;
+
     yInfo() << "[configure] Ready to play!";
-
-
 
     return true;
 }
@@ -497,6 +512,40 @@ bool WalkingModule::solveQPIK(const std::shared_ptr<WalkingQPIK> solver, const i
     }
 
     return true;
+}
+
+void WalkingModule::checkWaitCondition(const std::deque<bool>& footInContact,
+                                       const iDynTree::Wrench& contactWrench)
+{
+    if(!m_useWaitCondition)
+    {
+        m_waitCondition = false;
+        return;
+    }
+
+    if(footInContact.front())
+    {
+        if(footInContact.front() != footInContact[1])
+        {
+            if(contactWrench(2) > m_switchOutThreshold)
+                m_waitCondition = true;
+            else
+                m_waitCondition = false;
+        }
+    }
+    else
+    {
+        if(footInContact.front() != footInContact[1])
+        {
+            if(contactWrench(2) < m_switchInThreshold)
+                m_waitCondition = true;
+            else
+                m_waitCondition = false;
+        }
+    }
+
+    // TODO remove me
+    yInfo() << "[checkWaitCondition] Wait condition " << m_waitCondition;
 }
 
 bool WalkingModule::solveTaskBased(const iDynTree::Rotation& desiredNeckOrientation,
@@ -809,7 +858,9 @@ bool WalkingModule::updateModule()
                 resetTrajectory = true;
             }
 
-            m_newTrajectoryMergeCounter--;
+            // During the wait condition the time is frozen
+            if(!m_waitCondition)
+                m_newTrajectoryMergeCounter--;
         }
 
         if (m_robotControlHelper->getPIDHandler().usingGainScheduling())
@@ -848,6 +899,9 @@ bool WalkingModule::updateModule()
             yError() << "[updateModule] Unable to evaluate the ZMP.";
             return false;
         }
+
+        checkWaitCondition(m_leftInContact, m_robotControlHelper->getLeftWrench());
+        checkWaitCondition(m_rightInContact, m_robotControlHelper->getRightWrench());
 
         // evaluate 3D-LIPM reference signal
         m_stableDCMModel->setDCMPosition(m_DCMPositionDesired.front());
@@ -1215,13 +1269,17 @@ bool WalkingModule::updateModule()
                                       m_FKSolver->getRootLinkToWorldTransform().getPosition(), m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
                                       m_FKSolver->getRootLinkVelocity(),
                                       m_FKSolverDebug->getRootLinkToWorldTransform().getPosition(), m_FKSolverDebug->getRootLinkToWorldTransform().getRotation().asRPY(),
-                                      m_FKSolverDebug->getRootLinkVelocity());
+                                      m_FKSolverDebug->getRootLinkVelocity(),
+                                      statusVector);
         }
 
-        propagateTime();
+        if(!m_waitCondition)
+        {
+            propagateTime();
 
-        // advance all the signals
-        advanceReferenceSignals();
+            // advance all the signals
+            advanceReferenceSignals();
+        }
 
         if(m_firstStep)
             m_firstStep = false;

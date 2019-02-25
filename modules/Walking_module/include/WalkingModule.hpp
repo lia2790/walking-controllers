@@ -63,6 +63,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
     bool m_dumpData; /**< True if data are saved. */
     bool m_useTorque; /**< True if the torque controller is used. */
+    bool m_useWaitCondition; /**< True the wait condition is used. */
 
     std::unique_ptr<RobotHelper> m_robotControlHelper; /**< Robot control helper. */
     std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */
@@ -132,6 +133,10 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     iDynTree::Vector2 m_desiredPosition;
 
+    bool m_waitCondition;
+    double m_switchInThreshold;
+    double m_switchOutThreshold;
+
     // debug
     std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 
@@ -153,6 +158,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
      */
     bool advanceReferenceSignals();
 
+    void checkWaitCondition(const std::deque<bool>& footInContact,
+                            const iDynTree::Wrench& contactWrench);
 
     /**
      * Update the FK solver.
