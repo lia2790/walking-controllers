@@ -559,7 +559,6 @@ bool WalkingModule::solveTaskBased(const iDynTree::Rotation& desiredNeckOrientat
     // do at the beginning!
     // TODO
     m_taskBasedTorqueSolver->setFeetState(m_leftInContact.front(), m_rightInContact.front());
-    // m_taskBasedTorqueSolver->setFeetState(false, true);
 
     iDynTree::VectorDynSize dummyJoint(m_robotControlHelper->getActuatedDoFs());
     dummyJoint.zero();
@@ -936,6 +935,15 @@ bool WalkingModule::updateModule()
         // DCM controller
         iDynTree::Vector2 desiredZMP;
         iDynTree::Vector3 desiredVRP;
+
+        DCMPositionDesired(0) = m_DCMPositionDesired.front()(0);
+        DCMPositionDesired(1) = m_DCMPositionDesired.front()(1);
+        DCMPositionDesired(2) = m_comHeightTrajectory.front();
+
+        DCMVelocityDesired(0) = m_DCMVelocityDesired.front()(0);
+        DCMVelocityDesired(1) = m_DCMVelocityDesired.front()(1);
+        DCMVelocityDesired(2) = m_comHeightVelocity.front();
+
         if(m_useMPC)
         {
             // Model predictive controller
@@ -984,15 +992,6 @@ bool WalkingModule::updateModule()
         else
         {
             m_walkingDCMReactiveController->setFeedback(m_FKSolver->getDCM());
-
-            DCMPositionDesired(0) = m_DCMPositionDesired.front()(0);
-            DCMPositionDesired(1) = m_DCMPositionDesired.front()(1);
-            DCMPositionDesired(2) = m_comHeightTrajectory.front();
-
-            DCMVelocityDesired(0) = m_DCMVelocityDesired.front()(0);
-            DCMVelocityDesired(1) = m_DCMVelocityDesired.front()(1);
-            DCMVelocityDesired(2) = m_comHeightVelocity.front();
-
             // TODO
             // Left and right
             // double a = 0.07;

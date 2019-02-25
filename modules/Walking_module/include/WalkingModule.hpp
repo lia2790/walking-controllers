@@ -82,10 +82,6 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     std::unique_ptr<WalkingFK> m_FKSolverDebug; /**< Pointer to the forward kinematics solver. */
 
-    double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
-    double m_desiredJointsWeight; /**< Desired joint weight matrix. */
-    yarp::sig::Vector m_desiredJointInRadYarp; /**< Desired joint position (regularization task). */
-
     std::deque<iDynTree::Transform> m_leftTrajectory; /**< Deque containing the trajectory of the left foot. */
     std::deque<iDynTree::Transform> m_rightTrajectory; /**< Deque containing the trajectory of the right foot. */
 
@@ -94,7 +90,6 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     std::deque<iDynTree::Vector6> m_leftAccelerationTrajectory; /**< Deque containing the twist trajectory of the left foot. */
     std::deque<iDynTree::Vector6> m_rightAccelerationTrajectory; /**< Deque containing the twist trajectory of the right foot. */
-
 
     std::deque<iDynTree::Vector2> m_DCMPositionDesired; /**< Deque containing the desired DCM position. */
     std::deque<iDynTree::Vector2> m_DCMVelocityDesired; /**< Deque containing the desired DCM velocity. */
