@@ -113,6 +113,8 @@ public:
     void getZMP(iDynTree::Vector2& zmp);
 
     iDynTree::Vector3 getDesiredNeckOrientation();
+
+    bool isDoubleSupportPhase();
 };
 
 #endif

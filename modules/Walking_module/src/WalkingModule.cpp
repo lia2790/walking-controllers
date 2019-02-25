@@ -1248,6 +1248,10 @@ bool WalkingModule::updateModule()
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
 
+            yarp::sig::Vector statusVector(2);
+            statusVector(0) = m_waitCondition;
+            statusVector(1) = m_taskBasedTorqueSolver->isDoubleSupportPhase();
+
             m_walkingLogger->sendData(m_FKSolver->getDCM(),
                                       DCMPositionDesired, DCMVelocityDesired,
 				      desiredCoMPositionXY,
@@ -1755,7 +1759,8 @@ bool WalkingModule::startWalking()
                     "base_x", "base_y", "base_z", "base_roll", "base_pitch", "base_yaw",
                     "base_dx", "base_dy", "base_dz", "base_omega_x", "base_omega_y", "base_omega_z",
                     "base_debug_x", "base_debug_y", "base_debug_z", "base_debug_roll", "base_debug_pitch", "base_debug_yaw",
-                    "base_debug_dx", "base_debug_dy", "base_debug_dz", "base_debug_omega_x", "base_debug_omega_y", "base_debug_omega_z"});
+                    "base_debug_dx", "base_debug_dy", "base_debug_dz", "base_debug_omega_x", "base_debug_omega_y", "base_debug_omega_z",
+                    "wait_condition", "double_support_solver"});
 
         // m_walkingLogger->startRecord({"record","dcm_x", "dcm_y", "dcm_z",
         //             "dcm_des_x", "dcm_des_y", "dcm_des_z",

@@ -47,9 +47,15 @@ void WalkingTaskBasedTorqueController::setFeetState(const bool &leftInContact, c
     m_rightInContact = rightInContact;
 
     if(m_leftInContact && m_rightInContact)
+    {
         m_isDoubleSupportPhase = true;
+        yInfo() << "[setFeetState] Double support phase";
+    }
     else
+    {
         m_isDoubleSupportPhase = false;
+        yInfo() << "[setFeetState] Single support phase";
+    }
 }
 
 bool WalkingTaskBasedTorqueController::setMassMatrix(const iDynTree::MatrixDynSize& massMatrix)
@@ -581,4 +587,9 @@ iDynTree::Vector3 WalkingTaskBasedTorqueController::getDesiredNeckOrientation()
         return m_doubleSupportSolver->getDesiredNeckOrientation();
     else
         return m_singleSupportSolver->getDesiredNeckOrientation();
+}
+
+bool WalkingTaskBasedTorqueController::isDoubleSupportPhase()
+{
+    return m_isDoubleSupportPhase;
 }
