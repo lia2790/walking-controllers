@@ -365,27 +365,52 @@ bool TaskBasedTorqueSolver::instantiateRegularizationTaskConstraint(const yarp::
         }
     }
 
-    std::shared_ptr<JointRegularizationTerm> ptr;
-    ptr = std::make_shared<JointRegularizationTerm>(m_actuatedDOFs);
+    std::shared_ptr<JointRegularizationCostFunction> ptr;
+    ptr = std::make_shared<JointRegularizationCostFunction>(m_actuatedDOFs);
+    bool useJointRegularizationAsCostFunction = config.check("useAsCostFunction", yarp::os::Value("False")).asBool();
+    if(useJointRegularizationAsCostFunction)
+    {
+        std::shared_ptr<JointRegularizationCostFunction> ptr;
+        ptr = std::make_shared<JointRegularizationCostFunction>(m_actuatedDOFs);
 
-    ptr->setSubMatricesStartingPosition(6, 0);
+        ptr->setSubMatricesStartingPosition(6, 0);
 
-    ptr->setWeight(jointRegularizationWeights);
-    ptr->setDerivativeGains(derivativeGains);
-    ptr->setProportionalGains(proportionalGains);
+        ptr->setWeight(jointRegularizationWeights);
+        ptr->setDerivativeGains(derivativeGains);
+        ptr->setProportionalGains(proportionalGains);
 
-    ptr->setDesiredJointPosition(m_desiredJointPosition);
-    ptr->setDesiredJointVelocity(m_desiredJointVelocity);
-    ptr->setDesiredJointAcceleration(m_desiredJointAcceleration);
-    ptr->setJointPosition(m_jointPosition);
-    ptr->setJointVelocity(m_jointVelocity);
+        ptr->setDesiredJointPosition(m_desiredJointPosition);
+        ptr->setDesiredJointVelocity(m_desiredJointVelocity);
+        ptr->setDesiredJointAcceleration(m_desiredJointAcceleration);
+        ptr->setJointPosition(m_jointPosition);
+        ptr->setJointVelocity(m_jointVelocity);
 
-    m_costFunctions.insert(std::make_pair("regularization_joint", ptr));
+        m_costFunctions.insert(std::make_pair("regularization_joint_costFunction", ptr));
 
-    m_hessianMatrices.insert(std::make_pair("regularization_joint", std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
+        m_hessianMatrices.insert(std::make_pair("regularization_joint_costFunction", std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
 
-    m_gradientVectors.insert(std::make_pair("regularization_joint", std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
+        m_gradientVectors.insert(std::make_pair("regularization_joint_costFunction", std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
+    }
 
+    bool useJointRegularizationAsConstraint = config.check("useAsConstraint", yarp::os::Value("False")).asBool();
+    if(useJointRegularizationAsConstraint)
+    {
+        std::shared_ptr<JointRegularizationConstraint> ptr;
+        ptr = std::make_shared<JointRegularizationConstraint>(m_actuatedDOFs);
+
+        ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6);
+        ptr->setDerivativeGains(derivativeGains);
+        ptr->setProportionalGains(proportionalGains);
+
+        ptr->setDesiredJointPosition(m_desiredJointPosition);
+        ptr->setDesiredJointVelocity(m_desiredJointVelocity);
+        ptr->setDesiredJointAcceleration(m_desiredJointAcceleration);
+        ptr->setJointPosition(m_jointPosition);
+        ptr->setJointVelocity(m_jointVelocity);
+
+        m_constraints.insert(std::make_pair("regularization_joint_constraint", ptr));
+        m_numberOfConstraints += ptr->getNumberOfConstraints();
+    }
 
     return true;
 }
@@ -1227,7 +1252,7 @@ bool TaskBasedTorqueSolver::solve()
     // }
 
     for(int i = 0; i < m_actuatedDOFs; i++)
-        m_desiredJointTorque(i) = m_solution(i + m_actuatedDOFs + 6);
+        m_desiredJointTorque(i) = m_solution(i + m_actuatedDOFs + 6) +  0*m_desiredJointVelocity(i);
 
     if(!tempPrint())
         return false;

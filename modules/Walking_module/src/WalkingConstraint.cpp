@@ -438,6 +438,8 @@ void LinearMomentumConstraint::evaluateBounds(Eigen::VectorXd &upperBounds,
         = upperBounds.block(m_jacobianStartingRow, 0, 3, 1);
 }
 
+
+
 iDynTree::Vector3 AngularMomentumElement::desiredAngularMomentumRateOfChange()
 {
     iDynTree::Vector3 angularMomentumRateOfChange;
@@ -530,7 +532,6 @@ void RateOfChangeConstraint::setJacobianConstantElements(Eigen::SparseMatrix<dou
         jacobian.insert(m_jacobianStartingRow + i, m_jacobianStartingColumn + i) = 1;
 }
 
-
 void RateOfChangeConstraint::evaluateBounds(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds)
 {
     for(int i = 0; i < m_sizeOfElement; i++)
@@ -587,30 +588,56 @@ void CartesianCostFunction::evaluateGradient(Eigen::VectorXd& gradient)
         (iDynTree::toEigen(m_desiredAcceleration) - iDynTree::toEigen(*m_biasAcceleration));
 }
 
-void JointRegularizationTerm::evaluateHessian(Eigen::SparseMatrix<double>& hessian)
-{
-    for(int i = 0; i < m_sizeOfElement; i++)
-        hessian.coeffRef(m_hessianStartingRow + i, m_hessianStartingColumn + i) = m_weight(i);
-}
-
-void JointRegularizationTerm::evaluateGradient(Eigen::VectorXd& gradient)
-{
-    double desiredJointAccelerationControlled;
-
-    for(int i = 0; i < m_sizeOfElement; i++)
-    {
-        desiredJointAccelerationControlled = m_desiredJointAcceleration->getVal(i)
-            + m_derivativeGains(i) * (m_desiredJointVelocity->getVal(i) - m_jointVelocity->getVal(i))
-            + m_proportionalGains(i) * (m_desiredJointPosition->getVal(i) - m_jointPosition->getVal(i));
-
-        gradient(i + m_hessianStartingRow) = -m_weight(i) * desiredJointAccelerationControlled;
-    }
-}
-
 void InputRegularizationTerm::evaluateHessian(Eigen::SparseMatrix<double>& hessian)
 {
     for(int i = 0; i < m_sizeOfElement; i++)
         hessian.coeffRef(m_hessianStartingRow + i, m_hessianStartingColumn + i) = m_weight(i);
+}
+
+void JointRegularizationElement::evaluateControl()
+{
+    iDynTree::toEigen(m_desiredJointAccelerationControlled)
+        = iDynTree::toEigen(*m_desiredJointAcceleration)
+        + iDynTree::toEigen(m_derivativeGains).asDiagonal()
+        * (iDynTree::toEigen(*m_desiredJointVelocity) - iDynTree::toEigen(*m_jointVelocity))
+        + iDynTree::toEigen(m_proportionalGains).asDiagonal()
+        * (iDynTree::toEigen(*m_desiredJointPosition) - iDynTree::toEigen(*m_jointPosition));
+}
+
+void JointRegularizationCostFunction::evaluateHessian(Eigen::SparseMatrix<double>& hessian)
+{
+    for(int i = 0; i < m_sizeOfElement; i++)
+        hessian.coeffRef(m_hessianStartingRow + i, m_hessianStartingColumn + i) = m_weight(i);
+}
+
+void JointRegularizationCostFunction::evaluateGradient(Eigen::VectorXd& gradient)
+{
+
+    evaluateControl();
+
+    gradient.block(m_hessianStartingRow, 0, m_sizeOfElement, 1) =
+        (-iDynTree::toEigen(m_weight)).asDiagonal()
+        *iDynTree::toEigen(m_desiredJointAccelerationControlled);
+}
+
+void JointRegularizationConstraint::setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian)
+{
+    for(int i = 0; i < m_sizeOfElement; i++)
+        jacobian.insert(m_jacobianStartingRow + i, m_jacobianStartingColumn + i) = 1;
+}
+
+void JointRegularizationConstraint::evaluateBounds(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds)
+{
+    evaluateControl();
+
+    for(int i = 0; i<m_sizeOfElement; i++)
+    {
+        upperBounds(m_jacobianStartingRow + i) = m_desiredJointAccelerationControlled(i) + 0.1;
+        lowerBounds(m_jacobianStartingRow + i) = m_desiredJointAccelerationControlled(i) - 0.1;
+    }
+    // upperBounds.block(m_jacobianStartingRow, 0, m_sizeOfElement, 1) = iDynTree::toEigen(m_desiredJointAccelerationControlled) + 0.01;
+
+    // lowerBounds.block(m_jacobianStartingRow, 0, m_sizeOfElement, 1) = iDynTree::toEigen(m_desiredJointAccelerationControlled) - 0.01;
 }
 
 LinearMomentumCostFunction::LinearMomentumCostFunction(const Type &elemetType)

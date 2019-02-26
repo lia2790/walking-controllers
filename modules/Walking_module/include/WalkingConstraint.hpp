@@ -583,11 +583,13 @@ public:
     void evaluateHessian(Eigen::SparseMatrix<double>& hessian) override;
 };
 
-class JointRegularizationTerm : public QuadraticCostFunction
+class JointRegularizationElement
 {
-
+protected:
     iDynTree::VectorDynSize m_derivativeGains;
     iDynTree::VectorDynSize m_proportionalGains;
+
+    iDynTree::VectorDynSize m_desiredJointAccelerationControlled;
 
     iDynTree::VectorDynSize const * m_desiredJointPosition;
     iDynTree::VectorDynSize const * m_desiredJointVelocity;
@@ -595,8 +597,11 @@ class JointRegularizationTerm : public QuadraticCostFunction
     iDynTree::VectorDynSize const * m_jointPosition;
     iDynTree::VectorDynSize const * m_jointVelocity;
 
+    void evaluateControl();
+
 public:
-    JointRegularizationTerm(const int &systemSize){m_sizeOfElement = systemSize;};
+
+    JointRegularizationElement(const int &systemSize){m_desiredJointAccelerationControlled.resize(systemSize);}
 
     void setDerivativeGains(const iDynTree::VectorDynSize &derivativeGains){m_derivativeGains = derivativeGains;};
 
@@ -611,6 +616,32 @@ public:
     void setJointPosition(const iDynTree::VectorDynSize &jointPosition){m_jointPosition = &jointPosition;};
 
     void setJointVelocity(const iDynTree::VectorDynSize &jointVelocity){m_jointVelocity = &jointVelocity;};
+};
+
+class JointRegularizationConstraint : public LinearConstraint,
+                                      public JointRegularizationElement
+{
+public:
+    JointRegularizationConstraint(const int &systemSize):JointRegularizationElement(systemSize)
+    {m_sizeOfElement = systemSize;};
+
+    /**
+     * Evaluate the Hessian matrix
+     */
+    void setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian) override;
+
+    /**
+     * Evaluate the bounds
+     */
+    void evaluateBounds(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds) override;
+};
+
+class JointRegularizationCostFunction : public QuadraticCostFunction,
+                                        public JointRegularizationElement
+{
+public:
+    JointRegularizationCostFunction(const int &systemSize):JointRegularizationElement(systemSize)
+    {m_sizeOfElement = systemSize;};
 
     /**
      * Evaluate the Hessian matrix
