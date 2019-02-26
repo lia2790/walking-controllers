@@ -543,12 +543,22 @@ bool RobotHelper::switchToControlMode(const int& controlMode)
         yError() << "[switchToControlMode] Error while setting the controlMode.";
         return false;
     }
+
+    m_controlMode = controlMode;
     return true;
 }
 
 bool RobotHelper::setPositionReferences(const iDynTree::VectorDynSize& desiredJointPositionsRad,
                                         const double& positioningTimeSec)
 {
+
+    if (m_controlMode != VOCAB_CM_POSITION)
+        if (!switchToControlMode(VOCAB_CM_POSITION))
+        {
+            yError() << "[setPositionReferences] Unable to switch in position control";
+            return false;
+        }
+
     m_positioningTime = positioningTimeSec;
     m_positionMoveSkipped = false;
     if(m_positionInterface == nullptr)
@@ -652,6 +662,15 @@ bool RobotHelper::checkMotionDone(bool& motionDone)
 
 bool RobotHelper::setDirectPositionReferences(const iDynTree::VectorDynSize& desiredPositionRad)
 {
+
+    if (m_controlMode != VOCAB_CM_POSITION_DIRECT)
+        if (!switchToControlMode(VOCAB_CM_POSITION_DIRECT))
+        {
+            yError() << "[setPositionReferences] Unable to switch in position control";
+            return false;
+        }
+
+
     if(m_positionDirectInterface == nullptr)
     {
         yError() << "[setDirectPositionReferences] PositionDirect I/F not ready.";
@@ -734,6 +753,13 @@ bool RobotHelper::setVelocityReferences(const iDynTree::VectorDynSize& desiredVe
 
 bool RobotHelper::setTorqueReferences(const iDynTree::VectorDynSize& desiredTorque)
 {
+    if (m_controlMode != VOCAB_CM_TORQUE)
+        if (!switchToControlMode(VOCAB_CM_TORQUE))
+        {
+            yError() << "[setTorqueReferences] Unable to switch in torque control";
+            return false;
+        }
+
     if(m_torqueInterface == nullptr)
     {
         yError() << "[setTorqueReferences] Torque I/F not ready.";

@@ -39,6 +39,7 @@ class RobotHelper
     yarp::dev::PolyDriver m_robotDevice; /**< Main robot device. */
     std::vector<std::string> m_axesList; /**< Vector containing the name of the controlled joints. */
     unsigned int m_actuatedDOFs; /**< Number of the actuated DoFs. */
+    int m_controlMode{-1};
 
     // YARP Interfaces exposed by the remotecontrolboardremapper
     yarp::dev::IEncodersTimed *m_encodersInterface{nullptr}; /**< Encorders interface. */

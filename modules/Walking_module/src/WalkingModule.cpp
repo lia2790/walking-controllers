@@ -758,14 +758,14 @@ bool WalkingModule::updateModule()
         {
             if(!m_useTorque)
             {
-                if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION_DIRECT))
-                {
-                    yError() << "[updateModule] Failed in setting POSITION DIRECT mode.";
-                    yInfo() << "[updateModule] Try to prepare again";
-                    reset();
-                    m_robotState = WalkingFSM::Stopped;
-                    return true;
-                }
+                // if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION_DIRECT))
+                // {
+                //     yError() << "[updateModule] Failed in setting POSITION DIRECT mode.";
+                //     yInfo() << "[updateModule] Try to prepare again";
+                //     reset();
+                //     m_robotState = WalkingFSM::Stopped;
+                //     return true;
+                // }
 
                 // send the reference again in order to reduce error
                 if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
@@ -1419,11 +1419,11 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         return false;
     }
 
-    if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION))
-    {
-        yError() << "[prepareRobot] Error while setting the position control.";
-        return false;
-    }
+    // if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION))
+    // {
+    //     yError() << "[prepareRobot] Error while setting the position control.";
+    //     return false;
+    // }
 
     if(!m_robotControlHelper->setPositionReferences(m_qDesired, 5.0))
     {
@@ -1830,14 +1830,14 @@ bool WalkingModule::startWalking()
     yInfo() << heightOffset;
     m_robotControlHelper->setHeightOffset(heightOffset);
 
-    if (m_useTorque)
-    {
-        if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_TORQUE))
-        {
-            yError() << "[prepareRobot] Error while setting the torque control.";
-            return false;
-        }
-    }
+    // if (m_useTorque)
+    // {
+    //     if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_TORQUE))
+    //     {
+    //         yError() << "[prepareRobot] Error while setting the torque control.";
+    //         return false;
+    //     }
+    // }
 
     m_robotState = WalkingFSM::Walking;
     m_firstStep = true;
