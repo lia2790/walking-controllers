@@ -1086,6 +1086,14 @@ bool WalkingModule::updateModule()
                     return false;
                 }
 
+                if(!m_FKSolver->evaluateCoM())
+                {
+                    yError() << "[updateModule] Unable to evaluate the CoM.";
+                    return false;
+                }
+
+                m_FKSolver->evaluateDCM();
+
                 if(m_useOSQP)
                 {
                     if(!solveQPIK(m_QPIKSolver_osqp, desiredCoMPosition,
@@ -1110,6 +1118,22 @@ bool WalkingModule::updateModule()
 
                 bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
                 iDynTree::toiDynTree(bufferPosition, m_qDesired);
+
+                if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+                                                      m_robotControlHelper->getJointVelocity()))
+                {
+                    yError() << "[solveTaskBased] Unable to set the internal robot state";
+                    return false;
+                }
+
+                if(!m_FKSolver->evaluateCoM())
+                {
+                    yError() << "[updateModule] Unable to evaluate the CoM.";
+                    return false;
+                }
+
+                m_FKSolver->evaluateDCM();
+
             }
             else
             {
