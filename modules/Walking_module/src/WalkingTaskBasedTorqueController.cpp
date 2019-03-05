@@ -246,11 +246,21 @@ bool WalkingTaskBasedTorqueController::setDesiredFeetTrajectory(const iDynTree::
                                                                 const iDynTree::Vector6& rightFootAcceleration)
 {
     if(m_isDoubleSupportPhase)
+    {
+        if(!m_doubleSupportSolver->setDesiredFeetTrajectory(leftFootToWorldTransform,
+                                                            rightFootToWorldTransform))
+        {
+            yInfo() << "[setDesiredFeetTrajectory] Unable to set the feet trajectory";
+            return false;
+        }
+
         return true;
+    }
 
     if(m_leftInContact)
     {
-        if(!m_singleSupportSolver->setDesiredFeetTrajectory(rightFootToWorldTransform,
+        if(!m_singleSupportSolver->setDesiredFeetTrajectory(leftFootToWorldTransform,
+                                                            rightFootToWorldTransform,
                                                             rightFootTwist, rightFootAcceleration))
         {
             yInfo() << "[setDesiredFeetTrajectory] Unable to set the right foot trajectory";
@@ -259,7 +269,8 @@ bool WalkingTaskBasedTorqueController::setDesiredFeetTrajectory(const iDynTree::
     }
     else
     {
-        if(!m_singleSupportSolver->setDesiredFeetTrajectory(leftFootToWorldTransform,
+        if(!m_singleSupportSolver->setDesiredFeetTrajectory(rightFootToWorldTransform,
+                                                            leftFootToWorldTransform,
                                                             leftFootTwist, leftFootAcceleration))
         {
             yInfo() << "[setDesiredFeetTrajectory] Unable to set the left foot trajectory";
@@ -276,13 +287,14 @@ bool WalkingTaskBasedTorqueController::setFeetState(const iDynTree::Transform& l
 {
     if(m_isDoubleSupportPhase)
     {
-        m_doubleSupportSolver->setFeetState(leftFootToWorldTransform, rightFootToWorldTransform);
+        m_doubleSupportSolver->setFeetState(leftFootToWorldTransform, leftFootTwist,
+                                            rightFootToWorldTransform, rightFootTwist);
         return true;
     }
 
     if(m_leftInContact)
     {
-        if(!m_singleSupportSolver->setFeetState(leftFootToWorldTransform,
+        if(!m_singleSupportSolver->setFeetState(leftFootToWorldTransform, leftFootTwist,
                                                 rightFootToWorldTransform, rightFootTwist))
         {
             yInfo() << "[setDesiredFeetTrajectory] Unable to set the foot state (left in contact)";
@@ -291,7 +303,7 @@ bool WalkingTaskBasedTorqueController::setFeetState(const iDynTree::Transform& l
     }
     else
     {
-        if(!m_singleSupportSolver->setFeetState(rightFootToWorldTransform,
+        if(!m_singleSupportSolver->setFeetState(rightFootToWorldTransform, rightFootTwist,
                                                 leftFootToWorldTransform, leftFootTwist))
         {
             yInfo() << "[setDesiredFeetTrajectory] Unable to set the foot state (right in contact)";

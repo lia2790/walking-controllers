@@ -28,6 +28,7 @@ protected:
     bool m_useAngularMomentumCostFunction;
     bool m_controlOnlyCoMHeight;
     bool m_useMotorReflectedInertia;
+    bool m_controlContact;
 
     //todo
     std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
@@ -252,7 +253,12 @@ private:
 
 public:
     void setFeetState(const iDynTree::Transform& leftFootToWorldTransform,
-                      const iDynTree::Transform& rightFootToWorldTransform);
+                      const iDynTree::Twist& leftFootTwist,
+                      const iDynTree::Transform& rightFootToWorldTransform,
+                      const iDynTree::Twist& rightFootTwist);
+
+    bool setDesiredFeetTrajectory(const iDynTree::Transform& leftFootToWorldTransform,
+                                  const iDynTree::Transform& rightFootToWorldTransform);
 
     void setFeetJacobian(const iDynTree::MatrixDynSize& leftFootJacobian,
                          const iDynTree::MatrixDynSize& rightFootJacobian) override;
@@ -309,11 +315,13 @@ class TaskBasedTorqueSolverSingleSupport : public TaskBasedTorqueSolver
     void instantiateLinearMomentumConstraint(const yarp::os::Searchable& config) override;
 
 public:
-    bool setDesiredFeetTrajectory(const iDynTree::Transform& swingFootToWorldTransform,
+    bool setDesiredFeetTrajectory(const iDynTree::Transform& stanceFootToWorldTransform,
+                                  const iDynTree::Transform& swingFootToWorldTransform,
                                   const iDynTree::Twist& swingFootTwist,
                                   const iDynTree::Vector6& swingFootAcceleration);
 
     bool setFeetState(const iDynTree::Transform& stanceFootToWorldTransform,
+                      const iDynTree::Twist& stanceFootTwist,
                       const iDynTree::Transform& swingFootToWorldTransform,
                       const iDynTree::Twist& swingFootTwist);
 

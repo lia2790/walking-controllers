@@ -1394,11 +1394,66 @@ iDynTree::Vector3 TaskBasedTorqueSolver::getDesiredNeckOrientation()
 
 bool TaskBasedTorqueSolverDoubleSupport::instantiateFeetConstraint(const yarp::os::Searchable& config)
 {
+    m_controlContact = config.check("controlContact", yarp::os::Value("False")).asBool();
     m_isSingleSupport = false;
     if(config.isNull())
     {
         yError() << "[instantiateFeetConstraint] Empty configuration file.";
         return false;
+    }
+
+    bool useDefaultKd = config.check("useDefaultKd", yarp::os::Value("False")).asBool();
+
+    double kpLinear;
+    if(!YarpHelper::getNumberFromSearchable(config, "kpLinear", kpLinear))
+    {
+        yError() << "[instantiateFeetConstraint] Unable to get proportional gain";
+        return false;
+    }
+
+    double kdLinear;
+    if(useDefaultKd)
+    {
+        double scaling;
+        if(!YarpHelper::getNumberFromSearchable(config, "scaling", scaling))
+        {
+            yError() << "[initialize] Unable to get the scaling factor.";
+            return false;
+        }
+
+        kdLinear = 2 / scaling * std::sqrt(kpLinear);
+    }
+    else
+    {
+        if(!YarpHelper::getNumberFromSearchable(config, "kdLinear", kdLinear))
+        {
+            yError() << "[instantiateFeetConstraint] Unable to get derivative gain";
+            return false;
+        }
+    }
+
+    double c0, kpAngular, kdAngular;
+    if(!YarpHelper::getNumberFromSearchable(config, "c0", c0))
+        return false;
+
+    if(!YarpHelper::getNumberFromSearchable(config, "kpAngular", kpAngular))
+        return false;
+
+    if(useDefaultKd)
+    {
+        double scaling;
+        if(!YarpHelper::getNumberFromSearchable(config, "scaling", scaling))
+        {
+            yError() << "[initialize] Unable to get the scaling factor.";
+            return false;
+        }
+
+        kdAngular = 2 / scaling * std::sqrt(kpAngular);
+    }
+    else
+    {
+        if(!YarpHelper::getNumberFromSearchable(config, "kdAngular", kdAngular))
+            return false;
     }
 
     std::shared_ptr<CartesianConstraint> ptr;
@@ -1407,7 +1462,15 @@ bool TaskBasedTorqueSolverDoubleSupport::instantiateFeetConstraint(const yarp::o
     // resize quantities
     m_leftFootJacobian.resize(6, m_actuatedDOFs + 6);
     m_leftFootBiasAcceleration.resize(6);
-    ptr = std::make_shared<CartesianConstraint>(CartesianElement::Type::CONTACT);
+    if(m_controlContact)
+    {
+        ptr = std::make_shared<CartesianConstraint>(CartesianElement::Type::POSE);
+        ptr->positionController()->setGains(kpLinear, kdLinear);
+        ptr->orientationController()->setGains(c0, kdAngular, kpAngular);
+    }
+    else
+        ptr = std::make_shared<CartesianConstraint>(CartesianElement::Type::CONTACT);
+
     ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 0);
     ptr->setRoboticJacobian(m_leftFootJacobian);
     ptr->setBiasAcceleration(m_leftFootBiasAcceleration);
@@ -1419,7 +1482,16 @@ bool TaskBasedTorqueSolverDoubleSupport::instantiateFeetConstraint(const yarp::o
     // resize quantities
     m_rightFootJacobian.resize(6, m_actuatedDOFs + 6);
     m_rightFootBiasAcceleration.resize(6);
-    ptr = std::make_shared<CartesianConstraint>(CartesianElement::Type::CONTACT);
+
+    if(m_controlContact)
+    {
+        ptr = std::make_shared<CartesianConstraint>(CartesianElement::Type::POSE);
+        ptr->positionController()->setGains(kpLinear, kdLinear);
+        ptr->orientationController()->setGains(c0, kdAngular, kpAngular);
+    }
+    else
+        ptr = std::make_shared<CartesianConstraint>(CartesianElement::Type::CONTACT);
+
     ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 0);
     ptr->setRoboticJacobian(m_rightFootJacobian);
     ptr->setBiasAcceleration(m_rightFootBiasAcceleration);
@@ -1687,10 +1759,102 @@ void TaskBasedTorqueSolverDoubleSupport::setNumberOfVariables()
 }
 
 void TaskBasedTorqueSolverDoubleSupport::setFeetState(const iDynTree::Transform& leftFootToWorldTransform,
-                                                      const iDynTree::Transform& rightFootToWorldTransform)
+                                                      const iDynTree::Twist& leftFootTwist,
+                                                      const iDynTree::Transform& rightFootToWorldTransform,
+                                                      const iDynTree::Twist& rightFootTwist)
 {
     m_leftFootToWorldTransform = leftFootToWorldTransform;
     m_rightFootToWorldTransform = rightFootToWorldTransform;
+
+    if(m_controlContact)
+    {
+        auto constraint = m_constraints.find("left_foot");
+        if(constraint == m_constraints.end())
+        {
+            yError() << "[setFeetState] unable to find the left foot constraint. "
+                     << "Please call 'initialize()' method";
+            return ;
+        }
+
+        auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
+        ptr->positionController()->setFeedback(leftFootTwist.getLinearVec3(),
+                                               leftFootToWorldTransform.getPosition());
+
+
+        ptr->orientationController()->setFeedback(leftFootTwist.getAngularVec3(),
+                                                  leftFootToWorldTransform.getRotation());
+
+
+        constraint = m_constraints.find("right_foot");
+        if(constraint == m_constraints.end())
+        {
+            yError() << "[setFeetState] unable to find the right foot constraint. "
+                     << "Please call 'initialize()' method";
+            return ;
+        }
+
+        ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
+        ptr->positionController()->setFeedback(rightFootTwist.getLinearVec3(),
+                                               rightFootToWorldTransform.getPosition());
+
+
+        ptr->orientationController()->setFeedback(rightFootTwist.getAngularVec3(),
+                                                  rightFootToWorldTransform.getRotation());
+    }
+}
+
+
+bool TaskBasedTorqueSolverDoubleSupport::setDesiredFeetTrajectory(const iDynTree::Transform& leftFootToWorldTransform,
+                                                                  const iDynTree::Transform& rightFootToWorldTransform)
+{
+    if(m_controlContact)
+    {
+        iDynTree::Vector3 footAcceleration;
+        iDynTree::Twist footTwist;
+        footTwist.zero();
+        footAcceleration.zero();
+
+
+        auto constraint = m_constraints.find("left_foot");
+        if(constraint == m_constraints.end())
+        {
+            yError() << "[setDesiredFeetTrajectory] unable to find the left foot constraint. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+
+        auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
+
+        ptr->positionController()->setDesiredTrajectory(footAcceleration,
+                                                        footTwist.getLinearVec3(),
+                                                        leftFootToWorldTransform.getPosition());
+
+
+        ptr->orientationController()->setDesiredTrajectory(footAcceleration,
+                                                           footTwist.getAngularVec3(),
+                                                           leftFootToWorldTransform.getRotation());
+
+        constraint = m_constraints.find("right_foot");
+        if(constraint == m_constraints.end())
+        {
+            yError() << "[setDesiredFeetTrajectory] unable to find the right foot constraint. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+
+        ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
+
+        ptr->positionController()->setDesiredTrajectory(footAcceleration,
+                                                        footTwist.getLinearVec3(),
+                                                        rightFootToWorldTransform.getPosition());
+
+
+        ptr->orientationController()->setDesiredTrajectory(footAcceleration,
+                                                           footTwist.getAngularVec3(),
+                                                           rightFootToWorldTransform.getRotation());
+    }
+
+    return true;
 }
 
 void TaskBasedTorqueSolverDoubleSupport::setFeetJacobian(const iDynTree::MatrixDynSize& leftFootJacobian,
@@ -1762,6 +1926,7 @@ bool TaskBasedTorqueSolverSingleSupport::instantiateFeetConstraint(const yarp::o
 {
     m_useSwingFootAsConstraint = config.check("useAsConstraint", yarp::os::Value("False")).asBool();
     m_useSwingFootAsCostFunction = config.check("useAsCostFunction", yarp::os::Value("False")).asBool();
+    m_controlContact = config.check("controlContact", yarp::os::Value("False")).asBool();
 
     yInfo() << "m_useSwingFootAsConstraint " << m_useSwingFootAsConstraint;
 
@@ -1833,7 +1998,15 @@ bool TaskBasedTorqueSolverSingleSupport::instantiateFeetConstraint(const yarp::o
     m_stanceFootJacobian.resize(6, m_actuatedDOFs + 6);
     m_stanceFootBiasAcceleration.resize(6);
 
-    ptrConstraint = std::make_shared<CartesianConstraint>(CartesianElement::Type::CONTACT);
+    if(m_controlContact)
+    {
+        ptrConstraint = std::make_shared<CartesianConstraint>(CartesianElement::Type::POSE);
+        ptrConstraint->positionController()->setGains(kpLinear, kdLinear);
+        ptrConstraint->orientationController()->setGains(c0, kdAngular, kpAngular);
+    }
+    else
+        ptrConstraint = std::make_shared<CartesianConstraint>(CartesianElement::Type::CONTACT);
+
     ptrConstraint->setSubMatricesStartingPosition(m_numberOfConstraints, 0);
     ptrConstraint->setRoboticJacobian(m_stanceFootJacobian);
     ptrConstraint->setBiasAcceleration(m_stanceFootBiasAcceleration);
@@ -2131,7 +2304,8 @@ void TaskBasedTorqueSolverSingleSupport::setNumberOfVariables()
     m_numberOfVariables = 6 + m_actuatedDOFs + m_actuatedDOFs + 6;
 }
 
-bool TaskBasedTorqueSolverSingleSupport::setDesiredFeetTrajectory(const iDynTree::Transform& swingFootToWorldTransform,
+bool TaskBasedTorqueSolverSingleSupport::setDesiredFeetTrajectory(const iDynTree::Transform& stanceFootToWorldTransform,
+                                                                  const iDynTree::Transform& swingFootToWorldTransform,
                                                                   const iDynTree::Twist& swingFootTwist,
                                                                   const iDynTree::Vector6& swingFootAcceleration)
 {
@@ -2193,10 +2367,37 @@ bool TaskBasedTorqueSolverSingleSupport::setDesiredFeetTrajectory(const iDynTree
                                                            swingFootTwist.getAngularVec3(),
                                                            swingFootToWorldTransform.getRotation());
     }
+
+    if(m_controlContact)
+    {
+        auto constraint = m_constraints.find("stance_foot");
+        if(constraint == m_constraints.end())
+        {
+            yError() << "[setDesiredFeetTrajectory] unable to find the stance foot constraint. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+
+        auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
+        iDynTree::Vector3 stanceFootAcceleration;
+        iDynTree::Twist stanceFootTwist;
+        stanceFootTwist.zero();
+        stanceFootAcceleration.zero();
+        ptr->positionController()->setDesiredTrajectory(stanceFootAcceleration,
+                                                        stanceFootTwist.getLinearVec3(),
+                                                        stanceFootToWorldTransform.getPosition());
+
+
+        ptr->orientationController()->setDesiredTrajectory(stanceFootAcceleration,
+                                                           stanceFootTwist.getAngularVec3(),
+                                                           stanceFootToWorldTransform.getRotation());
+    }
+
     return true;
 }
 
 bool TaskBasedTorqueSolverSingleSupport::setFeetState(const iDynTree::Transform& stanceFootToWorldTransform,
+                                                      const iDynTree::Twist& stanceFootTwist,
                                                       const iDynTree::Transform& swingFootToWorldTransform,
                                                       const iDynTree::Twist& swingFootTwist)
 {
@@ -2236,6 +2437,26 @@ bool TaskBasedTorqueSolverSingleSupport::setFeetState(const iDynTree::Transform&
         ptr->orientationController()->setFeedback(swingFootTwist.getAngularVec3(),
                                                   swingFootToWorldTransform.getRotation());
     }
+
+    if(m_controlContact)
+    {
+        auto constraint = m_constraints.find("stance_foot");
+        if(constraint == m_constraints.end())
+        {
+            yError() << "[setDesiredFeetTrajectory] unable to find the swing foot constraint. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+
+        auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
+        ptr->positionController()->setFeedback(stanceFootTwist.getLinearVec3(),
+                                               stanceFootToWorldTransform.getPosition());
+
+
+        ptr->orientationController()->setFeedback(stanceFootTwist.getAngularVec3(),
+                                                  stanceFootToWorldTransform.getRotation());
+    }
+
     return true;
 }
 
