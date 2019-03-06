@@ -1185,68 +1185,96 @@ bool WalkingModule::updateModule()
 
             m_profiler->setInitTime("IK");
 
-            // // integrate dq because velocity control mode seems not available
-            // yarp::sig::Vector bufferVelocity(m_robotControlHelper->getActuatedDoFs());
-            // yarp::sig::Vector bufferPosition(m_robotControlHelper->getActuatedDoFs());
+            if(m_useQPIK)
+            {
+                // integrate dq because velocity control mode seems not available
+                yarp::sig::Vector bufferVelocity(m_robotControlHelper->getActuatedDoFs());
+                yarp::sig::Vector bufferPosition(m_robotControlHelper->getActuatedDoFs());
+                if(!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired))
+                {
+                    yError() << "[updateModule] Unable to set the internal robot state.";
+                    return false;
+                }
 
-            // if(!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired))
-            // {
-            //     yError() << "[updateModule] Unable to set the internal robot state.";
-            //     return false;
-            // }
+                if(!m_FKSolver->evaluateCoM())
+                {
+                    yError() << "[updateModule] Unable to evaluate the CoM.";
+                    return false;
+                }
 
-            // if(!m_FKSolver->evaluateCoM())
-            // {
-            //     yError() << "[updateModule] Unable to evaluate the CoM.";
-            //     return false;
-            // }
+                m_FKSolver->evaluateDCM();
 
-            // m_FKSolver->evaluateDCM();
+                if(m_useOSQP)
+                {
+                    if(!solveQPIK(m_QPIKSolver_osqp, desiredCoMPosition,
+                                  desiredCoMVelocity,
+                                  yawRotation, m_dqDesired))
+                    {
+                        yError() << "[updateModule] Unable to solve the QP problem with osqp.";
+                        return false;
+                    }
+                }
+                else
+                {
+                    if(!solveQPIK(m_QPIKSolver_qpOASES, desiredCoMPosition,
+                                  desiredCoMVelocity,
+                                  yawRotation, m_dqDesired))
+                    {
+                        yError() << "[updateModule] Unable to solve the QP problem with osqp.";
+                        return false;
+                    }
+                }
+                iDynTree::toYarp(m_dqDesired, bufferVelocity);
 
-            // if(m_useOSQP)
-            // {
-            //     if(!solveQPIK(m_QPIKSolver_osqp, desiredCoMPosition,
-            //                   desiredCoMVelocity,
-            //                   yawRotation, m_dqDesired))
-            //     {
-            //         yError() << "[updateModule] Unable to solve the QP problem with osqp.";
-            //         return false;
-            //     }
-            // }
-            // else
-            // {
-            //     if(!solveQPIK(m_QPIKSolver_qpOASES, desiredCoMPosition,
-            //                   desiredCoMVelocity,
-            //                   yawRotation, m_dqDesired))
-            //     {
-            //         yError() << "[updateModule] Unable to solve the QP problem with osqp.";
-            //         return false;
-            //     }
-            // }
-            // iDynTree::toYarp(m_dqDesired, bufferVelocity);
+                bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
+                iDynTree::toiDynTree(bufferPosition, m_qDesired);
 
-            // bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
-            // iDynTree::toiDynTree(bufferPosition, m_qDesired);
+                yInfo() << m_qDesired.toString();
 
-            // if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
-            //                                       m_robotControlHelper->getJointVelocity()))
-            // {
-            //     yError() << "[solveTaskBased] Unable to set the internal robot state";
-            //     return false;
-            // }
+                if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+                                                      m_robotControlHelper->getJointVelocity()))
+                {
+                    yError() << "[solveTaskBased] Unable to set the internal robot state";
+                    return false;
+                }
 
-            // if(!m_FKSolver->evaluateCoM())
-            // {
-            //     yError() << "[updateModule] Unable to evaluate the CoM.";
-            //     return false;
-            // }
+                if(!m_FKSolver->evaluateCoM())
+                {
+                    yError() << "[updateModule] Unable to evaluate the CoM.";
+                    return false;
+                }
 
-            // m_FKSolver->evaluateDCM();
+                m_FKSolver->evaluateDCM();
+            }
+            else
+            {
+                if(m_IKSolver->usingAdditionalRotationTarget())
+                {
+                    if(!m_IKSolver->updateIntertiaToWorldFrameRotation(modifiedInertial))
+                    {
+                        yError() << "[updateModule] Error updating the inertia to world frame rotation.";
+                        return false;
+                    }
+                }
+
+                if(!m_IKSolver->setFullModelFeedBack(m_robotControlHelper->getJointPosition()))
+                {
+                    yError() << "[updateModule] Error while setting the feedback to the inverse Kinematics.";
+                    return false;
+                }
+
+                if(!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
+                                          desiredCoMPosition, m_qDesired))
+                {
+                    yError() << "[updateModule] Error during the inverse Kinematics iteration.";
+                    return false;
+                }
+            }
 
             m_profiler->setEndTime("IK");
 
+            // torque controller
             m_profiler->setInitTime("Torque");
-
 
             if(!solveTaskBased(yawRotation, desiredCoMPosition, desiredCoMVelocity,
                                desiredCoMAcceleration, desiredZMP, desiredVRP, m_torqueDesired))
@@ -1270,7 +1298,7 @@ bool WalkingModule::updateModule()
         // debug
         yarp::sig::Vector& temp =  m_floatingBasePort.prepare();
         temp.clear();
-        //temp.push_back(        m_FKSolverDebug->getRootLinkToWorldTransform().getPosition()
+
         YarpHelper::mergeSigVector(temp,
                                    m_FKSolverDebug->getRootLinkToWorldTransform().getPosition(),
                                    m_FKSolverDebug->getRootLinkToWorldTransform().getRotation().asRPY(),
@@ -1890,15 +1918,6 @@ bool WalkingModule::startWalking()
 
     yInfo() << heightOffset;
     m_robotControlHelper->setHeightOffset(heightOffset);
-
-    // if (m_useTorque)
-    // {
-    //     if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_TORQUE))
-    //     {
-    //         yError() << "[prepareRobot] Error while setting the torque control.";
-    //         return false;
-    //     }
-    // }
 
     m_robotState = WalkingFSM::Walking;
     m_firstStep = true;
