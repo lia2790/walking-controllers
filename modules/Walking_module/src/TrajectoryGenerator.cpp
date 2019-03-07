@@ -127,7 +127,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && unicyclePlanner->setMinimumAngleForNewSteps(minAngleVariation);
     ok = ok && unicyclePlanner->setMinimumStepLength(minStepLength);
     ok = ok && unicyclePlanner->setSlowWhenTurnGain(slowWhenTurningGain);
-    unicyclePlanner->addTerminalStep(false);
+    unicyclePlanner->addTerminalStep(true);
     unicyclePlanner->startWithLeft(m_swingLeft);
     unicyclePlanner->resetStartingFootIfStill(startWithSameFoot);
 
@@ -658,4 +658,9 @@ void TrajectoryGenerator::reset()
 
     // change the state of the generator
     m_generatorState = GeneratorState::FirstStep;
+}
+
+bool TrajectoryGenerator::swingLeft()
+{
+    return m_swingLeft;
 }

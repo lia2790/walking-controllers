@@ -238,6 +238,11 @@ public:
      * Reset the planner
      */
     void reset();
+
+    /**
+     * Check if the swing foot is the left
+     */
+    bool swingLeft();
 };
 
 #endif

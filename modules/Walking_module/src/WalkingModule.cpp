@@ -1881,11 +1881,14 @@ bool WalkingModule::startWalking()
     if(m_robotState == WalkingFSM::Prepared)
         m_robotControlHelper->resetFilters();
 
-    // TODO in a better way (remove magic numbers)
-    iDynTree::Transform stanceFoot_T_world = m_rightTrajectory.front().inverse();
+    iDynTree::Transform stanceFoot_T_world = m_trajectoryGenerator->swingLeft() ?
+        m_rightTrajectory.front().inverse() : m_leftTrajectory.front().inverse();
+
+    std::string frameName = m_trajectoryGenerator->swingLeft() ? "r_sole" : "l_sole";
+
     yarp::os::Bottle cmd, outcome;
     cmd.addString("resetLeggedOdometryWithRefFrame");
-    cmd.addString("r_sole");
+    cmd.addString(frameName);
     cmd.addDouble(stanceFoot_T_world.getPosition()(0));
     cmd.addDouble(stanceFoot_T_world.getPosition()(1));
     cmd.addDouble(stanceFoot_T_world.getPosition()(2));
