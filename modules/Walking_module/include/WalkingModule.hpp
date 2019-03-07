@@ -110,6 +110,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     iDynTree::VectorDynSize m_qDesired; /**< Vector containing the results of the IK algorithm [rad]. */
     iDynTree::VectorDynSize m_dqDesired; /**< Vector containing the results of the IK algorithm [rad]. */
+    iDynTree::VectorDynSize m_ddqDesired; /**< Vector containing the results of the task based torque algorithm [rad/s^2]. */
     iDynTree::VectorDynSize m_torqueDesired; /**< Vector containing the desired joint torques. */
 
     iDynTree::Rotation m_inertial_R_worldFrame; /**< Rotation between the inertial and the world frame. */
@@ -134,6 +135,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     // debug
     std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
+    std::unique_ptr<iCub::ctrl::Integrator> m_accelerationIntegral{nullptr};
 
     /**
      * Get the robot model from the resource finder and set it.
@@ -193,8 +195,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
                         const iDynTree::Vector3& desiredCoMAcceleration,
                         const iDynTree::Vector2& desiredZMPPosition,
                         const iDynTree::Vector3& desiredVRPPosition,
-                        iDynTree::VectorDynSize &output);
-
+                        iDynTree::VectorDynSize &outputTorque,
+                        iDynTree::VectorDynSize &outputAcceleration);
 
     /**
      * Generate the first trajectory.

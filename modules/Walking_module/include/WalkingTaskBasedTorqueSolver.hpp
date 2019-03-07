@@ -43,6 +43,7 @@ protected:
     Eigen::VectorXd m_lowerBound;
 
     iDynTree::VectorDynSize m_desiredJointTorque;
+    iDynTree::VectorDynSize m_desiredJointAccelerationOutput;
 
     iDynTree::VectorDynSize m_desiredJointPosition;
     iDynTree::VectorDynSize m_desiredJointVelocity;
@@ -205,7 +206,9 @@ public:
      * Get the solution of the optimization problem.
      * @param output joint torque
      */
-    const iDynTree::VectorDynSize& getSolution() const;
+    const iDynTree::VectorDynSize& desiredJointTorque() const;
+
+    const iDynTree::VectorDynSize& desiredJointAcceleration() const;
 
     virtual iDynTree::Vector2 getZMP() = 0;
 

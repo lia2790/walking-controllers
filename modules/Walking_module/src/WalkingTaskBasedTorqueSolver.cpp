@@ -476,6 +476,7 @@ bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
     // results
     m_solution.resize(m_numberOfVariables);
     m_desiredJointTorque.resize(m_actuatedDOFs);
+    m_desiredJointAccelerationOutput.resize(m_actuatedDOFs);
 
     // check if the config is empty
     if(config.isNull())
@@ -1254,6 +1255,9 @@ bool TaskBasedTorqueSolver::solve()
     for(int i = 0; i < m_actuatedDOFs; i++)
         m_desiredJointTorque(i) = m_solution(i + m_actuatedDOFs + 6) +  0*m_desiredJointVelocity(i);
 
+    for(int i = 0; i < m_actuatedDOFs; i++)
+        m_desiredJointAccelerationOutput(i) = m_solution(i + 6);
+
     if(!tempPrint())
         return false;
 
@@ -1363,9 +1367,14 @@ bool TaskBasedTorqueSolver::isSolutionFeasible()
     return false;
 }
 
-const iDynTree::VectorDynSize& TaskBasedTorqueSolver::getSolution() const
+const iDynTree::VectorDynSize& TaskBasedTorqueSolver::desiredJointTorque() const
 {
     return m_desiredJointTorque;
+}
+
+const iDynTree::VectorDynSize& TaskBasedTorqueSolver::desiredJointAcceleration() const
+{
+    return m_desiredJointAccelerationOutput;
 }
 
 iDynTree::Wrench TaskBasedTorqueSolverDoubleSupport::getLeftWrench()

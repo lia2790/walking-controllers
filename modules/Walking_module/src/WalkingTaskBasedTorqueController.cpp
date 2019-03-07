@@ -551,13 +551,22 @@ bool WalkingTaskBasedTorqueController::solve()
     return true;
 }
 
-const iDynTree::VectorDynSize& WalkingTaskBasedTorqueController::getSolution() const
+const iDynTree::VectorDynSize& WalkingTaskBasedTorqueController::desiredJointTorque() const
 {
     if(m_isDoubleSupportPhase)
-        return m_doubleSupportSolver->getSolution();
+        return m_doubleSupportSolver->desiredJointTorque();
     else
-        return m_singleSupportSolver->getSolution();
+        return m_singleSupportSolver->desiredJointTorque();
 }
+
+const iDynTree::VectorDynSize& WalkingTaskBasedTorqueController::desiredJointAcceleration() const
+{
+    if(m_isDoubleSupportPhase)
+        return m_doubleSupportSolver->desiredJointAcceleration();
+    else
+        return m_singleSupportSolver->desiredJointAcceleration();
+}
+
 
 void WalkingTaskBasedTorqueController::getWrenches(iDynTree::Wrench& left,
                                                    iDynTree::Wrench& right)

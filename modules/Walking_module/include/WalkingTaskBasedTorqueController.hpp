@@ -106,7 +106,9 @@ public:
      * Get the solution of the optimization problem.
      * @return the desired joint torque
      */
-    const iDynTree::VectorDynSize& getSolution()const;
+    const iDynTree::VectorDynSize& desiredJointTorque() const;
+
+    const iDynTree::VectorDynSize& desiredJointAcceleration() const;
 
     void getWrenches(iDynTree::Wrench& left, iDynTree::Wrench& right);
 

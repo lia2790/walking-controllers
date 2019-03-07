@@ -383,7 +383,12 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     // resize variables
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
+    m_ddqDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_torqueDesired.resize(m_robotControlHelper->getActuatedDoFs());
+    m_qDesired.zero();
+    m_dqDesired.zero();
+    m_ddqDesired.zero();
+    m_torqueDesired.zero();
 
     // TODO move in the config
     std::string portNameBaseEst;
@@ -554,7 +559,8 @@ bool WalkingModule::solveTaskBased(const iDynTree::Rotation& desiredNeckOrientat
                                    const iDynTree::Vector3& desiredCoMAcceleration,
                                    const iDynTree::Vector2& desiredZMPPosition,
                                    const iDynTree::Vector3& desiredVRPPosition,
-                                   iDynTree::VectorDynSize &output)
+                                   iDynTree::VectorDynSize &outputTorque,
+                                   iDynTree::VectorDynSize &outputAcceleration)
 {
     // do at the beginning!
     // TODO
@@ -733,7 +739,8 @@ bool WalkingModule::solveTaskBased(const iDynTree::Rotation& desiredNeckOrientat
         return false;
     }
 
-    output = m_taskBasedTorqueSolver->getSolution();
+    outputTorque = m_taskBasedTorqueSolver->desiredJointTorque();
+    outputAcceleration = m_taskBasedTorqueSolver->desiredJointAcceleration();
 
     return true;
 }
@@ -781,10 +788,13 @@ bool WalkingModule::updateModule()
             }
 
             yarp::sig::Vector buffer(m_qDesired.size());
+            yarp::sig::Vector bufferZero(m_qDesired.size());
+            bufferZero.zero();
             iDynTree::toYarp(m_qDesired, buffer);
 
             // instantiate Integrator object
             m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, buffer);
+            m_accelerationIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, bufferZero);
 
             // reset the models
             m_walkingZMPController->reset(m_DCMPositionDesired.front());
@@ -1274,11 +1284,27 @@ bool WalkingModule::updateModule()
             m_profiler->setInitTime("Torque");
 
             if(!solveTaskBased(yawRotation, desiredCoMPosition, desiredCoMVelocity,
-                               desiredCoMAcceleration, desiredZMP, desiredVRP, m_torqueDesired))
+                               desiredCoMAcceleration, desiredZMP, desiredVRP, m_torqueDesired,
+                               m_ddqDesired))
             {
                 yError() << "[updateModule] Unable to solve the task based problem.";
                 return false;
             }
+
+            // yarp::sig::Vector bufferAcceleration(m_robotControlHelper->getActuatedDoFs());
+            // yarp::sig::Vector bufferVelocity(m_robotControlHelper->getActuatedDoFs());
+            // yarp::sig::Vector bufferPosition(m_robotControlHelper->getActuatedDoFs());
+
+            // iDynTree::toYarp(m_ddqDesired, bufferAcceleration);
+            // bufferVelocity = m_accelerationIntegral->integrate(bufferAcceleration);
+            // bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
+            // iDynTree::toiDynTree(bufferPosition, m_qDesired);
+
+            // if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+            // {
+            //     yError() << "[updateModule] Unable to set the desired joint position.";
+            //     return false;
+            // }
 
             if(!m_robotControlHelper->setTorqueReferences(m_torqueDesired))
             {
