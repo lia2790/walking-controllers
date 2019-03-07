@@ -1080,19 +1080,19 @@ bool WalkingModule::updateModule()
                 yarp::sig::Vector bufferVelocity(m_robotControlHelper->getActuatedDoFs());
                 yarp::sig::Vector bufferPosition(m_robotControlHelper->getActuatedDoFs());
 
-                if(!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired))
-                {
-                    yError() << "[updateModule] Unable to set the internal robot state.";
-                    return false;
-                }
+                // if(!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired))
+                // {
+                //     yError() << "[updateModule] Unable to set the internal robot state.";
+                //     return false;
+                // }
 
-                if(!m_FKSolver->evaluateCoM())
-                {
-                    yError() << "[updateModule] Unable to evaluate the CoM.";
-                    return false;
-                }
+                // if(!m_FKSolver->evaluateCoM())
+                // {
+                //     yError() << "[updateModule] Unable to evaluate the CoM.";
+                //     return false;
+                // }
 
-                m_FKSolver->evaluateDCM();
+                // m_FKSolver->evaluateDCM();
 
                 if(m_useOSQP)
                 {
@@ -1119,21 +1119,20 @@ bool WalkingModule::updateModule()
                 bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
                 iDynTree::toiDynTree(bufferPosition, m_qDesired);
 
-                if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
-                                                      m_robotControlHelper->getJointVelocity()))
-                {
-                    yError() << "[solveTaskBased] Unable to set the internal robot state";
-                    return false;
-                }
+                // if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+                //                                       m_robotControlHelper->getJointVelocity()))
+                // {
+                //     yError() << "[solveTaskBased] Unable to set the internal robot state";
+                //     return false;
+                // }
 
-                if(!m_FKSolver->evaluateCoM())
-                {
-                    yError() << "[updateModule] Unable to evaluate the CoM.";
-                    return false;
-                }
+                // if(!m_FKSolver->evaluateCoM())
+                // {
+                //     yError() << "[updateModule] Unable to evaluate the CoM.";
+                //     return false;
+                // }
 
-                m_FKSolver->evaluateDCM();
-
+                // m_FKSolver->evaluateDCM();
             }
             else
             {
@@ -1228,8 +1227,6 @@ bool WalkingModule::updateModule()
 
                 bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
                 iDynTree::toiDynTree(bufferPosition, m_qDesired);
-
-                yInfo() << m_qDesired.toString();
 
                 if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
                                                       m_robotControlHelper->getJointVelocity()))
@@ -1332,13 +1329,20 @@ bool WalkingModule::updateModule()
             // }
 
             iDynTree::Wrench left, right;
-            m_taskBasedTorqueSolver->getWrenches(left, right);
+            if(m_useTorque)
+                m_taskBasedTorqueSolver->getWrenches(left, right);
+
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
 
+            iDynTree::Vector3 desiredNeckOrientation;
+            if(m_useTorque)
+                desiredNeckOrientation = m_taskBasedTorqueSolver->getDesiredNeckOrientation();
+
             yarp::sig::Vector statusVector(2);
             statusVector(0) = m_waitCondition;
-            statusVector(1) = m_taskBasedTorqueSolver->isDoubleSupportPhase();
+            if(m_useTorque)
+                statusVector(1) = m_taskBasedTorqueSolver->isDoubleSupportPhase();
 
             m_walkingLogger->sendData(m_FKSolver->getDCM(),
                                       DCMPositionDesired, DCMVelocityDesired,
@@ -1351,7 +1355,7 @@ bool WalkingModule::updateModule()
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
                                       m_robotControlHelper->getLeftWrench(), m_robotControlHelper->getRightWrench(),
                                       left, right,
-                                      m_taskBasedTorqueSolver->getDesiredNeckOrientation(),
+                                      desiredNeckOrientation,
                                       m_FKSolver->getNeckOrientation().asRPY(),
                                       m_torqueDesired,
                                       m_robotControlHelper->getJointTorque(),
