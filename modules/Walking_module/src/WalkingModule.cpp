@@ -562,7 +562,7 @@ bool WalkingModule::solveTaskBased(const iDynTree::Rotation& desiredNeckOrientat
 
     iDynTree::VectorDynSize dummyJoint(m_robotControlHelper->getActuatedDoFs());
     dummyJoint.zero();
-    m_taskBasedTorqueSolver->setDesiredJointTrajectory(m_qDesired, dummyJoint, dummyJoint);
+    m_taskBasedTorqueSolver->setDesiredJointTrajectory(m_qDesired, m_dqDesired, dummyJoint);
 
     iDynTree::MatrixDynSize jacobian, comJacobian;
     jacobian.resize(6, m_robotControlHelper->getActuatedDoFs() + 6);
