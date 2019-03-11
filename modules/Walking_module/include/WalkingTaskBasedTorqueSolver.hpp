@@ -132,7 +132,7 @@ protected:
     int m_actuatedDOFs;
     int m_numberOfVariables; /**<Number of variables in the QP problem (# of joints + 12) */
     int m_numberOfConstraints; /**<Number of constraints in the QP problem */
-    Eigen::VectorXd m_solution;
+    iDynTree::VectorDynSize m_solution;
 
     bool m_useZMPConstraint;
 
@@ -147,6 +147,10 @@ public:
                     const iDynTree::VectorDynSize& minJointTorque,
                     const iDynTree::VectorDynSize& maxJointTorque);
 
+
+    void setInitialValue(const iDynTree::VectorDynSize initialValue);
+
+    const iDynTree::VectorDynSize& solution() const;
 
     bool setMassMatrix(const iDynTree::MatrixDynSize& massMatrix);
 

@@ -1243,7 +1243,7 @@ bool TaskBasedTorqueSolver::solve()
     //     return false;
     // }
 
-    m_solution = m_optimizer->getSolution();
+    iDynTree::toEigen(m_solution) = m_optimizer->getSolution();
 
     // check equality constraints
     // if(!isSolutionFeasible())
@@ -1346,7 +1346,7 @@ bool TaskBasedTorqueSolver::solve()
 bool TaskBasedTorqueSolver::isSolutionFeasible()
 {
     double tolerance = 0.5;
-    Eigen::VectorXd constrainedOutput = m_constraintMatrix * m_solution;
+    Eigen::VectorXd constrainedOutput = m_constraintMatrix * iDynTree::toEigen(m_solution);
     // std::cerr<<"m_constraintMatrix"<<std::endl;
     // std::cerr<<Eigen::MatrixXd(m_constraintMatrix)<<std::endl;
 
@@ -1377,6 +1377,11 @@ const iDynTree::VectorDynSize& TaskBasedTorqueSolver::desiredJointAcceleration()
     return m_desiredJointAccelerationOutput;
 }
 
+const iDynTree::VectorDynSize& TaskBasedTorqueSolver::solution() const
+{
+    return m_solution;
+}
+
 iDynTree::Wrench TaskBasedTorqueSolverDoubleSupport::getLeftWrench()
 {
     iDynTree::Wrench wrench;
@@ -1399,6 +1404,20 @@ iDynTree::Wrench TaskBasedTorqueSolverDoubleSupport::getRightWrench()
 iDynTree::Vector3 TaskBasedTorqueSolver::getDesiredNeckOrientation()
 {
     return m_desiredNeckOrientation.asRPY();
+}
+
+void TaskBasedTorqueSolver::setInitialValue(const iDynTree::VectorDynSize initialValue)
+{
+    m_solution = initialValue;
+    for(int i = 0; i < m_actuatedDOFs; i++)
+        m_desiredJointTorque(i) = m_solution(i + m_actuatedDOFs + 6);
+
+    // TODO change API osqp
+    if(m_optimizer->isInitialized())
+    {
+        Eigen::VectorXd init = iDynTree::toEigen(initialValue);
+        m_optimizer->setPrimalVariable<double, Eigen::Dynamic>(init);
+    }
 }
 
 bool TaskBasedTorqueSolverDoubleSupport::instantiateFeetConstraint(const yarp::os::Searchable& config)

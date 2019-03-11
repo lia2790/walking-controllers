@@ -43,19 +43,67 @@ bool WalkingTaskBasedTorqueController::initialize(const yarp::os::Searchable& co
 
 void WalkingTaskBasedTorqueController::setFeetState(const bool &leftInContact, const bool &rightInContact)
 {
-    m_leftInContact = leftInContact;
-    m_rightInContact = rightInContact;
 
-    if(m_leftInContact && m_rightInContact)
+    if(leftInContact && rightInContact)
     {
+        if(!m_firstStep)
+        {
+            if(!m_isDoubleSupportPhase)
+            {
+                auto solution = m_singleSupportSolver->solution();
+                iDynTree::VectorDynSize primalVariable(6 + m_actuatedDOFs + m_actuatedDOFs + 6 + 6);
+                iDynTree::toEigen(primalVariable).block(0, 0, 6 + m_actuatedDOFs + m_actuatedDOFs, 1)
+                    = iDynTree::toEigen(solution).block(0, 0, 6 + m_actuatedDOFs + m_actuatedDOFs, 1);
+                if(m_leftInContact)
+                {
+                    iDynTree::toEigen(primalVariable).block(6 + m_actuatedDOFs + m_actuatedDOFs, 0, 6, 1)
+                        = iDynTree::toEigen(solution).block(6 + m_actuatedDOFs + m_actuatedDOFs, 0, 6, 1);
+
+                    iDynTree::toEigen(primalVariable).block(6 + m_actuatedDOFs + m_actuatedDOFs + 6, 0, 6, 1).setZero();
+                }
+                else
+                {
+                    iDynTree::toEigen(primalVariable).block(6 + m_actuatedDOFs + m_actuatedDOFs + 6, 0, 6, 1)
+                        = iDynTree::toEigen(solution).block(6 + m_actuatedDOFs + m_actuatedDOFs, 0, 6, 1);
+
+                    iDynTree::toEigen(primalVariable).block(6 + m_actuatedDOFs + m_actuatedDOFs, 0, 6, 1).setZero();
+                }
+
+                m_singleSupportSolver->setInitialValue(primalVariable);
+            }
+        }
         m_isDoubleSupportPhase = true;
         yInfo() << "[setFeetState] Double support phase";
     }
     else
     {
+        if(!m_firstStep)
+        {
+            if(m_isDoubleSupportPhase)
+            {
+                auto solution = m_doubleSupportSolver->solution();
+                iDynTree::VectorDynSize primalVariable(6 + m_actuatedDOFs + m_actuatedDOFs + 6);
+                iDynTree::toEigen(primalVariable).block(0, 0, 6 + m_actuatedDOFs + m_actuatedDOFs, 1)
+                    = iDynTree::toEigen(solution).block(0, 0, 6 + m_actuatedDOFs + m_actuatedDOFs, 1);
+                if(leftInContact)
+                    iDynTree::toEigen(primalVariable).block(6 + m_actuatedDOFs + m_actuatedDOFs, 0, 6, 1)
+                        = iDynTree::toEigen(solution).block(6 + m_actuatedDOFs + m_actuatedDOFs, 0, 6, 1);
+                else
+                    iDynTree::toEigen(primalVariable).block(6 + m_actuatedDOFs + m_actuatedDOFs, 0, 6, 1)
+                        = iDynTree::toEigen(solution).block(6 + m_actuatedDOFs + m_actuatedDOFs + 6, 0, 6, 1);
+
+                m_singleSupportSolver->setInitialValue(primalVariable);
+            }
+        }
         m_isDoubleSupportPhase = false;
         yInfo() << "[setFeetState] Single support phase";
     }
+
+    if(m_firstStep)
+        m_firstStep = false;
+    m_leftInContact = leftInContact;
+    m_rightInContact = rightInContact;
+
 }
 
 bool WalkingTaskBasedTorqueController::setMassMatrix(const iDynTree::MatrixDynSize& massMatrix)

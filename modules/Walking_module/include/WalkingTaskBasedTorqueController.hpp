@@ -17,6 +17,8 @@ class WalkingTaskBasedTorqueController
 {
     int m_actuatedDOFs;
 
+    bool m_firstStep{true};
+
     bool m_isDoubleSupportPhase{true};
 
     bool m_leftInContact{true};
