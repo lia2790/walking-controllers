@@ -789,3 +789,20 @@ void AngularMomentumCostFunctionSingleSupport::evaluateGradient(Eigen::VectorXd 
         - temp * iDynTree::toEigen(m_weight).asDiagonal() *
         iDynTree::toEigen(desiredAngularMomentumRateOfChange());
 }
+
+RateOfChangeCostFunction::RateOfChangeCostFunction(const int& sizeOfTheConstraintVector)
+{
+    m_sizeOfElement = sizeOfTheConstraintVector;
+}
+
+void RateOfChangeCostFunction::setHessianConstantElements(Eigen::SparseMatrix<double>& hessian)
+{
+    for(int i = 0; i < m_sizeOfElement; i++)
+        hessian.insert(m_hessianStartingRow + i, m_hessianStartingColumn + i) = m_weight(i);
+}
+
+void RateOfChangeCostFunction::evaluateGradient(Eigen::VectorXd& gradient)
+{
+    gradient.block(m_hessianStartingRow, 0, m_sizeOfElement, 1)
+        = (-iDynTree::toEigen(m_weight)).asDiagonal() * iDynTree::toEigen(*m_previousValues);
+}

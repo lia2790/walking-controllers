@@ -525,18 +525,26 @@ public:
 
 };
 
-class RateOfChangeConstraint : public LinearConstraint
+class RateOfChangeElement
 {
-    iDynTree::VectorDynSize m_maximumRateOfChange;
+protected:
     iDynTree::VectorDynSize const * m_previousValues;
 
 public:
 
+    void setPreviousValues(const iDynTree::VectorDynSize& previousValues){m_previousValues = &previousValues;};
+};
+
+class RateOfChangeConstraint : public LinearConstraint, public RateOfChangeElement
+{
+    iDynTree::VectorDynSize m_maximumRateOfChange;
+
+
+public:
     RateOfChangeConstraint(const int& sizeOfTheCOnstraintVector);
 
-    void setMaximumRateOfChange(const iDynTree::VectorDynSize& maximumRateOfChange){m_maximumRateOfChange = maximumRateOfChange;};
 
-    void setPreviousValues(const iDynTree::VectorDynSize& previousValues){m_previousValues = &previousValues;};
+    void setMaximumRateOfChange(const iDynTree::VectorDynSize& maximumRateOfChange){m_maximumRateOfChange = maximumRateOfChange;};
 
     /**
      * Evaluate the constraint jacobian
@@ -673,7 +681,7 @@ public:
 
     LinearMomentumCostFunction(const Type &elemetType);
 
-    void setHessianConstantElements(Eigen::SparseMatrix<double>& hessian) override;
+    void setHessianConstantElements(Eigen::SparseMatrix<double>& hessian) final;
 
     /**
      * Evaluate the Gradient vector
@@ -706,6 +714,20 @@ public:
     AngularMomentumCostFunctionSingleSupport();
 
     void evaluateHessian(Eigen::SparseMatrix<double>& hessian) override;
+
+    /**
+     * Evaluate the Gradient vector
+     */
+    void evaluateGradient(Eigen::VectorXd& gradient) override;
+};
+
+class RateOfChangeCostFunction : public QuadraticCostFunction, public RateOfChangeElement
+{
+public:
+    RateOfChangeCostFunction(const int& sizeOfTheConstraintVector);
+
+
+    void setHessianConstantElements(Eigen::SparseMatrix<double>& hessian) final;
 
     /**
      * Evaluate the Gradient vector
