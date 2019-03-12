@@ -1952,6 +1952,10 @@ bool WalkingModule::startWalking()
     yInfo() << heightOffset;
     m_robotControlHelper->setHeightOffset(heightOffset);
 
+    m_taskBasedTorqueSolver->reset(m_robotControlHelper->getJointTorque(),
+                                   m_robotControlHelper->getLeftWrench(),
+                                   m_robotControlHelper->getRightWrench());
+
     m_robotState = WalkingFSM::Walking;
     m_firstStep = true;
 

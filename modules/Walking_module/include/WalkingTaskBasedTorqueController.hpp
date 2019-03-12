@@ -34,6 +34,10 @@ public:
                     const iDynTree::VectorDynSize& minJointTorque,
                     const iDynTree::VectorDynSize& maxJointTorque);
 
+    void reset(const iDynTree::VectorDynSize& jointTorque,
+               const iDynTree::Wrench& leftWrench,
+               const iDynTree::Wrench& rightWrench);
+
     void setFeetState(const bool &leftInContact, const bool &rightInContact);
 
     bool setMassMatrix(const iDynTree::MatrixDynSize& massMatrix);

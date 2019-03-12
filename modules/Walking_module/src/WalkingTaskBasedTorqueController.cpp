@@ -41,6 +41,26 @@ bool WalkingTaskBasedTorqueController::initialize(const yarp::os::Searchable& co
     return true;
 }
 
+void WalkingTaskBasedTorqueController::reset(const iDynTree::VectorDynSize& jointTorque,
+                                             const iDynTree::Wrench& leftWrench,
+                                             const iDynTree::Wrench& rightWrench)
+{
+    // the robot will start in double support phase
+
+    iDynTree::VectorDynSize initialValue(6 + m_actuatedDOFs + m_actuatedDOFs + 12);
+    initialValue.zero();
+    iDynTree::toEigen(initialValue).block(6 + m_actuatedDOFs, 0, m_actuatedDOFs, 1)
+        = iDynTree::toEigen(jointTorque);
+
+    iDynTree::toEigen(initialValue).block(6 + 2 * m_actuatedDOFs, 0, 6, 1)
+        = iDynTree::toEigen(leftWrench);
+
+    iDynTree::toEigen(initialValue).block(6 + 2 * m_actuatedDOFs + 6, 0, 6, 1)
+        = iDynTree::toEigen(rightWrench);
+
+    m_doubleSupportSolver->setInitialValue(initialValue);
+}
+
 void WalkingTaskBasedTorqueController::setFeetState(const bool &leftInContact, const bool &rightInContact)
 {
 

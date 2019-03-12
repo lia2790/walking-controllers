@@ -96,7 +96,7 @@ bool TaskBasedTorqueSolver::instantiateCoMConstraint(const yarp::os::Searchable&
     return true;
 }
 
-bool TaskBasedTorqueSolver::instantiateRateOfChangeConstraint(const yarp::os::Searchable& config)
+bool TaskBasedTorqueSolver::instantiateJointRateOfChangeConstraint(const yarp::os::Searchable& config)
 {
     yarp::os::Value tempValue;
 
@@ -106,12 +106,12 @@ bool TaskBasedTorqueSolver::instantiateRateOfChangeConstraint(const yarp::os::Se
         return true;
     }
 
-    tempValue = config.find("maximumRateOfChange");
+    tempValue = config.find("joint_torques");
     iDynTree::VectorDynSize maximumRateOfChange(m_actuatedDOFs);
     if(!YarpHelper::yarpListToiDynTreeVectorDynSize(tempValue, maximumRateOfChange))
     {
         yError() << "Initialization failed while reading maximumRateOfChange vector.";
-        return false;
+        return true;
     }
 
     std::shared_ptr<RateOfChangeConstraint> ptr;
@@ -121,9 +121,113 @@ bool TaskBasedTorqueSolver::instantiateRateOfChangeConstraint(const yarp::os::Se
     ptr->setMaximumRateOfChange(maximumRateOfChange);
     ptr->setPreviousValues(m_desiredJointTorque);
 
-    m_constraints.insert(std::make_pair("rate_of_change", ptr));
+    m_constraints.insert(std::make_pair("rate_of_change_joint_torques", ptr));
     m_numberOfConstraints += ptr->getNumberOfConstraints();
 
+    return true;
+}
+
+bool TaskBasedTorqueSolverSingleSupport::instantiateContactWrenchesRateOfChangeConstraint(const yarp::os::Searchable& config)
+{
+    yarp::os::Value tempValue;
+
+    if(config.isNull())
+    {
+        yError() << "[instantiateRateOfChangeConstraint] Empty configuration for rate of change constraint. This constraint will not take into account";
+        return true;
+    }
+
+    tempValue = config.find("contact_wrenches_limit");
+    iDynTree::VectorDynSize maximumRateOfChange(6);
+    if(YarpHelper::yarpListToiDynTreeVectorDynSize(tempValue, maximumRateOfChange))
+    {
+        auto ptrConstraint = std::make_shared<RateOfChangeConstraint>(6);
+        ptrConstraint->setSubMatricesStartingPosition(m_numberOfConstraints, m_actuatedDOFs + 6 + m_actuatedDOFs);
+
+        ptrConstraint->setMaximumRateOfChange(maximumRateOfChange);
+        ptrConstraint->setPreviousValues(m_desiredContactWrenches);
+
+        m_constraints.insert(std::make_pair("rate_of_change_contact_wrench", ptrConstraint));
+        m_numberOfConstraints += ptrConstraint->getNumberOfConstraints();
+    }
+
+    // cost
+    tempValue = config.find("contact_wrenches_cost");
+    iDynTree::VectorDynSize weight(6);
+    if(YarpHelper::yarpListToiDynTreeVectorDynSize(tempValue, weight))
+    {
+        auto ptrCost = std::make_shared<RateOfChangeCostFunction>(6);
+        ptrCost->setSubMatricesStartingPosition(m_actuatedDOFs + 6 + m_actuatedDOFs, 0);
+
+        ptrCost->setWeight(weight);
+        ptrCost->setPreviousValues(m_desiredContactWrenches);
+
+        m_costFunctions.insert(std::make_pair("rate_of_change_contact_wrench_cost", ptrCost));
+        m_hessianMatrices.insert(std::make_pair("rate_of_change_contact_wrench_cost",
+                                                std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
+        m_gradientVectors.insert(std::make_pair("rate_of_change_contact_wrench_cost",
+                                                std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
+    }
+    return true;
+}
+
+bool TaskBasedTorqueSolverDoubleSupport::instantiateContactWrenchesRateOfChangeConstraint(const yarp::os::Searchable& config)
+{
+    yarp::os::Value tempValue;
+
+    if(config.isNull())
+    {
+        yError() << "[instantiateRateOfChangeConstraint] Empty configuration for rate of change constraint. This constraint will not take into account";
+        return true;
+    }
+
+    tempValue = config.find("contact_wrenches");
+    iDynTree::VectorDynSize maximumRateOfChange(6);
+    if(YarpHelper::yarpListToiDynTreeVectorDynSize(tempValue, maximumRateOfChange))
+    {
+        iDynTree::VectorDynSize maximumRateOfChangeBothFeet(12);
+        for(int i = 0; i < 6; i++)
+        {
+            maximumRateOfChangeBothFeet(i) = maximumRateOfChange(i);
+            maximumRateOfChangeBothFeet(i + 6) = maximumRateOfChange(i);
+        }
+
+        std::shared_ptr<RateOfChangeConstraint> ptr;
+        ptr = std::make_shared<RateOfChangeConstraint>(12);
+        ptr->setSubMatricesStartingPosition(m_numberOfConstraints, m_actuatedDOFs + 6 + m_actuatedDOFs);
+
+        ptr->setMaximumRateOfChange(maximumRateOfChangeBothFeet);
+        ptr->setPreviousValues(m_desiredContactWrenches);
+
+        m_constraints.insert(std::make_pair("rate_of_change_contact_wrench", ptr));
+        m_numberOfConstraints += ptr->getNumberOfConstraints();
+    }
+    // cost
+    tempValue = config.find("contact_wrenches_cost");
+    iDynTree::VectorDynSize weight(6);
+    if(YarpHelper::yarpListToiDynTreeVectorDynSize(tempValue, weight))
+    {
+        yError() << "[instantiateNeckSoftConstraint] Initialization failed while reading contact_wrenches_cost.";
+
+        iDynTree::VectorDynSize weightBothFeet(12);
+        for(int i = 0; i < 6; i++)
+        {
+            weightBothFeet(i) = weight(i);
+            weightBothFeet(i + 6) = weight(i);
+        }
+
+        auto ptrCost = std::make_shared<RateOfChangeCostFunction>(12);
+        ptrCost->setSubMatricesStartingPosition(m_actuatedDOFs + 6 + m_actuatedDOFs, 0);
+
+        ptrCost->setWeight(weightBothFeet);
+        ptrCost->setPreviousValues(m_desiredContactWrenches);
+
+        m_costFunctions.insert(std::make_pair("rate_of_change_contact_wrench_cost", ptrCost));
+        m_hessianMatrices.insert(std::make_pair("rate_of_change_contact_wrench_cost",
+                                                std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
+        m_gradientVectors.insert(std::make_pair("rate_of_change_contact_wrench_cost",
+                                                std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
+    }
     return true;
 }
 
@@ -478,6 +582,9 @@ bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
     m_desiredJointTorque.resize(m_actuatedDOFs);
     m_desiredJointAccelerationOutput.resize(m_actuatedDOFs);
 
+    // fine for double and single support
+    m_desiredContactWrenches.resize(m_numberOfVariables - (2 * m_actuatedDOFs + 6));
+
     // check if the config is empty
     if(config.isNull())
     {
@@ -567,9 +674,15 @@ bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
     instantiateSystemDynamicsConstraint();
 
     yarp::os::Bottle& rateOfChangeOption = config.findGroup("RATE_OF_CHANGE");
-    if(!instantiateRateOfChangeConstraint(rateOfChangeOption))
+    if(!instantiateJointRateOfChangeConstraint(rateOfChangeOption))
     {
         yError() << "[initialize] Unable to get the instantiate the rate of change constraint.";
+        return false;
+    }
+
+    if(!instantiateContactWrenchesRateOfChangeConstraint(rateOfChangeOption))
+    {
+        yError() << "[initialize] Unable to get the instantiate the rate of change constraint for the contact wrenches.";
         return false;
     }
 
@@ -595,8 +708,9 @@ bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
     m_optimizer->data()->setNumberOfVariables(m_numberOfVariables);
     m_optimizer->data()->setNumberOfConstraints(m_numberOfConstraints);
 
-    m_optimizer->settings()->setVerbosity(false);
+    m_optimizer->settings()->setVerbosity(true);
     m_optimizer->settings()->setLinearSystemSolver(0);
+    m_optimizer->settings()->setMaxIteraction(100000);
 
     // set constant element of the cost function
     for(const auto& element: m_costFunctions)
@@ -1258,6 +1372,9 @@ bool TaskBasedTorqueSolver::solve()
     for(int i = 0; i < m_actuatedDOFs; i++)
         m_desiredJointAccelerationOutput(i) = m_solution(i + 6);
 
+    for(int i = 0; i < m_numberOfVariables - (2 * m_actuatedDOFs + 6); i++)
+        m_desiredContactWrenches(i) = m_solution(i + 2 * m_actuatedDOFs + 6);
+
     if(!tempPrint())
         return false;
 
@@ -1411,6 +1528,9 @@ void TaskBasedTorqueSolver::setInitialValue(const iDynTree::VectorDynSize initia
     m_solution = initialValue;
     for(int i = 0; i < m_actuatedDOFs; i++)
         m_desiredJointTorque(i) = m_solution(i + m_actuatedDOFs + 6);
+
+    for(int i = 0; i < m_numberOfVariables - (2 * m_actuatedDOFs + 6); i++)
+        m_desiredContactWrenches(i) = m_solution(i + 2 * m_actuatedDOFs + 6);
 
     // TODO change API osqp
     if(m_optimizer->isInitialized())

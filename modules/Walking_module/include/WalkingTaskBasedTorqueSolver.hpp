@@ -92,7 +92,9 @@ protected:
 
     virtual void instantiateSystemDynamicsConstraint() = 0;
 
-    bool instantiateRateOfChangeConstraint(const yarp::os::Searchable& config);
+    bool instantiateJointRateOfChangeConstraint(const yarp::os::Searchable& config);
+
+    virtual bool instantiateContactWrenchesRateOfChangeConstraint(const yarp::os::Searchable& config) = 0;
 
     virtual bool instantiateContactForcesConstraint(const yarp::os::Searchable& config) = 0;
 
@@ -133,6 +135,7 @@ protected:
     int m_numberOfVariables; /**<Number of variables in the QP problem (# of joints + 12) */
     int m_numberOfConstraints; /**<Number of constraints in the QP problem */
     iDynTree::VectorDynSize m_solution;
+    iDynTree::VectorDynSize m_desiredContactWrenches;
 
     bool m_useZMPConstraint;
 
@@ -249,6 +252,8 @@ private:
 
     bool instantiateForceRegularizationConstraint(const yarp::os::Searchable& config) override;
 
+    bool instantiateContactWrenchesRateOfChangeConstraint(const yarp::os::Searchable& config) override;
+
     void setNumberOfVariables() override;
 
     /**
@@ -309,6 +314,8 @@ class TaskBasedTorqueSolverSingleSupport : public TaskBasedTorqueSolver
     bool instantiateAngularMomentumConstraint(const yarp::os::Searchable& config) override;
 
     bool instantiateForceRegularizationConstraint(const yarp::os::Searchable& config) override;
+
+    bool instantiateContactWrenchesRateOfChangeConstraint(const yarp::os::Searchable& config) override;
 
     void setNumberOfVariables() override;
 
