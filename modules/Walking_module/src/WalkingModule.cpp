@@ -424,6 +424,8 @@ void WalkingModule::reset()
 
     m_trajectoryGenerator->reset();
 
+    m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION);
+
     if(m_dumpData)
         m_walkingLogger->quit();
 }
@@ -2039,7 +2041,10 @@ bool WalkingModule::stopWalking()
     std::lock_guard<std::mutex> guard(m_mutex);
 
     if(m_robotState != WalkingFSM::Walking)
+    {
+        yError() << "[stopWalking] Cannot stop the walking controller.";
         return false;
+    }
 
     reset();
 
