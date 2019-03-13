@@ -1092,19 +1092,19 @@ bool WalkingModule::updateModule()
                 yarp::sig::Vector bufferVelocity(m_robotControlHelper->getActuatedDoFs());
                 yarp::sig::Vector bufferPosition(m_robotControlHelper->getActuatedDoFs());
 
-                // if(!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired))
-                // {
-                //     yError() << "[updateModule] Unable to set the internal robot state.";
-                //     return false;
-                // }
+                if(!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired))
+                {
+                    yError() << "[updateModule] Unable to set the internal robot state.";
+                    return false;
+                }
 
-                // if(!m_FKSolver->evaluateCoM())
-                // {
-                //     yError() << "[updateModule] Unable to evaluate the CoM.";
-                //     return false;
-                // }
+                if(!m_FKSolver->evaluateCoM())
+                {
+                    yError() << "[updateModule] Unable to evaluate the CoM.";
+                    return false;
+                }
 
-                // m_FKSolver->evaluateDCM();
+                m_FKSolver->evaluateDCM();
 
                 if(m_useOSQP)
                 {
@@ -1131,20 +1131,20 @@ bool WalkingModule::updateModule()
                 bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
                 iDynTree::toiDynTree(bufferPosition, m_qDesired);
 
-                // if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
-                //                                       m_robotControlHelper->getJointVelocity()))
-                // {
-                //     yError() << "[solveTaskBased] Unable to set the internal robot state";
-                //     return false;
-                // }
+                if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+                                                      m_robotControlHelper->getJointVelocity()))
+                {
+                    yError() << "[solveTaskBased] Unable to set the internal robot state";
+                    return false;
+                }
 
-                // if(!m_FKSolver->evaluateCoM())
-                // {
-                //     yError() << "[updateModule] Unable to evaluate the CoM.";
-                //     return false;
-                // }
+                if(!m_FKSolver->evaluateCoM())
+                {
+                    yError() << "[updateModule] Unable to evaluate the CoM.";
+                    return false;
+                }
 
-                // m_FKSolver->evaluateDCM();
+                m_FKSolver->evaluateDCM();
             }
             else
             {
