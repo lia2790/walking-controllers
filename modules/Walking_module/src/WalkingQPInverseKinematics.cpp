@@ -119,10 +119,10 @@ WalkingQPIK::~WalkingQPIK()
 { }
 
 bool WalkingQPIK::setRobotState(const iDynTree::VectorDynSize& jointPosition,
-                                     const iDynTree::Transform& leftFootToWorldTransform,
-                                     const iDynTree::Transform& rightFootToWorldTransform,
-                                     const iDynTree::Rotation& neckOrientation,
-                                     const iDynTree::Position& comPosition)
+                                const iDynTree::Transform& leftFootToWorldTransform,
+                                const iDynTree::Transform& rightFootToWorldTransform,
+                                const iDynTree::Rotation& neckOrientation,
+                                const iDynTree::Position& comPosition)
 {
     if(jointPosition.size() != m_actuatedDOFs)
     {
@@ -254,4 +254,3 @@ void WalkingQPIK::setDesiredCoMPosition(const iDynTree::Position& desiredComPosi
 {
     m_desiredComPosition = desiredComPosition;
 }
-

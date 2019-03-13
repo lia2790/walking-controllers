@@ -21,40 +21,33 @@
 
 #include <WalkingQPInverseKinematics_osqp.hpp>
 
-bool WalkingQPIK_osqp::setVelocityBounds(const iDynTree::VectorDynSize& minJointsLimit,
-                                         const iDynTree::VectorDynSize& maxJointsLimit)
+bool WalkingQPIK_osqp::setJointsBounds(const iDynTree::VectorDynSize& maxJointsVelocity,
+                                       const iDynTree::VectorDynSize& maxJointsPosition,
+                                       const iDynTree::VectorDynSize& minJointsPosition)
 {
-    if(minJointsLimit.size() != maxJointsLimit.size())
+    if(maxJointsVelocity.size() != maxJointsPosition.size() ||
+       maxJointsVelocity.size() != minJointsPosition.size())
     {
         yError() << "[setVelocityBounds] The size of the vector limits has to be equal.";
         return false;
     }
-    if(minJointsLimit.size() != m_actuatedDOFs)
+    if(maxJointsVelocity.size() != m_actuatedDOFs)
     {
         yError() << "[setVelocityBounds] The size of the vector limits has to be equal to ."
                  << "the number of the joint";
         return false;
     }
-
-    int numberOfTaskConstraints;
-    if(m_useCoMAsConstraint)
-        numberOfTaskConstraints = 6 + 6 + 3;
-    else
-        numberOfTaskConstraints = 6 + 6;
-
-    for(int i = numberOfTaskConstraints; i < m_numberOfConstraints; i++)
-    {
-        m_lowerBound(i) = minJointsLimit(i - numberOfTaskConstraints);
-        m_upperBound(i) = maxJointsLimit(i - numberOfTaskConstraints);
-    }
-
+    m_maxJointsVelocity = maxJointsVelocity;
+    m_maxJointsPosition = maxJointsPosition;
+    m_minJointsPosition = minJointsPosition;
     return true;
 }
 
 bool WalkingQPIK_osqp::initialize(const yarp::os::Searchable& config,
                                   const int& actuatedDOFs,
-                                  const iDynTree::VectorDynSize& minJointsLimit,
-                                  const iDynTree::VectorDynSize& maxJointsLimit)
+                                  const iDynTree::VectorDynSize& maxJointsVelocity,
+                                  const iDynTree::VectorDynSize& maxJointsPosition,
+                                  const iDynTree::VectorDynSize& minJointsPosition)
 {
 
     m_actuatedDOFs = actuatedDOFs;
@@ -77,9 +70,15 @@ bool WalkingQPIK_osqp::initialize(const yarp::os::Searchable& config,
     // the number of constraints is equal to the number of joints plus
     // 12 (position + attitude) of the left and right feet
     if(m_useCoMAsConstraint)
+    {
         m_numberOfConstraints = m_actuatedDOFs + 6 + 6 + 3;
+        m_numberOfTaskConstraints = 6 + 6 + 3;
+    }
     else
+    {
         m_numberOfConstraints = m_actuatedDOFs + 6 + 6;
+        m_numberOfTaskConstraints = 6 + 6;
+    }
 
     // resize vectors
     m_gradient = Eigen::VectorXd::Zero(m_numberOfVariables);
@@ -108,7 +107,14 @@ bool WalkingQPIK_osqp::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
-    if(!setVelocityBounds(minJointsLimit, maxJointsLimit))
+    if(!YarpHelper::getNumberFromSearchable(config, "k_u", m_ku))
+        return false;
+
+    if(!YarpHelper::getNumberFromSearchable(config, "k_b", m_kb))
+        return false;
+
+
+    if(!setJointsBounds(maxJointsVelocity, maxJointsPosition, minJointsPosition))
     {
         yError() << "[initialize] Unable to set the velocity bounds.";
         return false;
@@ -311,6 +317,20 @@ bool WalkingQPIK_osqp::setBounds()
         m_upperBound.block(12, 0, 3, 1) = iDynTree::toEigen(m_comVelocity)
             - m_kCom * (iDynTree::toEigen(m_comPosition) -  iDynTree::toEigen(m_desiredComPosition));
     }
+
+    // set joint velocity bounds
+    for(int i = m_numberOfTaskConstraints; i < m_numberOfConstraints; i++)
+    {
+        int index = i - m_numberOfTaskConstraints;
+
+        m_lowerBound(i) = std::tanh(m_kb * (m_jointPosition(index) - m_minJointsPosition(index)))
+            * (-m_maxJointsVelocity(index));
+
+        m_upperBound(i) = std::tanh(m_ku *(m_maxJointsPosition(index) - m_jointPosition(index)))
+            * (m_maxJointsVelocity(index));
+    }
+
+
 
     if(m_optimizerSolver->isInitialized())
     {

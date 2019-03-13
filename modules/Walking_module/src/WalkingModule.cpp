@@ -266,13 +266,12 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     {
         yarp::os::Bottle& inverseKinematicsQPSolverOptions = rf.findGroup("INVERSE_KINEMATICS_QP_SOLVER");
 
-        iDynTree::VectorDynSize negativeJointVelocityLimits(m_robotControlHelper->getActuatedDoFs());
-        iDynTree::toEigen(negativeJointVelocityLimits) = -iDynTree::toEigen(m_robotControlHelper->getVelocityLimits());
         m_QPIKSolver_osqp = std::make_shared<WalkingQPIK_osqp>();
         if(!m_QPIKSolver_osqp->initialize(inverseKinematicsQPSolverOptions,
                                           m_robotControlHelper->getActuatedDoFs(),
-                                          negativeJointVelocityLimits,
-                                          m_robotControlHelper->getVelocityLimits()))
+                                          m_robotControlHelper->getVelocityLimits(),
+                                          m_robotControlHelper->getJointAngleUpperLimits(),
+                                          m_robotControlHelper->getJointAngleLowerLimits()))
         {
             yError() << "[configure] Failed to configure the QP-IK solver (osqp)";
             return false;
@@ -281,8 +280,9 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         m_QPIKSolver_qpOASES = std::make_shared<WalkingQPIK_qpOASES>();
         if(!m_QPIKSolver_qpOASES->initialize(inverseKinematicsQPSolverOptions,
                                              m_robotControlHelper->getActuatedDoFs(),
-                                             negativeJointVelocityLimits,
-                                             m_robotControlHelper->getVelocityLimits()))
+                                             m_robotControlHelper->getVelocityLimits(),
+                                             m_robotControlHelper->getJointAngleUpperLimits(),
+                                             m_robotControlHelper->getJointAngleLowerLimits()))
         {
             yError() << "[configure] Failed to configure the QP-IK solver (qpOASES)";
             return false;

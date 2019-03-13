@@ -52,8 +52,9 @@ bool WalkingQPIK_qpOASES::setVelocityBounds(const iDynTree::VectorDynSize& minJo
 
 bool WalkingQPIK_qpOASES::initialize(const yarp::os::Searchable& config,
                                      const int& actuatedDOFs,
-                                     const iDynTree::VectorDynSize& minJointsLimit,
-                                     const iDynTree::VectorDynSize& maxJointsLimit)
+                                     const iDynTree::VectorDynSize& maxJointsVelocity,
+                                     const iDynTree::VectorDynSize& maxJointsPosition,
+                                     const iDynTree::VectorDynSize& minJointsPosition)
 {
     m_actuatedDOFs = actuatedDOFs;
     // check if the config is empty
@@ -109,7 +110,10 @@ bool WalkingQPIK_qpOASES::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
-    if(!setVelocityBounds(minJointsLimit, maxJointsLimit))
+    // TODO remove me
+    iDynTree::VectorDynSize minJointsVelocity(m_actuatedDOFs);
+    iDynTree::toEigen(minJointsVelocity) = - iDynTree::toEigen(maxJointsVelocity);
+    if(!setVelocityBounds(minJointsVelocity, maxJointsVelocity))
     {
         yError() << "[initialize] Unable to set the velocity bounds.";
         return false;

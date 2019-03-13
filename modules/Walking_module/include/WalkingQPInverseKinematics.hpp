@@ -42,6 +42,13 @@ protected:
 
     iDynTree::VectorDynSize m_regularizationTerm; /**< Desired joint position (regularization term).*/
 
+    iDynTree::VectorDynSize m_maxJointsVelocity;
+    iDynTree::VectorDynSize m_maxJointsPosition;
+    iDynTree::VectorDynSize m_minJointsPosition;
+
+    double m_ku;
+    double m_kb;
+
     iDynTree::Position m_comPosition; /**< Desired Linear velocity of the CoM. */
     iDynTree::Transform m_leftFootToWorldTransform; /**< Actual left foot to world transformation.*/
     iDynTree::Transform m_rightFootToWorldTransform; /**< Actual right foot to world transformation.*/
@@ -50,6 +57,7 @@ protected:
 
     int m_numberOfVariables; /**<Number of variables in the QP problem (# of joints + 6) */
     int m_numberOfConstraints; /**<Number of constraints in the QP problem (# of joints + 12) */
+    int m_numberOfTaskConstraints; /**<Number of task constraints in the QP problem */
 
     iDynSparseMatrix m_jointRegulatizationGains;  /**< Gain related to the joint regularization. */
     double m_kPosFoot; /**< Gain related to the desired foot position. */
@@ -90,8 +98,9 @@ public:
      */
     virtual bool initialize(const yarp::os::Searchable& config,
                             const int& actuatedDOFs,
-                            const iDynTree::VectorDynSize& minJointsLimit,
-                            const iDynTree::VectorDynSize& maxJointsLimit) = 0;
+                            const iDynTree::VectorDynSize& maxJointsVelocity,
+                            const iDynTree::VectorDynSize& maxJointsPosition,
+                            const iDynTree::VectorDynSize& minJointsPosition) = 0;
 
     /**
      * Set the robot state.

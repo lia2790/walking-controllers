@@ -78,8 +78,9 @@ public:
      */
     virtual bool initialize(const yarp::os::Searchable& config,
                             const int& actuatedDOFs,
-                            const iDynTree::VectorDynSize& minJointsLimit,
-                            const iDynTree::VectorDynSize& maxJointsLimit) final;
+                            const iDynTree::VectorDynSize& maxJointsVelocity,
+                            const iDynTree::VectorDynSize& maxJointsPosition,
+                            const iDynTree::VectorDynSize& minJointsPosition) final;
 
     /**
      * Solve the optimization problem.

@@ -58,8 +58,9 @@ class WalkingQPIK_osqp : public WalkingQPIK
      * @param maxJointsLimit is a vector containing the max joints velocity limit.
      * @return true/false in case of success/failure.
      */
-    bool setVelocityBounds(const iDynTree::VectorDynSize& minJointsLimit,
-                           const iDynTree::VectorDynSize& maxJointsLimit);
+    bool setJointsBounds(const iDynTree::VectorDynSize& maxJointsVelocity,
+                         const iDynTree::VectorDynSize& maxJointsPosition,
+                         const iDynTree::VectorDynSize& minJointsPosition);
 
     /**
      * Check if the solution is feasible.
@@ -79,8 +80,9 @@ public:
      */
     virtual bool initialize(const yarp::os::Searchable& config,
                             const int& actuatedDOFs,
-                            const iDynTree::VectorDynSize& minJointsLimit,
-                            const iDynTree::VectorDynSize& maxJointsLimit) final;
+                            const iDynTree::VectorDynSize& maxJointsVelocity,
+                            const iDynTree::VectorDynSize& maxJointsPosition,
+                            const iDynTree::VectorDynSize& minJointsPosition) final;
 
     /**
      * Solve the optimization problem.
