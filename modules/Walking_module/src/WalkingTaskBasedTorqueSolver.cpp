@@ -708,7 +708,7 @@ bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
     m_optimizer->data()->setNumberOfVariables(m_numberOfVariables);
     m_optimizer->data()->setNumberOfConstraints(m_numberOfConstraints);
 
-    m_optimizer->settings()->setVerbosity(true);
+    m_optimizer->settings()->setVerbosity(false);
     m_optimizer->settings()->setLinearSystemSolver(0);
     m_optimizer->settings()->setMaxIteraction(100000);
 
@@ -1552,14 +1552,15 @@ bool TaskBasedTorqueSolverDoubleSupport::instantiateFeetConstraint(const yarp::o
 
     bool useDefaultKd = config.check("useDefaultKd", yarp::os::Value("False")).asBool();
 
-    double kpLinear;
-    if(!YarpHelper::getNumberFromSearchable(config, "kpLinear", kpLinear))
+    iDynTree::Vector3 kpLinear;
+    auto tempValue = config.find("kpLinear");
+    if(!YarpHelper::yarpListToiDynTreeVectorFixSize(tempValue, kpLinear))
     {
         yError() << "[instantiateFeetConstraint] Unable to get proportional gain";
         return false;
     }
 
-    double kdLinear;
+    iDynTree::Vector3 kdLinear;
     if(useDefaultKd)
     {
         double scaling;
@@ -1569,11 +1570,12 @@ bool TaskBasedTorqueSolverDoubleSupport::instantiateFeetConstraint(const yarp::o
             return false;
         }
 
-        kdLinear = 2 / scaling * std::sqrt(kpLinear);
+        iDynTree::toEigen(kdLinear) = 2 / scaling * iDynTree::toEigen(kpLinear).array().sqrt();
     }
     else
     {
-        if(!YarpHelper::getNumberFromSearchable(config, "kdLinear", kdLinear))
+        tempValue = config.find("kdLinear");
+        if(!YarpHelper::yarpListToiDynTreeVectorFixSize(tempValue, kdLinear))
         {
             yError() << "[instantiateFeetConstraint] Unable to get derivative gain";
             return false;
@@ -2088,14 +2090,15 @@ bool TaskBasedTorqueSolverSingleSupport::instantiateFeetConstraint(const yarp::o
 
     bool useDefaultKd = config.check("useDefaultKd", yarp::os::Value("False")).asBool();
 
-    double kpLinear;
-    if(!YarpHelper::getNumberFromSearchable(config, "kpLinear", kpLinear))
+    iDynTree::Vector3 kpLinear;
+    auto tempValue = config.find("kpLinear");
+    if(!YarpHelper::yarpListToiDynTreeVectorFixSize(tempValue, kpLinear))
     {
         yError() << "[instantiateFeetConstraint] Unable to get proportional gain";
         return false;
     }
 
-    double kdLinear;
+    iDynTree::Vector3 kdLinear;
     if(useDefaultKd)
     {
         double scaling;
@@ -2105,11 +2108,12 @@ bool TaskBasedTorqueSolverSingleSupport::instantiateFeetConstraint(const yarp::o
             return false;
         }
 
-        kdLinear = 2 / scaling * std::sqrt(kpLinear);
+        iDynTree::toEigen(kdLinear) = 2 / scaling * iDynTree::toEigen(kpLinear).array().sqrt();
     }
     else
     {
-        if(!YarpHelper::getNumberFromSearchable(config, "kdLinear", kdLinear))
+        tempValue = config.find("kdLinear");
+        if(!YarpHelper::yarpListToiDynTreeVectorFixSize(tempValue, kdLinear))
         {
             yError() << "[instantiateFeetConstraint] Unable to get derivative gain";
             return false;
@@ -2162,7 +2166,7 @@ bool TaskBasedTorqueSolverSingleSupport::instantiateFeetConstraint(const yarp::o
     m_numberOfConstraints += ptrConstraint->getNumberOfConstraints();
 
     iDynTree::VectorDynSize weight(6);
-    yarp::os::Value tempValue = config.find("weight");
+    tempValue = config.find("weight");
     if(!YarpHelper::yarpListToiDynTreeVectorDynSize(tempValue, weight))
     {
         yError() << "[TaskBasedTorqueSolverSingleSupport::instantiateFeetConstraint] Initialization failed while reading weight vector.";
