@@ -291,6 +291,8 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
     m_desiredJointPositionRad.resize(m_actuatedDOFs);
     m_desiredJointValueDeg.resize(m_actuatedDOFs);
     m_jointsVelocityLimit.resize(m_actuatedDOFs);
+    m_jointsAngleUpperLimit.resize(m_actuatedDOFs);
+    m_jointsAngleLowerLimit.resize(m_actuatedDOFs);
 
     // m_positionFeedbackDegFiltered.resize(m_actuatedDOFs);
     // m_positionFeedbackDegFiltered.zero();
@@ -341,16 +343,27 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
     }
 
     // get the limits
-    double max, min;
+    double maxVelocity, dummy;
+    double maxAngle, minAngle;
     for(unsigned int i = 0; i < m_actuatedDOFs; i++)
     {
-        if(!m_limitsInterface->getVelLimits(i, &min, &max))
+        if(!m_limitsInterface->getVelLimits(i, &dummy, &maxVelocity))
         {
             yError() << "[configure] Unable get joints velocity limits.";
             return false;
         }
 
-        m_jointsVelocityLimit(i) = iDynTree::deg2rad(max);
+        m_jointsVelocityLimit(i) = iDynTree::deg2rad(maxVelocity);
+
+
+        if(!m_limitsInterface->getLimits(i, &minAngle, &maxAngle))
+        {
+            yError() << "[configure] Unable get joints velocity limits.";
+            return false;
+        }
+
+        m_jointsAngleUpperLimit(i) = iDynTree::deg2rad(maxAngle);
+        m_jointsAngleLowerLimit(i) = iDynTree::deg2rad(minAngle);
     }
 
     m_useExternalRobotBase = config.check("use_external_robot_base", yarp::os::Value("False")).asBool();
@@ -821,6 +834,16 @@ const iDynTree::Wrench& RobotHelper::getRightWrench() const
 const iDynTree::VectorDynSize& RobotHelper::getVelocityLimits() const
 {
     return m_jointsVelocityLimit;
+}
+
+const iDynTree::VectorDynSize& RobotHelper::getJointAngleUpperLimits() const
+{
+    return m_jointsAngleUpperLimit;
+}
+
+const iDynTree::VectorDynSize& RobotHelper::getJointAngleLowerLimits() const
+{
+    return m_jointsAngleLowerLimit;
 }
 
 const std::vector<std::string>& RobotHelper::getAxesList() const

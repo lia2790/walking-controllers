@@ -67,6 +67,8 @@ class RobotHelper
     iDynTree::VectorDynSize m_desiredJointValueDeg; /**< Desired joint position or velocity [deg or deg/s]. */
 
     iDynTree::VectorDynSize m_jointsVelocityLimit; /**< JointVeloc [rad/s]. */
+    iDynTree::VectorDynSize m_jointsAngleLowerLimit; /**< JointVeloc [rad/s]. */
+    iDynTree::VectorDynSize m_jointsAngleUpperLimit; /**< JointVeloc [rad/s]. */
 
     // yarp::sig::Vector m_positionFeedbackDegFiltered;
     yarp::sig::Vector m_velocityFeedbackDegFiltered; /**< Vector containing the filtered joint velocity [deg/s]. */
@@ -131,7 +133,7 @@ public:
      */
     bool getFeedbacks(unsigned int maxAttempts = 1);
 
-  bool getFeedbacksRaw( bool useBaseEst, unsigned int maxAttempts = 1);
+    bool getFeedbacksRaw( bool useBaseEst, unsigned int maxAttempts = 1);
 
     /**
      * Switch the control mode.
@@ -183,6 +185,9 @@ public:
     const iDynTree::VectorDynSize& getJointTorque() const;
 
     const iDynTree::VectorDynSize& getVelocityLimits() const;
+
+    const iDynTree::VectorDynSize& getJointAngleUpperLimits() const;
+    const iDynTree::VectorDynSize& getJointAngleLowerLimits() const;
 
     const iDynTree::Wrench& getLeftWrench() const;
     const iDynTree::Wrench& getRightWrench() const;
