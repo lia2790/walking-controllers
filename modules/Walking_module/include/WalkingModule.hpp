@@ -64,6 +64,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     bool m_dumpData; /**< True if data are saved. */
     bool m_useTorque; /**< True if the torque controller is used. */
     bool m_useWaitCondition; /**< True the wait condition is used. */
+    bool m_useConstantRegularization;
 
     std::unique_ptr<RobotHelper> m_robotControlHelper; /**< Robot control helper. */
     std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */

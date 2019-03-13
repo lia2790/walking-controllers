@@ -148,6 +148,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_useOSQP = rf.check("use_osqp", yarp::os::Value(false)).asBool();
     m_dumpData = rf.check("dump_data", yarp::os::Value(false)).asBool();
     m_useTorque = rf.check("use_torque_control", yarp::os::Value(false)).asBool();
+    m_useConstantRegularization = rf.check("use_constant_regularization", yarp::os::Value(false)).asBool();
     m_useWaitCondition = rf.check("use_wait_condition", yarp::os::Value(false)).asBool();
 
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
@@ -1194,94 +1195,96 @@ bool WalkingModule::updateModule()
             desiredCoMAcceleration(0) = desiredCoMAccelerationXY(0);
             desiredCoMAcceleration(1) = desiredCoMAccelerationXY(1);
 
-            m_profiler->setInitTime("IK");
-
-            if(m_useQPIK)
+            if(!m_useConstantRegularization)
             {
-                // integrate dq because velocity control mode seems not available
-                yarp::sig::Vector bufferVelocity(m_robotControlHelper->getActuatedDoFs());
-                yarp::sig::Vector bufferPosition(m_robotControlHelper->getActuatedDoFs());
-                if(!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired))
-                {
-                    yError() << "[updateModule] Unable to set the internal robot state.";
-                    return false;
-                }
+                m_profiler->setInitTime("IK");
 
-                if(!m_FKSolver->evaluateCoM())
+                if(m_useQPIK)
                 {
-                    yError() << "[updateModule] Unable to evaluate the CoM.";
-                    return false;
-                }
-
-                m_FKSolver->evaluateDCM();
-
-                if(m_useOSQP)
-                {
-                    if(!solveQPIK(m_QPIKSolver_osqp, desiredCoMPosition,
-                                  desiredCoMVelocity,
-                                  yawRotation, m_dqDesired))
+                    // integrate dq because velocity control mode seems not available
+                    yarp::sig::Vector bufferVelocity(m_robotControlHelper->getActuatedDoFs());
+                    yarp::sig::Vector bufferPosition(m_robotControlHelper->getActuatedDoFs());
+                    if(!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired))
                     {
-                        yError() << "[updateModule] Unable to solve the QP problem with osqp.";
+                        yError() << "[updateModule] Unable to set the internal robot state.";
                         return false;
                     }
+
+                    if(!m_FKSolver->evaluateCoM())
+                    {
+                        yError() << "[updateModule] Unable to evaluate the CoM.";
+                        return false;
+                    }
+
+                    m_FKSolver->evaluateDCM();
+
+                    if(m_useOSQP)
+                    {
+                        if(!solveQPIK(m_QPIKSolver_osqp, desiredCoMPosition,
+                                      desiredCoMVelocity,
+                                      yawRotation, m_dqDesired))
+                        {
+                            yError() << "[updateModule] Unable to solve the QP problem with osqp.";
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        if(!solveQPIK(m_QPIKSolver_qpOASES, desiredCoMPosition,
+                                      desiredCoMVelocity,
+                                      yawRotation, m_dqDesired))
+                        {
+                            yError() << "[updateModule] Unable to solve the QP problem with osqp.";
+                            return false;
+                        }
+                    }
+                    iDynTree::toYarp(m_dqDesired, bufferVelocity);
+
+                    bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
+                    iDynTree::toiDynTree(bufferPosition, m_qDesired);
+
+                    if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+                                                          m_robotControlHelper->getJointVelocity()))
+                    {
+                        yError() << "[solveTaskBased] Unable to set the internal robot state";
+                        return false;
+                    }
+
+                    if(!m_FKSolver->evaluateCoM())
+                    {
+                        yError() << "[updateModule] Unable to evaluate the CoM.";
+                        return false;
+                    }
+
+                    m_FKSolver->evaluateDCM();
                 }
                 else
                 {
-                    if(!solveQPIK(m_QPIKSolver_qpOASES, desiredCoMPosition,
-                                  desiredCoMVelocity,
-                                  yawRotation, m_dqDesired))
+                    if(m_IKSolver->usingAdditionalRotationTarget())
                     {
-                        yError() << "[updateModule] Unable to solve the QP problem with osqp.";
+                        if(!m_IKSolver->updateIntertiaToWorldFrameRotation(modifiedInertial))
+                        {
+                            yError() << "[updateModule] Error updating the inertia to world frame rotation.";
+                            return false;
+                        }
+                    }
+
+                    if(!m_IKSolver->setFullModelFeedBack(m_robotControlHelper->getJointPosition()))
+                    {
+                        yError() << "[updateModule] Error while setting the feedback to the inverse Kinematics.";
                         return false;
                     }
-                }
-                iDynTree::toYarp(m_dqDesired, bufferVelocity);
 
-                bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
-                iDynTree::toiDynTree(bufferPosition, m_qDesired);
-
-                if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
-                                                      m_robotControlHelper->getJointVelocity()))
-                {
-                    yError() << "[solveTaskBased] Unable to set the internal robot state";
-                    return false;
-                }
-
-                if(!m_FKSolver->evaluateCoM())
-                {
-                    yError() << "[updateModule] Unable to evaluate the CoM.";
-                    return false;
-                }
-
-                m_FKSolver->evaluateDCM();
-            }
-            else
-            {
-                if(m_IKSolver->usingAdditionalRotationTarget())
-                {
-                    if(!m_IKSolver->updateIntertiaToWorldFrameRotation(modifiedInertial))
+                    if(!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
+                                              desiredCoMPosition, m_qDesired))
                     {
-                        yError() << "[updateModule] Error updating the inertia to world frame rotation.";
+                        yError() << "[updateModule] Error during the inverse Kinematics iteration.";
                         return false;
                     }
                 }
 
-                if(!m_IKSolver->setFullModelFeedBack(m_robotControlHelper->getJointPosition()))
-                {
-                    yError() << "[updateModule] Error while setting the feedback to the inverse Kinematics.";
-                    return false;
-                }
-
-                if(!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
-                                          desiredCoMPosition, m_qDesired))
-                {
-                    yError() << "[updateModule] Error during the inverse Kinematics iteration.";
-                    return false;
-                }
+                m_profiler->setEndTime("IK");
             }
-
-            m_profiler->setEndTime("IK");
-
             // torque controller
             m_profiler->setInitTime("Torque");
 
