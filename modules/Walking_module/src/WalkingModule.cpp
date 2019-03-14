@@ -1951,11 +1951,11 @@ bool WalkingModule::startWalking()
         return false;
     }
 
-    double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
-                           + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
+    // double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
+    //                        + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
 
-    yInfo() << heightOffset;
-    m_robotControlHelper->setHeightOffset(heightOffset);
+    // yInfo() << heightOffset;
+    // m_robotControlHelper->setHeightOffset(heightOffset);
 
     if(m_useTorque)
     {
