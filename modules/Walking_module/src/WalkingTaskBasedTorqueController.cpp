@@ -89,7 +89,7 @@ void WalkingTaskBasedTorqueController::setFeetState(const bool &leftInContact, c
                     iDynTree::toEigen(primalVariable).block(6 + m_actuatedDOFs + m_actuatedDOFs, 0, 6, 1).setZero();
                 }
 
-                m_singleSupportSolver->setInitialValue(primalVariable);
+                m_doubleSupportSolver->setInitialValue(primalVariable);
             }
         }
         m_isDoubleSupportPhase = true;
