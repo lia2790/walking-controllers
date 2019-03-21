@@ -27,6 +27,11 @@ bool TaskBasedTorqueSolver::instantiateCoMConstraint(const yarp::os::Searchable&
         m_useCoMConstraint = false;
         return true;
     }
+
+    bool asLinearMomentum = config.check("as_linear_momentum", yarp::os::Value("False")).asBool();
+    if(asLinearMomentum)
+        return true;
+
     m_useCoMConstraint = true;
 
     bool useDefaultKd = config.check("useDefaultKd", yarp::os::Value("False")).asBool();
@@ -600,6 +605,9 @@ bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
+    instantiateCoMAsLinearMomentumConstraint(comConstraintOptions);
+
+
     yarp::os::Bottle& linearMomentumOptions = config.findGroup("LINEAR_MOMENTUM");
     instantiateLinearMomentumConstraint(linearMomentumOptions);
     if(!instantiateLinearMomentumCostFunction(linearMomentumOptions))
@@ -782,6 +790,12 @@ bool TaskBasedTorqueSolver::setMassMatrix(const iDynTree::MatrixDynSize& massMat
         }
     }
 
+    auto constraint = m_constraints.find("com_linear_momentum_constraint");
+    if(constraint != m_constraints.end())
+    {
+        auto ptr = std::dynamic_pointer_cast<LinearMomentumElement>(constraint->second);
+        ptr->setRobotMass(m_massMatrix(0,0));
+    }
 
     return true;
 }
@@ -909,6 +923,14 @@ bool TaskBasedTorqueSolver::setDesiredCoMTrajectory(const iDynTree::Position& co
         auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
         ptr->positionController()->setDesiredTrajectory(comAcceleration, comVelocity, comPosition);
     }
+
+    auto constraint = m_constraints.find("com_linear_momentum_constraint");
+    if(constraint != m_constraints.end())
+    {
+        auto ptr = std::dynamic_pointer_cast<LinearMomentumElement>(constraint->second);
+        ptr->positionController()->setDesiredTrajectory(comAcceleration, comVelocity, comPosition);
+    }
+
     return true;
 }
 
@@ -948,15 +970,20 @@ bool TaskBasedTorqueSolver::setCoMState(const iDynTree::Position& comPosition,
     if(m_useCoMConstraint)
     {
         auto constraint = m_constraints.find("com");
-        if(constraint == m_constraints.end())
+        if(constraint != m_constraints.end())
         {
-            yError() << "[setCoMState] unable to find the right foot constraint. "
-                     << "Please call 'initialize()' method";
-            return false;
+            auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
+            ptr->positionController()->setFeedback(comVelocity, comPosition);
         }
-        auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
+    }
+
+    auto constraint = m_constraints.find("com_linear_momentum_constraint");
+    if(constraint != m_constraints.end())
+    {
+        auto ptr = std::dynamic_pointer_cast<LinearMomentumElement>(constraint->second);
         ptr->positionController()->setFeedback(comVelocity, comPosition);
     }
+
 
     if(m_useAngularMomentumConstraint)
     {
@@ -1869,6 +1896,22 @@ void TaskBasedTorqueSolverDoubleSupport::instantiateLinearMomentumConstraint(con
     return;
 }
 
+void TaskBasedTorqueSolverDoubleSupport::instantiateCoMAsLinearMomentumConstraint(const yarp::os::Searchable& config)
+{
+    bool asLinearMomentum = config.check("as_linear_momentum", yarp::os::Value("False")).asBool();
+    if(asLinearMomentum)
+    {
+        // memory allocation
+        auto ptr = std::make_shared<LinearMomentumConstraint>(LinearMomentumConstraint::Type::DOUBLE_SUPPORT, true);
+        // only the forces are used to control the linear momentum
+        ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6 + m_actuatedDOFs + m_actuatedDOFs);
+
+        m_constraints.insert(std::make_pair("com_linear_momentum_constraint", ptr));
+        m_numberOfConstraints += ptr->getNumberOfConstraints();
+    }
+    return;
+}
+
 bool TaskBasedTorqueSolverDoubleSupport::instantiateLinearMomentumCostFunction(const yarp::os::Searchable& config)
 {
     m_useLinearMomentumCostFunction = config.check("useAsCostFunction", yarp::os::Value("False")).asBool();
@@ -2416,6 +2459,24 @@ void TaskBasedTorqueSolverSingleSupport::instantiateLinearMomentumConstraint(con
     }
     return;
 }
+
+
+void TaskBasedTorqueSolverSingleSupport::instantiateCoMAsLinearMomentumConstraint(const yarp::os::Searchable& config)
+{
+    bool asLinearMomentum = config.check("as_linear_momentum", yarp::os::Value("False")).asBool();
+    if(asLinearMomentum)
+    {
+        // memory allocation
+        auto ptr = std::make_shared<LinearMomentumConstraint>(LinearMomentumConstraint::Type::SINGLE_SUPPORT, true);
+        // only the forces are used to control the linear momentum
+        ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6 + m_actuatedDOFs + m_actuatedDOFs);
+
+        m_constraints.insert(std::make_pair("com_linear_momentum_constraint", ptr));
+        m_numberOfConstraints += ptr->getNumberOfConstraints();
+    }
+    return;
+}
+
 
 bool TaskBasedTorqueSolverSingleSupport::instantiateLinearMomentumCostFunction(const yarp::os::Searchable& config)
 {

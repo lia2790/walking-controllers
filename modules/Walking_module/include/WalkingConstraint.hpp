@@ -349,22 +349,30 @@ protected:
     double m_robotMass;
     iDynTree::Position m_comPosition;
     iDynTree::Vector3 m_desiredVRPPosition;
+    std::shared_ptr<LinearPID> m_controller; /**< Set of controllers. */
+
+    bool m_controlCoM{false};
 
 public:
-    LinearMomentumElement(const Type& elementType) : m_elementType(elementType){};
+    LinearMomentumElement(const Type& elementType, bool controlCoM = false) : m_elementType(elementType), m_controlCoM(controlCoM)
+    {
+        m_controller = std::make_unique<LinearPID>();
+    };
 
     void setRobotMass(const double& robotMass){m_robotMass = robotMass;};
 
     void setCoMPosition(const iDynTree::Position& comPosition){m_comPosition = comPosition;};
 
     void setDesiredVRP(const iDynTree::Vector3& desiredVRPPosition){m_desiredVRPPosition = desiredVRPPosition;};
+
+    std::shared_ptr<LinearPID> positionController() {return m_controller;}
 };
 
 class LinearMomentumConstraint : public LinearConstraint, public LinearMomentumElement
 {
 public:
 
-    LinearMomentumConstraint(const Type& elementType);
+    LinearMomentumConstraint(const Type& elementType, bool controlCoM = false);
 
     /**
      * Evaluate the jacobian

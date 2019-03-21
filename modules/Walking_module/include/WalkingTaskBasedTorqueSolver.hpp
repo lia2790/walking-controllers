@@ -80,6 +80,8 @@ protected:
      */
     virtual void instantiateLinearMomentumConstraint(const yarp::os::Searchable& config) = 0;
 
+    virtual void instantiateCoMAsLinearMomentumConstraint(const yarp::os::Searchable& config) = 0;
+
     virtual bool instantiateLinearMomentumCostFunction(const yarp::os::Searchable& config) = 0;
 
     virtual bool instantiateAngularMomentumConstraint(const yarp::os::Searchable& config) = 0;
@@ -246,6 +248,8 @@ private:
 
     bool instantiateLinearMomentumCostFunction(const yarp::os::Searchable& config) override;
 
+    void instantiateCoMAsLinearMomentumConstraint(const yarp::os::Searchable& config) override;
+
     bool instantiateAngularMomentumCostFunction(const yarp::os::Searchable& config) override;
 
     bool instantiateAngularMomentumConstraint(const yarp::os::Searchable& config) override;
@@ -327,6 +331,8 @@ class TaskBasedTorqueSolverSingleSupport : public TaskBasedTorqueSolver
      * @param config configuration parameters.
      */
     void instantiateLinearMomentumConstraint(const yarp::os::Searchable& config) override;
+
+    void instantiateCoMAsLinearMomentumConstraint(const yarp::os::Searchable& config) override;
 
 public:
     bool setDesiredFeetTrajectory(const iDynTree::Transform& stanceFootToWorldTransform,

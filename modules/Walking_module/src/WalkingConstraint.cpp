@@ -398,8 +398,8 @@ void SystemDynamicConstraintSingleSupport::evaluateJacobian(Eigen::SparseMatrix<
 }
 
 
-LinearMomentumConstraint::LinearMomentumConstraint(const Type& elementType)
-    :LinearMomentumElement(elementType)
+LinearMomentumConstraint::LinearMomentumConstraint(const Type& elementType, bool controlCoM)
+    :LinearMomentumElement(elementType, controlCoM)
 {
     m_sizeOfElement = 3;
 }
@@ -427,12 +427,21 @@ void LinearMomentumConstraint::evaluateBounds(Eigen::VectorXd &upperBounds,
     weightForce.zero();
     weightForce(2) = -m_robotMass * 9.81;
 
-    // TODO remove magic number
-    double omegaSquare = 9.81 / 0.53;
+    if(m_controlCoM)
+    {
+        m_controller->evaluateControl();
+        upperBounds.block(m_jacobianStartingRow, 0, 3, 1) = -iDynTree::toEigen(weightForce) +
+            m_robotMass * iDynTree::toEigen(m_controller->getControllerOutput());
+    }
+    else
+    {
+        // TODO remove magic number
+        double omegaSquare = 9.81 / 0.53;
 
-    upperBounds.block(m_jacobianStartingRow, 0, 3, 1) = -iDynTree::toEigen(weightForce) +
-        m_robotMass * omegaSquare * (iDynTree::toEigen(m_comPosition) -
-                                     iDynTree::toEigen(m_desiredVRPPosition));
+        upperBounds.block(m_jacobianStartingRow, 0, 3, 1) = -iDynTree::toEigen(weightForce) +
+            m_robotMass * omegaSquare * (iDynTree::toEigen(m_comPosition) -
+                                         iDynTree::toEigen(m_desiredVRPPosition));
+    }
 
     lowerBounds.block(m_jacobianStartingRow, 0, 3, 1)
         = upperBounds.block(m_jacobianStartingRow, 0, 3, 1);
