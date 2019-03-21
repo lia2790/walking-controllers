@@ -152,6 +152,7 @@ public:
                     const iDynTree::VectorDynSize& minJointTorque,
                     const iDynTree::VectorDynSize& maxJointTorque);
 
+    bool setCoMGains(const iDynTree::Vector3& kp, const iDynTree::Vector3& kd);
 
     void setInitialValue(const iDynTree::VectorDynSize initialValue);
 

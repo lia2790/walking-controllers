@@ -11,6 +11,8 @@
 
 #include <iDynTree/Core/SpatialMomentum.h>
 
+#include <iCub/ctrl/minJerkCtrl.h>
+
 #include <WalkingTaskBasedTorqueSolver.hpp>
 
 class WalkingTaskBasedTorqueController
@@ -26,6 +28,15 @@ class WalkingTaskBasedTorqueController
 
     std::unique_ptr<TaskBasedTorqueSolverSingleSupport> m_singleSupportSolver;
     std::unique_ptr<TaskBasedTorqueSolverDoubleSupport> m_doubleSupportSolver;
+
+
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_kpCoMSmoother; /**< Minimum jerk trajectory for the kp com gain. */
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_kdCoMSmoother; /**< Minimum jerk trajectory for the kd com gain. */
+
+    iDynTree::Vector3 m_kpDoubleSupport;
+    iDynTree::Vector3 m_kdDoubleSupport;
+    iDynTree::Vector3 m_kpSingleSupport;
+    iDynTree::Vector3 m_kdSingleSupport;
 
 public:
 

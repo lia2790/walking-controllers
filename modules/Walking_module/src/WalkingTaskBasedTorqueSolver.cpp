@@ -19,6 +19,28 @@
 
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXd;
 
+bool TaskBasedTorqueSolver::setCoMGains(const iDynTree::Vector3& kp, const iDynTree::Vector3& kd)
+{
+    if(m_useCoMConstraint)
+    {
+        auto constraint = m_constraints.find("com");
+        if(constraint != m_constraints.end())
+        {
+            auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
+            ptr->positionController()->setGains(kp, kd);
+        }
+    }
+
+    auto constraint = m_constraints.find("com_linear_momentum_constraint");
+    if(constraint != m_constraints.end())
+    {
+        auto ptr = std::dynamic_pointer_cast<LinearMomentumElement>(constraint->second);
+        ptr->positionController()->setGains(kp, kd);
+    }
+
+    return true;
+}
+
 bool TaskBasedTorqueSolver::instantiateCoMConstraint(const yarp::os::Searchable& config)
 {
     if(config.isNull())
