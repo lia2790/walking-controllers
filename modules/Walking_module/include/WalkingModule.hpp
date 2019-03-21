@@ -41,7 +41,6 @@
 
 // iCub-ctrl
 #include <iCub/ctrl/filters.h>
-#include <iCub/ctrl/minJerkCtrl.h>
 
 #include <thrifts/WalkingCommands.h>
 
@@ -137,6 +136,9 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     // debug
     std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
     std::unique_ptr<iCub::ctrl::Integrator> m_accelerationIntegral{nullptr};
+
+    double m_footHeight;
+    double m_footVelocityLanding;
 
     /**
      * Get the robot model from the resource finder and set it.

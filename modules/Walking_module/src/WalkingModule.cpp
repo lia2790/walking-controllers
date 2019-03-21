@@ -293,14 +293,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     if(m_useTorque)
     {
         yarp::os::Bottle& taskBasedSolverOptions = rf.findGroup("TASK_BASED_TORQUE_CONTROLLER");
-
+        taskBasedSolverOptions.append(generalOptions);
         iDynTree::VectorDynSize negativeJointTorqueLimits(m_robotControlHelper->getActuatedDoFs());
         iDynTree::VectorDynSize jointTorqueLimits(m_robotControlHelper->getActuatedDoFs());
 
         for(int i = 0; i < m_robotControlHelper->getActuatedDoFs(); i++)
         {
-            jointTorqueLimits(i) = 10000;
-            negativeJointTorqueLimits(i) = -10000;
+            jointTorqueLimits(i) = 100;
+            negativeJointTorqueLimits(i) = -100;
         }
 
         m_taskBasedTorqueSolver = std::make_unique<WalkingTaskBasedTorqueController>();
@@ -406,6 +406,12 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         }
 
         if(!YarpHelper::getNumberFromSearchable(rf, "switch_out_threshold", m_switchOutThreshold))
+        {
+            yError() << "[configure] Unable to get the double from searchable.";
+            return false;
+        }
+
+        if(!YarpHelper::getNumberFromSearchable(rf, "foot_velocity_landing", m_footVelocityLanding))
         {
             yError() << "[configure] Unable to get the double from searchable.";
             return false;
@@ -538,7 +544,10 @@ void WalkingModule::checkWaitCondition(const std::deque<bool>& footInContact,
             if(contactWrench(2) > m_switchOutThreshold)
                 m_waitCondition = true;
             else
+            {
                 m_waitCondition = false;
+                m_footHeight = 0;
+            }
         }
     }
     else
@@ -548,7 +557,10 @@ void WalkingModule::checkWaitCondition(const std::deque<bool>& footInContact,
             if(contactWrench(2) < m_switchInThreshold)
                 m_waitCondition = true;
             else
+            {
                 m_waitCondition = false;
+                m_footHeight = 0;
+            }
         }
     }
 
@@ -615,46 +627,44 @@ bool WalkingModule::solveTaskBased(const iDynTree::Rotation& desiredNeckOrientat
     }
     m_taskBasedTorqueSolver->setNeckBiasAcceleration(m_FKSolver->getNeckBiasAcceleration());
 
+    iDynTree::Transform leftFootTransform =  m_leftTrajectory.front();
+    iDynTree::Twist leftFootTwist = m_leftTwistTrajectory.front();
+    iDynTree::Vector6 leftFootAcceleration = m_leftAccelerationTrajectory.front();
 
-    // feet
-    // TODO
-// iDynTree::Twist dummyTwist, twistLeft, accelerationLeft;
-    // dummyTwist.zero();
-    // twistLeft.zero();
-    // accelerationLeft.zero();
-    // iDynTree::Transform trans;
-    // iDynTree::Position dummyPos;
-    // dummyPos.zero();
-    // trans.setRotation(iDynTree::Rotation::Identity());
-    // trans.setPosition(dummyPos);
+    iDynTree::Transform rightFootTransform =  m_rightTrajectory.front();
+    iDynTree::Twist rightFootTwist = m_rightTwistTrajectory.front();
+    iDynTree::Vector6 rightFootAcceleration = m_rightAccelerationTrajectory.front();
 
-    // double amplitude = 0.0;
-    // double omega = 0.2;
-    // double frequency = 2 * M_PI * omega;
-    // iDynTree::Transform desiredLeftFootToWorldTransformOffset = m_desiredLeftFootToWorldTransform;
-    // iDynTree::Position desiredLeftFootPosition = m_desiredLeftFootToWorldTransform.getPosition();
-    // desiredLeftFootPosition(2) += amplitude * std::sin(frequency * m_time);
-    // desiredLeftFootToWorldTransformOffset.setPosition(desiredLeftFootPosition);
+    // if(m_waitCondition)
+    {
+        // we are in the wait condition (from SS -> DS left foot)
+        if(m_leftInContact.front() != m_leftInContact[1] && !m_leftInContact.front())
+        {
+            auto leftFootPosition = leftFootTransform.getPosition();
+            leftFootTwist(2) = -m_footVelocityLanding;
+            m_footHeight += -m_footVelocityLanding * m_dT;
+            leftFootPosition(2) = m_footHeight;
 
-    // twistLeft.getLinearVec3()(2) += amplitude * frequency * std::cos(frequency * m_time);
-    // accelerationLeft.getLinearVec3()(2) += -amplitude * frequency * frequency *  std::sin(frequency * m_time);
+            leftFootTransform.setPosition(leftFootPosition);
+        }
 
-    // yInfo() << desiredLeftFootToWorldTransformOffset.toString();
+        // we are in the wait condition (from SS -> DS right foot)
+        if(m_rightInContact.front() != m_rightInContact[1] && !m_rightInContact.front())
+        {
+            auto rightFootPosition = rightFootTransform.getPosition();
+            rightFootTwist(2) = -m_footVelocityLanding;
+            m_footHeight += -m_footVelocityLanding * m_dT;
+            rightFootPosition(2) = m_footHeight;
 
-    // if(!m_taskBasedTorqueSolver->setDesiredFeetTrajectory(desiredLeftFootToWorldTransformOffset,
-    //                                                       trans,
-    //                                                       twistLeft, dummyTwist, accelerationLeft, dummyTwist))
-    // {
-    //     yError() << "[solveTaskbased] Unable to set the desired feet trajectory";
-    //     return false;
-    // }
+            rightFootTransform.setPosition(rightFootPosition);
+        }
 
-    if(!m_taskBasedTorqueSolver->setDesiredFeetTrajectory(m_leftTrajectory.front(),
-                                                          m_rightTrajectory.front(),
-                                                          m_leftTwistTrajectory.front(),
-                                                          m_rightTwistTrajectory.front(),
-                                                          m_leftAccelerationTrajectory.front(),
-                                                          m_rightAccelerationTrajectory.front()))
+        yInfo() << "foot height " <<m_footHeight;
+    }
+
+    if(!m_taskBasedTorqueSolver->setDesiredFeetTrajectory(leftFootTransform, rightFootTransform,
+                                                          leftFootTwist, rightFootTwist,
+                                                          leftFootAcceleration, rightFootAcceleration))
     {
         yError() << "[solveTaskbased] Unable to set the desired feet trajectory";
         return false;
@@ -915,33 +925,42 @@ bool WalkingModule::updateModule()
         checkWaitCondition(m_leftInContact, m_robotControlHelper->getLeftWrench());
         checkWaitCondition(m_rightInContact, m_robotControlHelper->getRightWrench());
 
-        // evaluate 3D-LIPM reference signal
-        m_stableDCMModel->setDCMPosition(m_DCMPositionDesired.front());
-        m_stableDCMModel->setZMPPosition(m_ZMPPositionDesired.front());
-        if(!m_stableDCMModel->integrateModel())
+
+        iDynTree::Vector2 desiredCoMVelocityXY;
+        iDynTree::Vector2 desiredCoMAccelerationXY;
+        if(!m_waitCondition)
         {
-            yError() << "[updateModule] Unable to propagate the 3D-LIPM.";
-            return false;
+            // evaluate 3D-LIPM reference signal
+            m_stableDCMModel->setDCMPosition(m_DCMPositionDesired.front());
+            m_stableDCMModel->setZMPPosition(m_ZMPPositionDesired.front());
+            if(!m_stableDCMModel->integrateModel())
+            {
+                yError() << "[updateModule] Unable to propagate the 3D-LIPM.";
+                return false;
+            }
+
+            if(!m_stableDCMModel->getCoMVelocity(desiredCoMVelocityXY))
+            {
+                yError() << "[updateModule] Unable to get the desired CoM velocity.";
+                return false;
+            }
+
+            if(!m_stableDCMModel->getCoMAcceleration(desiredCoMAccelerationXY))
+            {
+                yError() << "[updateModule] Unable to get the desired CoM acceleration.";
+                return false;
+            }
+        }
+        else
+        {
+            desiredCoMVelocityXY.zero();
+            desiredCoMAccelerationXY.zero();
         }
 
         iDynTree::Vector2 desiredCoMPositionXY;
         if(!m_stableDCMModel->getCoMPosition(desiredCoMPositionXY))
         {
             yError() << "[updateModule] Unable to get the desired CoM position.";
-            return false;
-        }
-
-        iDynTree::Vector2 desiredCoMVelocityXY;
-        if(!m_stableDCMModel->getCoMVelocity(desiredCoMVelocityXY))
-        {
-            yError() << "[updateModule] Unable to get the desired CoM velocity.";
-            return false;
-        }
-
-        iDynTree::Vector2 desiredCoMAccelerationXY;
-        if(!m_stableDCMModel->getCoMAcceleration(desiredCoMAccelerationXY))
-        {
-            yError() << "[updateModule] Unable to get the desired CoM acceleration.";
             return false;
         }
 
