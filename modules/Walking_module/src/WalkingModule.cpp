@@ -1429,7 +1429,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // get the current state of the robot
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
-    if(!m_robotControlHelper->getFeedbacksRaw(false, 10))
+    if(!m_robotControlHelper->getFeedbacksRaw(true, 10))
     {
         yError() << "[prepareRobot] Unable to get the feedback.";
         return false;
@@ -1597,29 +1597,32 @@ bool WalkingModule::generateFirstTrajectories()
         return false;
     }
 
-    // // If the base is retrieved from an external source the robot may not start from (0, 0)
-    // if(m_robotControlHelper->isExternalRobotBaseUsed())
-    // {
-    //     if(!m_trajectoryGenerator->generateFirstTrajectories(m_robotControlHelper->getBaseTransform().getPosition()))
-    //     {
-    //         yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
-    //         return false;
-    //     }
-    // }
-    // else
-    // {
-    //     if(!m_trajectoryGenerator->generateFirstTrajectories())
-    //     {
-    //         yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
-    //         return false;
-    //     }
-    // }
-
-    if(!m_trajectoryGenerator->generateFirstTrajectories())
+    // If the base is retrieved from an external source the robot may not start from (0, 0)
+    if(m_robotControlHelper->isExternalRobotBaseUsed())
     {
-        yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
-        return false;
+
+        yInfo() << m_robotControlHelper->getBaseTransform().getPosition().toString();
+
+        if(!m_trajectoryGenerator->generateFirstTrajectories(m_robotControlHelper->getBaseTransform().getPosition()))
+        {
+            yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+            return false;
+        }
     }
+    else
+    {
+        if(!m_trajectoryGenerator->generateFirstTrajectories())
+        {
+            yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+            return false;
+        }
+    }
+
+    // if(!m_trajectoryGenerator->generateFirstTrajectories())
+    // {
+    //     yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+    //     return false;
+    // }
 
     if(!updateTrajectories(0))
     {
@@ -1919,24 +1922,24 @@ bool WalkingModule::startWalking()
     iDynTree::Transform stanceFoot_T_world = m_trajectoryGenerator->swingLeft() ?
         m_rightTrajectory.front().inverse() : m_leftTrajectory.front().inverse();
 
-    std::string frameName = m_trajectoryGenerator->swingLeft() ? "r_sole" : "l_sole";
+    // std::string frameName = m_trajectoryGenerator->swingLeft() ? "r_sole" : "l_sole";
 
-    yarp::os::Bottle cmd, outcome;
-    cmd.addString("resetLeggedOdometryWithRefFrame");
-    cmd.addString(frameName);
-    cmd.addDouble(stanceFoot_T_world.getPosition()(0));
-    cmd.addDouble(stanceFoot_T_world.getPosition()(1));
-    cmd.addDouble(stanceFoot_T_world.getPosition()(2));
-    cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(0));
-    cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(1));
-    cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(2));
-    m_rpcBaseEstPort.write(cmd,outcome);
+    // yarp::os::Bottle cmd, outcome;
+    // cmd.addString("resetLeggedOdometryWithRefFrame");
+    // cmd.addString(frameName);
+    // cmd.addDouble(stanceFoot_T_world.getPosition()(0));
+    // cmd.addDouble(stanceFoot_T_world.getPosition()(1));
+    // cmd.addDouble(stanceFoot_T_world.getPosition()(2));
+    // cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(0));
+    // cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(1));
+    // cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(2));
+    // m_rpcBaseEstPort.write(cmd,outcome);
 
-    if(!outcome.get(0).asBool())
-    {
-        yError() << "[startWalking] Unable reset the odometry.";
-        return false;
-    }
+    // if(!outcome.get(0).asBool())
+    // {
+    //     yError() << "[startWalking] Unable reset the odometry.";
+    //     return false;
+    // }
 
     // get feedbacks and evaluate useful quantities
     if(!m_robotControlHelper->getFeedbacks(100))
@@ -1951,11 +1954,11 @@ bool WalkingModule::startWalking()
         return false;
     }
 
-    // double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
-    //                        + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
+    double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
+                           + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
 
-    // yInfo() << heightOffset;
-    // m_robotControlHelper->setHeightOffset(heightOffset);
+    yInfo() << heightOffset;
+    m_robotControlHelper->setHeightOffset(heightOffset);
 
     if(m_useTorque)
     {

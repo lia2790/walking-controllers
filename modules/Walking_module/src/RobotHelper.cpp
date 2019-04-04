@@ -120,6 +120,9 @@ bool RobotHelper::getFeedbacksRaw(bool getBaseEst, unsigned int maxAttempts)
                     m_robotBaseTwist.setLinearVec3(iDynTree::Vector3(base->data() + 6, 3));
                     m_robotBaseTwist.setAngularVec3(iDynTree::Vector3(base->data() + 6 + 3, 3));
                     okBaseEstimation = true;
+
+
+                    yInfo() << "cisadiashas";
                 }
             }
         }
