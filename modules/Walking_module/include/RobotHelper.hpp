@@ -88,6 +88,7 @@ class RobotHelper
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_leftWrenchFilter; /**< Left wrench low pass filter.*/
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_rightWrenchFilter; /**< Right wrench low pass filter.*/
     bool m_useWrenchFilter; /**< True if the wrench filter is used. */
+    bool m_useFT{false};
 
     double m_startingPositionControlTime;
     bool m_positionMoveSkipped;
@@ -97,6 +98,7 @@ class RobotHelper
     iDynTree::Twist m_robotBaseTwist;
     yarp::os::BufferedPort<yarp::sig::Vector> m_robotBasePort; /**< Right foot wrench port. */
     double m_heightOffset;
+
 
     /**
      * Get the higher position error among all joints.

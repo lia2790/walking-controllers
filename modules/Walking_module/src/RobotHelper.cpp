@@ -60,8 +60,8 @@ bool RobotHelper::getFeedbacksRaw(bool getBaseEst, unsigned int maxAttempts)
     bool okVelocity = false;
     bool okTorque = false;
 
-    bool okLeftWrench = false;
-    bool okRightWrench = false;
+    bool okLeftWrench = !m_useFT;
+    bool okRightWrench = !m_useFT;
 
     bool okBaseEstimation = true;
     if(getBaseEst)
@@ -120,9 +120,6 @@ bool RobotHelper::getFeedbacksRaw(bool getBaseEst, unsigned int maxAttempts)
                     m_robotBaseTwist.setLinearVec3(iDynTree::Vector3(base->data() + 6, 3));
                     m_robotBaseTwist.setAngularVec3(iDynTree::Vector3(base->data() + 6 + 3, 3));
                     okBaseEstimation = true;
-
-
-                    yInfo() << "cisadiashas";
                 }
             }
         }
@@ -136,15 +133,18 @@ bool RobotHelper::getFeedbacksRaw(bool getBaseEst, unsigned int maxAttempts)
                 m_velocityFeedbackRad(j) = iDynTree::deg2rad(m_velocityFeedbackDeg(j));
             }
 
-            if(!iDynTree::toiDynTree(m_leftWrenchInput, m_leftWrench))
+            if(m_useFT)
             {
-                yError() << "[getFeedbacks] Unable to convert left foot wrench.";
-                return false;
-            }
-            if(!iDynTree::toiDynTree(m_rightWrenchInput, m_rightWrench))
-            {
-                yError() << "[getFeedbacks] Unable to convert right foot wrench.";
-                return false;
+                if(!iDynTree::toiDynTree(m_leftWrenchInput, m_leftWrench))
+                {
+                    yError() << "[getFeedbacks] Unable to convert left foot wrench.";
+                    return false;
+                }
+                if(!iDynTree::toiDynTree(m_rightWrenchInput, m_rightWrench))
+                {
+                    yError() << "[getFeedbacks] Unable to convert right foot wrench.";
+                    return false;
+                }
             }
             return true;
         }
@@ -395,6 +395,8 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
 
 bool RobotHelper::configureForceTorqueSensors(const yarp::os::Searchable& config)
 {
+    m_useFT = true;
+
     std::string portInput, portOutput;
 
     // check if the config file is empty

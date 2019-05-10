@@ -137,6 +137,9 @@ bool WalkingModule::setRobotModel(const yarp::os::Searchable& rf)
         yError() << "[setRobotModel] Error while loading the model from " << pathToModel;
         return false;
     }
+
+    yInfo() << m_loader.model().toString();
+
     return true;
 }
 
@@ -170,12 +173,15 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
-    yarp::os::Bottle& forceTorqueSensorsOptions = rf.findGroup("FT_SENSORS");
-    forceTorqueSensorsOptions.append(generalOptions);
-    if(!m_robotControlHelper->configureForceTorqueSensors(forceTorqueSensorsOptions))
+    if(!m_useTorque)
     {
-        yError() << "[configure] Unable to configure the Force Torque sensors.";
-        return false;
+        yarp::os::Bottle& forceTorqueSensorsOptions = rf.findGroup("FT_SENSORS");
+        forceTorqueSensorsOptions.append(generalOptions);
+        if(!m_robotControlHelper->configureForceTorqueSensors(forceTorqueSensorsOptions))
+        {
+            yError() << "[configure] Unable to configure the Force Torque sensors.";
+            return false;
+        }
     }
 
     if(!setRobotModel(rf))
@@ -905,15 +911,20 @@ bool WalkingModule::updateModule()
 
         m_FKSolver->evaluateDCM();
 
-        if(!m_FKSolver->evaluateZMP(m_robotControlHelper->getLeftWrench(),
-                                    m_robotControlHelper->getRightWrench()))
+        if(!m_useTorque)
         {
-            yError() << "[updateModule] Unable to evaluate the ZMP.";
-            return false;
+            if(!m_FKSolver->evaluateZMP(m_robotControlHelper->getLeftWrench(),
+                                        m_robotControlHelper->getRightWrench()))
+            {
+                yError() << "[updateModule] Unable to evaluate the ZMP.";
+                return false;
+            }
+
+            // TODO this is a bug. Cowboy cooding
+            checkWaitCondition(m_leftInContact, m_robotControlHelper->getLeftWrench());
+            checkWaitCondition(m_rightInContact, m_robotControlHelper->getRightWrench());
         }
 
-        checkWaitCondition(m_leftInContact, m_robotControlHelper->getLeftWrench());
-        checkWaitCondition(m_rightInContact, m_robotControlHelper->getRightWrench());
 
         // evaluate 3D-LIPM reference signal
         m_stableDCMModel->setDCMPosition(m_DCMPositionDesired.front());
@@ -1376,28 +1387,41 @@ bool WalkingModule::updateModule()
                 statusVector(1) = m_taskBasedTorqueSolver->isDoubleSupportPhase();
 
             m_walkingLogger->sendData(m_FKSolver->getDCM(),
-                                      DCMPositionDesired, DCMVelocityDesired,
-				      desiredCoMPositionXY,
-                                      m_FKSolver->getZMP(), desiredVRP,
+                                      DCMPositionDesired,
+                                      desiredCoMPositionXY,
+                                      desiredVRP,
                                       m_FKSolver->getCoMPosition(),
                                       leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
                                       rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
-                                      m_robotControlHelper->getLeftWrench(), m_robotControlHelper->getRightWrench(),
                                       left, right,
                                       desiredNeckOrientation,
-                                      m_FKSolver->getNeckOrientation().asRPY(),
-                                      m_torqueDesired,
-                                      m_robotControlHelper->getJointTorque(),
-                                      m_qDesired,
-                                      m_robotControlHelper->getJointPosition(),
-                                      m_robotControlHelper->getJointVelocity(),
-                                      m_FKSolver->getRootLinkToWorldTransform().getPosition(), m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
-                                      m_FKSolver->getRootLinkVelocity(),
-                                      m_FKSolverDebug->getRootLinkToWorldTransform().getPosition(), m_FKSolverDebug->getRootLinkToWorldTransform().getRotation().asRPY(),
-                                      m_FKSolverDebug->getRootLinkVelocity(),
-                                      statusVector);
+                                      m_FKSolver->getNeckOrientation().asRPY());
+
+            // m_walkingLogger->sendData(m_FKSolver->getDCM(),
+            //                           DCMPositionDesired, DCMVelocityDesired,
+            //                           desiredCoMPositionXY,
+            //                           m_FKSolver->getZMP(), desiredVRP,
+            //                           m_FKSolver->getCoMPosition(),
+            //                           leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
+            //                           rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
+            //                           m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
+            //                           m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
+            //                           m_robotControlHelper->getLeftWrench(), m_robotControlHelper->getRightWrench(),
+            //                           left, right,
+            //                           desiredNeckOrientation,
+            //                           m_FKSolver->getNeckOrientation().asRPY(),
+            //                           m_torqueDesired,
+            //                           m_robotControlHelper->getJointTorque(),
+            //                           m_qDesired,
+            //                           m_robotControlHelper->getJointPosition(),
+            //                           m_robotControlHelper->getJointVelocity(),
+            //                           m_FKSolver->getRootLinkToWorldTransform().getPosition(), m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
+            //                           m_FKSolver->getRootLinkVelocity(),
+            //                           m_FKSolverDebug->getRootLinkToWorldTransform().getPosition(), m_FKSolverDebug->getRootLinkToWorldTransform().getRotation().asRPY(),
+            //                           m_FKSolverDebug->getRootLinkVelocity(),
+            //                           statusVector);
         }
 
         if(!m_waitCondition)
@@ -1834,9 +1858,7 @@ bool WalkingModule::startWalking()
     {
         m_walkingLogger->startRecord({"record","dcm_x", "dcm_y", "dcm_z",
                     "dcm_des_x", "dcm_des_y", "dcm_des_z",
-                    "dcm_des_dx", "dcm_des_dy", "dcm_des_dz",
                     "com_des_x", "com_des_y",
-                    "zmp_x", "zmp_y",
                     "vrp_des_x", "vrp_des_y", "vrp_des_z",
                     "com_x", "com_y", "com_z",
                     "lf_x", "lf_y", "lf_z",
@@ -1847,46 +1869,42 @@ bool WalkingModule::startWalking()
                     "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
                     "rf_des_x", "rf_des_y", "rf_des_z",
                     "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
-                    "lf_force_x", "lf_force_y", "lf_force_z",
-                    "lf_torque_x", "lf_torque_y", "lf_torque_z",
-                    "rf_force_x", "rf_force_y", "rf_force_z",
-                    "rf_torque_x", "rf_torque_y", "rf_torque_z",
                     "lf_force_des_x", "lf_force_des_y", "lf_force_des_z",
                     "lf_torque_des_x", "lf_torque_des_y", "lf_torque_des_z",
                     "rf_force_des_x", "rf_force_des_y", "rf_force_des_z",
                     "rf_torque_des_x", "rf_torque_des_y", "rf_torque_des_z",
                     "torso_roll_cart_des", "torso_pitch_cart_des", "torso_yaw_cart_des",
-                    "torso_roll_cart", "torso_pitch_cart", "torso_yaw_cart",
-                    "torso_pitch_des_trq", "torso_roll_des_trq", "torso_yaw_des_trq",
-                    "l_shoulder_pitch_des_trq", "l_shoulder_roll_des_trq", "l_shoulder_yaw_des_trq", "l_elbow_des_trq",
-                    "r_shoulder_pitch_des_trq", "r_shoulder_roll_des_trq", "r_shoulder_yaw_des_trq", "r_elbow_des_trq",
-                    "l_hip_pitch_des_trq", "l_hip_roll_des_trq", "l_hip_yaw_des_trq", "l_knee_des_trq", "l_ankle_pitch_des_trq", "l_ankle_roll_des_trq",
-                    "r_hip_pitch_des_trq", "r_hip_roll_des_trq", "r_hip_yaw_des_trq", "r_knee_des_trq", "r_ankle_pitch_des_trq", "r_ankle_roll_des_trq",
-                    "torso_pitch_trq", "torso_roll_trq", "torso_yaw_trq",
-                    "l_shoulder_pitch_trq", "l_shoulder_roll_trq", "l_shoulder_yaw_trq", "l_elbow_trq",
-                    "r_shoulder_pitch_trq", "r_shoulder_roll_trq", "r_shoulder_yaw_trq", "r_elbow_trq",
-                    "l_hip_pitch_trq", "l_hip_roll_trq", "l_hip_yaw_trq", "l_knee_trq", "l_ankle_pitch_trq", "l_ankle_roll_trq",
-                    "r_hip_pitch_trq", "r_hip_roll_trq", "r_hip_yaw_trq", "r_knee_trq", "r_ankle_pitch_trq", "r_ankle_roll_trq",
-                    "torso_pitch_des_pos", "torso_roll_des_pos", "torso_yaw_des_pos",
-                    "l_shoulder_pitch_des_pos", "l_shoulder_roll_des_pos", "l_shoulder_yaw_des_pos", "l_elbow_des_pos",
-                    "r_shoulder_pitch_des_pos", "r_shoulder_roll_des_pos", "r_shoulder_yaw_des_pos", "r_elbow_des_pos",
-                    "l_hip_pitch_des_pos", "l_hip_roll_des_pos", "l_hip_yaw_des_pos", "l_knee_des_pos", "l_ankle_pitch_des_pos", "l_ankle_roll_des_pos",
-                    "r_hip_pitch_des_pos", "r_hip_roll_des_pos", "r_hip_yaw_des_pos", "r_knee_des_pos", "r_ankle_pitch_des_pos", "r_ankle_roll_des_pos",
-                    "torso_pitch_pos", "torso_roll_pos", "torso_yaw_pos",
-                    "l_shoulder_pitch_pos", "l_shoulder_roll_pos", "l_shoulder_yaw_pos", "l_elbow_pos",
-                    "r_shoulder_pitch_pos", "r_shoulder_roll_pos", "r_shoulder_yaw_pos", "r_elbow_pos",
-                    "l_hip_pitch_pos", "l_hip_roll_pos", "l_hip_yaw_pos", "l_knee_pos", "l_ankle_pitch_pos", "l_ankle_roll_pos",
-                    "r_hip_pitch_pos", "r_hip_roll_pos", "r_hip_yaw_pos", "r_knee_pos", "r_ankle_pitch_pos", "r_ankle_roll_pos",
-                    "torso_pitch_vel", "torso_roll_vel", "torso_yaw_vel",
-                    "l_shoulder_pitch_vel", "l_shoulder_roll_vel", "l_shoulder_yaw_vel", "l_elbow_vel",
-                    "r_shoulder_pitch_vel", "r_shoulder_roll_vel", "r_shoulder_yaw_vel", "r_elbow_vel",
-                    "l_hip_pitch_vel", "l_hip_roll_vel", "l_hip_yaw_vel", "l_knee_vel", "l_ankle_pitch_vel", "l_ankle_roll_vel",
-                    "r_hip_pitch_vel", "r_hip_roll_vel", "r_hip_yaw_vel", "r_knee_vel", "r_ankle_pitch_vel", "r_ankle_roll_vel",
-                    "base_x", "base_y", "base_z", "base_roll", "base_pitch", "base_yaw",
-                    "base_dx", "base_dy", "base_dz", "base_omega_x", "base_omega_y", "base_omega_z",
-                    "base_debug_x", "base_debug_y", "base_debug_z", "base_debug_roll", "base_debug_pitch", "base_debug_yaw",
-                    "base_debug_dx", "base_debug_dy", "base_debug_dz", "base_debug_omega_x", "base_debug_omega_y", "base_debug_omega_z",
-                    "wait_condition", "double_support_solver"});
+                    "torso_roll_cart", "torso_pitch_cart", "torso_yaw_cart"});
+                    // "torso_pitch_des_trq", "torso_roll_des_trq", "torso_yaw_des_trq",
+                    // "l_shoulder_pitch_des_trq", "l_shoulder_roll_des_trq", "l_shoulder_yaw_des_trq", "l_elbow_des_trq",
+                    // "r_shoulder_pitch_des_trq", "r_shoulder_roll_des_trq", "r_shoulder_yaw_des_trq", "r_elbow_des_trq",
+                    // "l_hip_pitch_des_trq", "l_hip_roll_des_trq", "l_hip_yaw_des_trq", "l_knee_des_trq", "l_ankle_pitch_des_trq", "l_ankle_roll_des_trq",
+                    // "r_hip_pitch_des_trq", "r_hip_roll_des_trq", "r_hip_yaw_des_trq", "r_knee_des_trq", "r_ankle_pitch_des_trq", "r_ankle_roll_des_trq",
+                    // "torso_pitch_trq", "torso_roll_trq", "torso_yaw_trq",
+                    // "l_shoulder_pitch_trq", "l_shoulder_roll_trq", "l_shoulder_yaw_trq", "l_elbow_trq",
+                    // "r_shoulder_pitch_trq", "r_shoulder_roll_trq", "r_shoulder_yaw_trq", "r_elbow_trq",
+                    // "l_hip_pitch_trq", "l_hip_roll_trq", "l_hip_yaw_trq", "l_knee_trq", "l_ankle_pitch_trq", "l_ankle_roll_trq",
+                    // "r_hip_pitch_trq", "r_hip_roll_trq", "r_hip_yaw_trq", "r_knee_trq", "r_ankle_pitch_trq", "r_ankle_roll_trq",
+                    // "torso_pitch_des_pos", "torso_roll_des_pos", "torso_yaw_des_pos",
+                    // "l_shoulder_pitch_des_pos", "l_shoulder_roll_des_pos", "l_shoulder_yaw_des_pos", "l_elbow_des_pos",
+                    // "r_shoulder_pitch_des_pos", "r_shoulder_roll_des_pos", "r_shoulder_yaw_des_pos", "r_elbow_des_pos",
+                    // "l_hip_pitch_des_pos", "l_hip_roll_des_pos", "l_hip_yaw_des_pos", "l_knee_des_pos", "l_ankle_pitch_des_pos", "l_ankle_roll_des_pos",
+                    // "r_hip_pitch_des_pos", "r_hip_roll_des_pos", "r_hip_yaw_des_pos", "r_knee_des_pos", "r_ankle_pitch_des_pos", "r_ankle_roll_des_pos",
+                    // "torso_pitch_pos", "torso_roll_pos", "torso_yaw_pos",
+                    // "l_shoulder_pitch_pos", "l_shoulder_roll_pos", "l_shoulder_yaw_pos", "l_elbow_pos",
+                    // "r_shoulder_pitch_pos", "r_shoulder_roll_pos", "r_shoulder_yaw_pos", "r_elbow_pos",
+                    // "l_hip_pitch_pos", "l_hip_roll_pos", "l_hip_yaw_pos", "l_knee_pos", "l_ankle_pitch_pos", "l_ankle_roll_pos",
+                    // "r_hip_pitch_pos", "r_hip_roll_pos", "r_hip_yaw_pos", "r_knee_pos", "r_ankle_pitch_pos", "r_ankle_roll_pos",
+                    // "torso_pitch_vel", "torso_roll_vel", "torso_yaw_vel",
+                    // "l_shoulder_pitch_vel", "l_shoulder_roll_vel", "l_shoulder_yaw_vel", "l_elbow_vel",
+                    // "r_shoulder_pitch_vel", "r_shoulder_roll_vel", "r_shoulder_yaw_vel", "r_elbow_vel",
+                    // "l_hip_pitch_vel", "l_hip_roll_vel", "l_hip_yaw_vel", "l_knee_vel", "l_ankle_pitch_vel", "l_ankle_roll_vel",
+                    // "r_hip_pitch_vel", "r_hip_roll_vel", "r_hip_yaw_vel", "r_knee_vel", "r_ankle_pitch_vel", "r_ankle_roll_vel",
+                    // "base_x", "base_y", "base_z", "base_roll", "base_pitch", "base_yaw",
+                    // "base_dx", "base_dy", "base_dz", "base_omega_x", "base_omega_y", "base_omega_z",
+                    // "base_debug_x", "base_debug_y", "base_debug_z", "base_debug_roll", "base_debug_pitch", "base_debug_yaw",
+                    // "base_debug_dx", "base_debug_dy", "base_debug_dz", "base_debug_omega_x", "base_debug_omega_y", "base_debug_omega_z",
+                    // "wait_condition", "double_support_solver"});
 
         // m_walkingLogger->startRecord({"record","dcm_x", "dcm_y", "dcm_z",
         //             "dcm_des_x", "dcm_des_y", "dcm_des_z",
@@ -1960,12 +1978,12 @@ bool WalkingModule::startWalking()
     yInfo() << heightOffset;
     m_robotControlHelper->setHeightOffset(heightOffset);
 
-    if(m_useTorque)
-    {
-        m_taskBasedTorqueSolver->reset(m_robotControlHelper->getJointTorque(),
-                                       m_robotControlHelper->getLeftWrench(),
-                                       m_robotControlHelper->getRightWrench());
-    }
+    // if(m_useTorque)
+    // {
+    //     m_taskBasedTorqueSolver->reset(m_robotControlHelper->getJointTorque(),
+    //                                    m_robotControlHelper->getLeftWrench(),
+    //                                    m_robotControlHelper->getRightWrench());
+    // }
     m_robotState = WalkingFSM::Walking;
     m_firstStep = true;
 
