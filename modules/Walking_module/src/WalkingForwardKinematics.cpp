@@ -120,31 +120,47 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
+    std::string lFootFrame;
+    if(!YarpHelper::getStringFromSearchable(config, "left_foot_frame", lFootFrame))
+    {
+        yError() << "[initialize] Unable to get the string from searchable.";
+        return false;
+    }
+
+    // set the right foot frame
+    std::string rFootFrame;
+    if(!YarpHelper::getStringFromSearchable(config, "right_foot_frame", rFootFrame))
+    {
+        yError() << "[initialize] Unable to get the string from searchable.";
+        return false;
+    }
+
+    std::string rootFrame;
+    if(!YarpHelper::getStringFromSearchable(config, "root_frame", rootFrame))
+    {
+        yError() << "[initialize] Unable to get the string from searchable.";
+        return false;
+    }
+
+    std::string torsoFrame;
+    if(!YarpHelper::getStringFromSearchable(config, "torso_frame", torsoFrame))
+    {
+        yError() << "[initialize] Unable to get the string from searchable.";
+        return false;
+    }
+
     m_useExternalRobotBase = config.check("use_external_robot_base", yarp::os::Value("False")).asBool();
+
     if(!m_useExternalRobotBase)
     {
         // if the robot base is not retrieved from the external the base moves from the left foot
         // to the right (according to the stance foot during the gait)
 
         // set the left foot frame
-        std::string lFootFrame;
-        if(!YarpHelper::getStringFromSearchable(config, "left_foot_frame", lFootFrame))
-        {
-            yError() << "[initialize] Unable to get the string from searchable.";
-            return false;
-        }
 
         if(!setBaseFrame(lFootFrame, "leftFoot"))
         {
             yError() << "[initialize] Unable to set the leftFootFrame.";
-            return false;
-        }
-
-        // set the right foot frame
-        std::string rFootFrame;
-        if(!YarpHelper::getStringFromSearchable(config, "right_foot_frame", rFootFrame))
-        {
-            yError() << "[initialize] Unable to get the string from searchable.";
             return false;
         }
 
@@ -160,13 +176,6 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
     }
     else
     {
-        std::string rootFrame;
-        if(!YarpHelper::getStringFromSearchable(config, "root_frame", rootFrame))
-        {
-            yError() << "[initialize] Unable to get the string from searchable.";
-            return false;
-        }
-
         if(!setBaseFrame(rootFrame, "root"))
         {
             yError() << "[initialize] Unable to set the rightFootFrame.";
@@ -182,28 +191,28 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
     }
 
     // get index frames
-    m_frameRootIndex = m_kinDyn.model().getFrameIndex("root_link");
+    m_frameRootIndex = m_kinDyn.model().getFrameIndex(rootFrame);
     if(m_frameRootIndex == iDynTree::FRAME_INVALID_INDEX)
     {
         yError() << "[initialize] Unable to find the frame named: root_link";
         return false;
     }
 
-    m_frameLeftIndex = m_kinDyn.model().getFrameIndex("l_sole");
+    m_frameLeftIndex = m_kinDyn.model().getFrameIndex(lFootFrame);
     if(m_frameLeftIndex == iDynTree::FRAME_INVALID_INDEX)
     {
-        yError() << "[initialize] Unable to find the frame named: l_sole";
+        yError() << "[initialize] Unable to find the frame named: " << lFootFrame;
         return false;
     }
 
-    m_frameRightIndex = m_kinDyn.model().getFrameIndex("r_sole");
+    m_frameRightIndex = m_kinDyn.model().getFrameIndex(rFootFrame);
     if(m_frameRightIndex == iDynTree::FRAME_INVALID_INDEX)
     {
-        yError() << "[initialize] Unable to find the frame named: r_sole";
+        yError() << "[initialize] Unable to find the frame named: " << rFootFrame;
         return false;
     }
 
-    m_frameNeckIndex = m_kinDyn.model().getFrameIndex("neck_2");
+    m_frameNeckIndex = m_kinDyn.model().getFrameIndex(torsoFrame);
     if(m_frameNeckIndex == iDynTree::FRAME_INVALID_INDEX)
     {
         yError() << "[initialize] Unable to find the frame named: root_link";
