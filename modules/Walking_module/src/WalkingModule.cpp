@@ -1209,7 +1209,7 @@ bool WalkingModule::updateModule()
 		{
 		    yError() << "[updateModule] Unable to evaluate the CoM.";
 		    return false;
-		}		
+		}
             }
 
             if(m_useOSQP)
@@ -1255,7 +1255,7 @@ bool WalkingModule::updateModule()
 		  {
 		    yError() << "[updateModule] Unable to evaluate the CoM.";
 		    return false;
-		  }		
+		  }
             }
             bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
             iDynTree::toiDynTree(bufferPosition, m_qDesired);
@@ -1636,7 +1636,7 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
     zmpRight = m_rightTrajectory.front() * zmpRight;
 
     // giulio
-    
+
     // the global zmp is given by a weighted average
     iDynTree::toEigen(zmpWorld) = ((m_leftWrench.getLinearVec3()(2) * zmpLeftDefined) / totalZ)
         * iDynTree::toEigen(zmpLeft) +
@@ -1777,14 +1777,16 @@ bool WalkingModule::setPositionReferences(const iDynTree::VectorDynSize& desired
 
         if(terminated)
         {
-            if(!getWorstError(desiredJointPositionsRad, worstErrorRad))
-            {
-                yError() << "[setPositionReferences] Unable to get the worst error.";
-                return false;
-            }
+            // if(!getWorstError(desiredJointPositionsRad, worstErrorRad))
+            // {
+            //     yError() << "[setPositionReferences] Unable to get the worst error.";
+            //     return false;
+            // }
 
-            if(worstErrorRad.second < 2.0)
-                return true;
+            // if(worstErrorRad.second < 2.0)
+            //     return true;
+
+            return true;
         }
 
         yarp::os::Time::delay(positioningTimeSec * 0.5);
