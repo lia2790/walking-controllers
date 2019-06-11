@@ -781,6 +781,10 @@ bool WalkingModule::updateModule()
             else
                 desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
 
+
+            auto leftHandDesired = m_FKSolver->getHeadToWorldTransform() * m_retargetingClient->leftHandTransform();
+            auto rightHandDesired = m_FKSolver->getHeadToWorldTransform() * m_retargetingClient->rightHandTransform();
+
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
             m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
@@ -791,7 +795,11 @@ bool WalkingModule::updateModule()
                                       rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
-                                      errorL, errorR);
+                                      errorL, errorR,
+                                      m_FKSolver->getLeftHandToWorldTransform().getPosition(), m_FKSolver->getLeftHandToWorldTransform().getRotation().asRPY(),
+                                      m_FKSolver->getRightHandToWorldTransform().getPosition(), m_FKSolver->getRightHandToWorldTransform().getRotation().asRPY(),
+                                      leftHandDesired.getPosition(), leftHandDesired.getRotation().asRPY(),
+                                      rightHandDesired.getPosition(), rightHandDesired.getRotation().asRPY());
         }
 
         propagateTime();
@@ -1167,7 +1175,15 @@ bool WalkingModule::startWalking()
                     "lf_err_x", "lf_err_y", "lf_err_z",
                     "lf_err_roll", "lf_err_pitch", "lf_err_yaw",
                     "rf_err_x", "rf_err_y", "rf_err_z",
-                    "rf_err_roll", "rf_err_pitch", "rf_err_yaw"});
+                    "rf_err_roll", "rf_err_pitch", "rf_err_yaw",
+                    "lhand_x", "lhand_y", "lhand_z",
+                    "lhand_roll", "lhand_pitch", "lhand_yaw",
+                    "rhand_x", "rhand_y", "rhand_z",
+                    "rhand_roll", "rhand_pitch", "rhand_yaw",
+                    "lhand_des_x", "lhand_des_y", "lhand_des_z",
+                    "lhand_des_roll", "lhand_des_pitch", "lhand_des_yaw",
+                    "rhand_des_x", "rhand_des_y", "rhand_des_z",
+                    "rhand_des_roll", "rhand_des_pitch", "rhand_des_yaw"});
     }
 
     // if the robot was only prepared the filters has to be reseted
