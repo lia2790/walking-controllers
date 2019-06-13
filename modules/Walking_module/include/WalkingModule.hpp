@@ -108,6 +108,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     iDynTree::Rotation m_inertial_R_worldFrame; /**< Rotation between the inertial and the world frame. */
 
+      yarp::os::BufferedPort<yarp::os::Bottle> m_torsoOrientationPort; /**< Port contain the yaw angle
+                                                                        of the torso. */
     yarp::os::Port m_rpcPort; /**< Remote Procedure Call port. */
     yarp::os::BufferedPort<yarp::sig::Vector> m_desiredUnyciclePositionPort; /**< Desired robot position port. */
     yarp::os::BufferedPort<yarp::sig::Vector> m_desiredJointPositionPort; /**< Desired robot joint position port. */

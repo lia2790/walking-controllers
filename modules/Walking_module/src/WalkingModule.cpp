@@ -328,6 +328,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
     m_inertial_R_worldFrame = iDynTree::Rotation::Identity();
 
+    m_torsoOrientationPort.open("/" + getName() + "/torsoYaw:o");
+    
     // resize variables
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
@@ -918,6 +920,11 @@ bool WalkingModule::updateModule()
                                       m_qDesired, m_desiredJointPositionFromExternalSource, m_robotControlHelper->getJointPosition());
         }
 
+        yarp::os::Bottle& output = m_torsoOrientationPort.prepare();
+        output.clear();
+        output.addDouble(meanYaw);
+        m_torsoOrientationPort.write(false);
+        
         propagateTime();
 
         // advance all the signals
