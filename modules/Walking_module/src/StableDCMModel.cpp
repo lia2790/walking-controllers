@@ -34,9 +34,18 @@ bool StableDCMModel::initialize(const yarp::os::Searchable& config)
         yError() << "[initialize] Unable to get a double from a searchable.";
         return false;
     }
+    
     double gravityAcceleration = config.check("gravity_acceleration", yarp::os::Value(9.81)).asDouble();
 
-    m_omega = sqrt(gravityAcceleration / comHeight);
+    double inclPlaneAngle;
+    if(!YarpHelper::getNumberFromSearchable(config, "inclPlaneAngle", inclPlaneAngle))
+    {
+        yError() << "[initialize] Unable to get a inclined plane angle from a searchable.";
+        return false;
+    }
+
+
+    m_omega = sqrt((gravityAcceleration*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / comHeight);
 
     // set the sampling time
     double samplingTime;
