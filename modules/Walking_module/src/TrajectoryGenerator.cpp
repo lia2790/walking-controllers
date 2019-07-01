@@ -101,6 +101,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double switchOverSwingRatio = config.check("switchOverSwingRatio",
                                                yarp::os::Value(0.4)).asDouble();
     double mergePointRatio = config.check("mergePointRatio", yarp::os::Value(0.5)).asDouble();
+    double inclPlaneAngle = config.check("inclPlaneAngle",yarp::os::Value(0)).asDouble();
 
     m_nominalWidth = config.check("nominalWidth", yarp::os::Value(0.04)).asDouble();
 
@@ -151,7 +152,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
 
     m_dcmGenerator = m_trajectoryGenerator.addDCMTrajectoryGenerator();
     m_dcmGenerator->setFootOriginOffset(leftZMPDelta, rightZMPDelta);
-    m_dcmGenerator->setOmega(sqrt(9.81/comHeight));
+    m_dcmGenerator->setOmega(sqrt(9.81*(std::cos(iDynTree::deg2rad(inclPlaneAngle)))/comHeight));
 
     m_correctLeft = true;
 
@@ -231,6 +232,8 @@ void TrajectoryGenerator::computeThread()
         unicyclePlanner->clearDesiredTrajectory();
 
         // add new point
+        // before apply rotation due to inclined plane
+        desiredPoint(0) = desiredPoint(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle))
         if(!unicyclePlanner->addDesiredTrajectoryPoint(endTime, desiredPoint))
         {
             // something goes wrong
@@ -303,6 +306,8 @@ bool TrajectoryGenerator::generateFirstTrajectories()
     m_desiredPoint(1) = m_referencePointDistance(1);
 
     // add the initial point
+    // before apply rotation due to inclined plane
+    m_referencePointDistance(0) = m_referencePointDistance(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
     if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_referencePointDistance))
     {
         yError() << "[generateFirstTrajectories] Error while setting the first reference.";
@@ -310,6 +315,8 @@ bool TrajectoryGenerator::generateFirstTrajectories()
     }
 
     // add the final point
+    // before apply rotation on inclined plane
+    m_desiredPoint(0) = m_desiredPoint(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
     if(!unicyclePlanner->addDesiredTrajectoryPoint(endTime, m_desiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the new reference.";
@@ -357,6 +364,8 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     m_desiredPoint(1) = m_referencePointDistance(1);
 
     // add the initial point
+    // before apply rotation due to inclined plane
+    m_referencePointDistance(0) = m_referencePointDistance(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
     if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_referencePointDistance))
     {
         yError() << "[generateFirstTrajectories] Error while setting the first reference.";
@@ -364,6 +373,8 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     }
 
     // add the final point
+    // before apply rotation on inclined plane
+    m_desiredPoint(0) = m_desiredPoint(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
     if(!unicyclePlanner->addDesiredTrajectoryPoint(endTime, m_desiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the new reference.";
@@ -446,8 +457,8 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
     unicyclePositionFromStanceFoot(0) = 0.0;
     unicyclePositionFromStanceFoot(1) = correctLeft ? -m_nominalWidth/2 : m_nominalWidth/2;
 
-    iDynTree::Vector2 desredPositionFromStanceFoot;
-    iDynTree::toEigen(desredPositionFromStanceFoot) = iDynTree::toEigen(unicyclePositionFromStanceFoot)
+    iDynTree::Vector2 desiredPositionFromStanceFoot;
+    iDynTree::toEigen(desiredPositionFromStanceFoot) = iDynTree::toEigen(unicyclePositionFromStanceFoot)
         + iDynTree::toEigen(m_referencePointDistance) + iDynTree::toEigen(desiredPosition);
 
     // prepare the rotation matrix w_R_{unicycle}
@@ -460,10 +471,10 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
         std::lock_guard<std::mutex> guard(m_mutex);
 
         // apply the homogeneous transformation w_H_{unicycle}
-        m_desiredPoint(0) = c_theta * desredPositionFromStanceFoot(0)
-            - s_theta * desredPositionFromStanceFoot(1) + measured.getPosition()(0);
-        m_desiredPoint(1) = s_theta * desredPositionFromStanceFoot(0)
-            + c_theta * desredPositionFromStanceFoot(1) + measured.getPosition()(1);
+        m_desiredPoint(0) = c_theta * desiredPositionFromStanceFoot(0)
+            - s_theta * desiredPositionFromStanceFoot(1) + measured.getPosition()(0);
+        m_desiredPoint(1) = s_theta * desiredPositionFromStanceFoot(0)
+            + c_theta * desiredPositionFromStanceFoot(1) + measured.getPosition()(1);
 
         m_initTime = initTime;
 
