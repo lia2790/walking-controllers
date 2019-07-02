@@ -34,6 +34,7 @@ class StableDCMModel
     iDynTree::Vector2 m_dcmPosition; /**< Position of the DCM. */
     iDynTree::Vector2 m_comPosition; /**< Position of the CoM. */
     iDynTree::Vector2 m_comVelocity; /**< Velocity of the CoM. */
+    iDynTree::Vector2 m_corrTerm; /**< Correction Term of the CoM. */
 
 public:
 

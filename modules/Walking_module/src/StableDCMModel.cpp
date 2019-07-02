@@ -34,7 +34,7 @@ bool StableDCMModel::initialize(const yarp::os::Searchable& config)
         yError() << "[initialize] Unable to get a double from a searchable.";
         return false;
     }
-    
+
     double gravityAcceleration = config.check("gravity_acceleration", yarp::os::Value(9.81)).asDouble();
 
     double inclPlaneAngle;
@@ -44,8 +44,8 @@ bool StableDCMModel::initialize(const yarp::os::Searchable& config)
         return false;
     }
 
-
     m_omega = sqrt((gravityAcceleration*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / comHeight);
+    m_corrTerm = comHeight*std::tan(iDynTree::deg2rad(inclPlaneAngle));
 
     // set the sampling time
     double samplingTime;
@@ -73,14 +73,14 @@ bool StableDCMModel::integrateModel()
 {
     if(m_comIntegrator == nullptr)
     {
-        yError() << "[integrateModel] The dcm integrator object is not ready. "
+        yError() << "[integrateModel] The dcm integrator object is not ready."
                  << "Please call initialize method.";
         return false;
     }
 
     // evaluate the velocity of the CoM
     yarp::sig::Vector comVelocityYarp(2);
-    iDynTree::toEigen(comVelocityYarp) = -m_omega * (iDynTree::toEigen(m_comPosition) -
+    iDynTree::toEigen(comVelocityYarp) = -m_omega * (iDynTree::toEigen(m_comPosition - m_corrTerm) -
                                                      iDynTree::toEigen(m_dcmPosition));
 
     // integrate velocities
