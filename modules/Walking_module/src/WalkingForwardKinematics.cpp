@@ -186,7 +186,16 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
     double gravityAcceleration = config.check("gravity_acceleration", yarp::os::Value(9.81)).asDouble();
-    m_omega = sqrt(gravityAcceleration / comHeight);
+
+    double inclPlaneAngle;
+    if(!YarpHelper::getNumberFromSearchable(config, "inclPlaneAngle", inclPlaneAngle))
+    {
+        yError() << "[initialize] Unable to get a inclined plane angle from a searchable.";
+        return false;
+    }
+
+    m_omega = sqrt((gravityAcceleration*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / comHeight);
+    m_corrTerm = comHeight*std::tan(deg2rad(inclPlaneAngle));
 
     // init filters
     double samplingTime;
@@ -370,10 +379,10 @@ void WalkingFK::evaluateDCM()
     // evaluate the 3D-DCM
     if(m_useFilters)
         iDynTree::toEigen(dcm3D) = iDynTree::toEigen(m_comPositionFiltered) +
-            iDynTree::toEigen(m_comVelocityFiltered) / m_omega;
+            iDynTree::toEigen(m_comVelocityFiltered) / m_omega - m_corrTerm;
     else
         iDynTree::toEigen(dcm3D) = iDynTree::toEigen(m_comPosition) +
-            iDynTree::toEigen(m_comVelocity) / m_omega;
+            iDynTree::toEigen(m_comVelocity) / m_omega - m_corrTerm;
 
     // take only the 2D projection
     m_dcm(0) = dcm3D(0);
