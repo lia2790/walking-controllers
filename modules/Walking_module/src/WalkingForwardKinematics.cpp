@@ -375,14 +375,18 @@ void WalkingFK::evaluateDCM()
     evaluateCoM();
 
     iDynTree::Vector3 dcm3D;
+    iDynTree::Vector3 corrTerm;
+    corrTerm(0) = -m_corrTerm;
+    corrTerm(1) = m_corrTerm;
+    corrTerm(2) = 0;
 
     // evaluate the 3D-DCM
     if(m_useFilters)
         iDynTree::toEigen(dcm3D) = iDynTree::toEigen(m_comPositionFiltered) +
-            iDynTree::toEigen(m_comVelocityFiltered) / m_omega - m_corrTerm;
+            iDynTree::toEigen(m_comVelocityFiltered) / m_omega + corrTerm;
     else
         iDynTree::toEigen(dcm3D) = iDynTree::toEigen(m_comPosition) +
-            iDynTree::toEigen(m_comVelocity) / m_omega - m_corrTerm;
+            iDynTree::toEigen(m_comVelocity) / m_omega + corrTerm;
 
     // take only the 2D projection
     m_dcm(0) = dcm3D(0);

@@ -28,13 +28,14 @@
 class StableDCMModel
 {
     double m_omega; /**< Inverted time constant of the 3D-LIPM. */
+    double m_corrTerm; /**< Correction Term of the CoM. */
 
     std::unique_ptr<iCub::ctrl::Integrator> m_comIntegrator{nullptr}; /**< CoM integrator object. */
 
     iDynTree::Vector2 m_dcmPosition; /**< Position of the DCM. */
     iDynTree::Vector2 m_comPosition; /**< Position of the CoM. */
     iDynTree::Vector2 m_comVelocity; /**< Velocity of the CoM. */
-    iDynTree::Vector2 m_corrTerm; /**< Correction Term of the CoM. */
+
 
 public:
 
