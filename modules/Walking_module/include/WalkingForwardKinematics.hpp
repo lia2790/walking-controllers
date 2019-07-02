@@ -46,7 +46,7 @@ class WalkingFK
     iDynTree::Position m_comPosition; /**< Position of the CoM. */
     iDynTree::Vector3 m_comVelocity; /**< Velocity of the CoM. */
     iDynTree::Vector2 m_dcm; /**< DCM position. */
-    double m_corrTerm;
+    double m_corrTerm; /**< Correction Term relavite to Inclined Plane dcm position*/
     double m_omega; /**< Inverted time constant of the 3D-LIPM. */
 
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_comPositionFilter; /**< CoM position low pass filter. */
