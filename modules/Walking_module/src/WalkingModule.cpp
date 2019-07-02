@@ -933,7 +933,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
 
     if(m_IKSolver->usingAdditionalRotationTarget())
     {
-        // get the yow angle of both feet
+        // get the yaw angle of both feet
         double yawLeft = m_leftTrajectory.front().getRotation().asRPY()(2);
         double yawRight = m_rightTrajectory.front().getRotation().asRPY()(2);
 
