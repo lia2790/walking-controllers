@@ -376,8 +376,9 @@ void WalkingFK::evaluateDCM()
 
     iDynTree::Vector3 dcm3D;
     iDynTree::Vector3 corrTerm;
-    corrTerm(0) = -m_corrTerm;
-    corrTerm(1) = m_corrTerm;
+    double yawFootAngle = 0;
+    corrTerm(0) = -m_corrTerm * std::cos(iDynTree::deg2rad(yawFootAngle));
+    corrTerm(1) = m_corrTerm * std::sin(iDynTree::deg2rad(yawFootAngle));
     corrTerm(2) = 0;
 
     // evaluate the 3D-DCM
@@ -428,7 +429,7 @@ bool WalkingFK::setBaseOnTheFly()
     m_worldToBaseTransform = m_frameHlinkLeft;
     if(!m_kinDyn.setFloatingBase(m_baseFrameLeft))
     {
-        yError() << "[WalkingFK::setBaseOnTheFly] Error while setting the floating base on link "
+        yError() << "[WalkingFK::setBaseOnTheFly] Error while setting the floating base on link"
                  << m_baseFrameLeft;
         return false;
     }

@@ -229,7 +229,7 @@ void TrajectoryGenerator::computeThread()
 
         // add new point
         // before apply rotation due to inclined plane
-        desiredPoint(0) = desiredPoint(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle))
+        // desiredPoint(0) = desiredPoint(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
         if(!unicyclePlanner->addDesiredTrajectoryPoint(endTime, desiredPoint))
         {
             // something goes wrong
@@ -303,7 +303,7 @@ bool TrajectoryGenerator::generateFirstTrajectories()
 
     // add the initial point
     // before apply rotation due to inclined plane
-    m_referencePointDistance(0) = m_referencePointDistance(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
+    // m_referencePointDistance(0) = m_referencePointDistance(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
     if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_referencePointDistance))
     {
         yError() << "[generateFirstTrajectories] Error while setting the first reference.";
@@ -312,7 +312,7 @@ bool TrajectoryGenerator::generateFirstTrajectories()
 
     // add the final point
     // before apply rotation on inclined plane
-    m_desiredPoint(0) = m_desiredPoint(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
+    // m_desiredPoint(0) = m_desiredPoint(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
     if(!unicyclePlanner->addDesiredTrajectoryPoint(endTime, m_desiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the new reference.";
@@ -361,7 +361,7 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
 
     // add the initial point
     // before apply rotation due to inclined plane
-    m_referencePointDistance(0) = m_referencePointDistance(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
+    // m_referencePointDistance(0) = m_referencePointDistance(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
     if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_referencePointDistance))
     {
         yError() << "[generateFirstTrajectories] Error while setting the first reference.";
@@ -370,7 +370,7 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
 
     // add the final point
     // before apply rotation on inclined plane
-    m_desiredPoint(0) = m_desiredPoint(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
+    // m_desiredPoint(0) = m_desiredPoint(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
     if(!unicyclePlanner->addDesiredTrajectoryPoint(endTime, m_desiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the new reference.";

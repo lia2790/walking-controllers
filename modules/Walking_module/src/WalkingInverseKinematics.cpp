@@ -53,6 +53,7 @@ bool WalkingIK::initialize(yarp::os::Searchable& ikOption, const iDynTree::Model
     std::string rFootFrame = ikOption.check("right_foot_frame", yarp::os::Value("r_sole")).asString();
     std::string solverName = ikOption.check("solver_name", yarp::os::Value("mumps")).asString();
     m_additionalFrame = ikOption.check("additional_frame", yarp::os::Value("")).asString();
+    m_inclPlaneAngle = = ikOption.check("incl_plane_angle",yarp::os::Value(10)).asDouble();
     if(m_additionalFrame.size()!=0)
     {
         if(!iDynTree::parseRotationMatrix(ikOption, "additional_rotation", m_additionalRotation))
