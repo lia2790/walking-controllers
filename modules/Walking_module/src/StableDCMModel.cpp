@@ -80,12 +80,13 @@ bool StableDCMModel::integrateModel()
 
     // evaluate the velocity of the CoM
     yarp::sig::Vector comVelocityYarp(2);
-    iDynTree::Vector3 corrTerm;
+    iDynTree::Vector2 corrTerm;
+    
     double yawFootAngle = 0;
     corrTerm(0) = - m_corrTerm * std::cos(iDynTree::deg2rad(yawFootAngle));
     corrTerm(1) = m_corrTerm * std::sin(iDynTree::deg2rad(yawFootAngle));
 
-    iDynTree::toEigen(comVelocityYarp) = -m_omega * ((iDynTree::toEigen(m_comPosition) + corrTerm) -
+    iDynTree::toEigen(comVelocityYarp) = -m_omega * ((iDynTree::toEigen(m_comPosition) + iDynTree::toEigen(corrTerm)) -
                                                      iDynTree::toEigen(m_dcmPosition));
 
     // integrate velocities

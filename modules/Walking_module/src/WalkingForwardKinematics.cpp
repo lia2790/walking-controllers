@@ -195,7 +195,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
     }
 
     m_omega = sqrt((gravityAcceleration*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / comHeight);
-    m_corrTerm = comHeight*std::tan(deg2rad(inclPlaneAngle));
+    m_corrTerm = comHeight*std::tan(iDynTree::deg2rad(inclPlaneAngle));
 
     // init filters
     double samplingTime;
@@ -376,6 +376,7 @@ void WalkingFK::evaluateDCM()
 
     iDynTree::Vector3 dcm3D;
     iDynTree::Vector3 corrTerm;
+
     double yawFootAngle = 0;
     corrTerm(0) = -m_corrTerm * std::cos(iDynTree::deg2rad(yawFootAngle));
     corrTerm(1) = m_corrTerm * std::sin(iDynTree::deg2rad(yawFootAngle));
@@ -384,10 +385,10 @@ void WalkingFK::evaluateDCM()
     // evaluate the 3D-DCM
     if(m_useFilters)
         iDynTree::toEigen(dcm3D) = iDynTree::toEigen(m_comPositionFiltered) +
-            iDynTree::toEigen(m_comVelocityFiltered) / m_omega + corrTerm;
+            (iDynTree::toEigen(m_comVelocityFiltered) / m_omega) + iDynTree::toEigen(corrTerm);
     else
         iDynTree::toEigen(dcm3D) = iDynTree::toEigen(m_comPosition) +
-            iDynTree::toEigen(m_comVelocity) / m_omega + corrTerm;
+            (iDynTree::toEigen(m_comVelocity) / m_omega) + iDynTree::toEigen(corrTerm);
 
     // take only the 2D projection
     m_dcm(0) = dcm3D(0);
