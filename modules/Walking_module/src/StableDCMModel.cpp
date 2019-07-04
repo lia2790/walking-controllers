@@ -38,7 +38,7 @@ bool StableDCMModel::initialize(const yarp::os::Searchable& config)
     double gravityAcceleration = config.check("gravity_acceleration", yarp::os::Value(9.81)).asDouble();
 
     double inclPlaneAngle;
-    if(!YarpHelper::getNumberFromSearchable(config, "inclPlaneAngle", inclPlaneAngle))
+    if(!YarpHelper::getNumberFromSearchable(config, "inclined_plane_angle", inclPlaneAngle))
     {
         yError() << "[initialize] Unable to get a inclined plane angle from a searchable.";
         return false;
