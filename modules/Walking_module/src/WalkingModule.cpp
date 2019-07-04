@@ -128,6 +128,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
     m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
+    m_inclPlaneAngle = generalOptions.check("incl_plane_angle", yarp::os::Value(10.0)).asDouble();
     std::string name;
     if(!YarpHelper::getStringFromSearchable(generalOptions, "name", name))
     {
@@ -312,7 +313,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_newTrajectoryMergeCounter = -1;
     m_robotState = WalkingFSM::Configured;
 
-    m_inertial_R_worldFrame = iDynTree::Rotation::Identity();
+    // m_inertial_R_worldFrame = iDynTree::Rotation::Identity();
+    m_inertial_R_worldFrame = iDynTree::Rotation::RotY(iDynTree::deg2rad(m_inclPlaneAngle));
 
     // resize variables
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
