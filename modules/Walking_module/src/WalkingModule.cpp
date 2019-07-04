@@ -697,6 +697,8 @@ bool WalkingModule::updateModule()
         yawRotation = yawRotation.inverse();
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
 
+        
+
         if(m_useQPIK)
         {
             // integrate dq because velocity control mode seems not available
