@@ -194,19 +194,19 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         dcmControllerOptions.append(generalOptions);
         if(!m_walkingController->initialize(dcmControllerOptions))
         {
-            yError() << "[WalkingModule::configure] Unable to initialize the controller.";
+            yError() << "[WalkingModule::configure] Unable to initialize the DCM MPC controller.";
             return false;
         }
     }
     else
     {
-        // initialize the MPC controller
+        // initialize the DCM Reactive controller
         m_walkingDCMReactiveController = std::make_unique<WalkingDCMReactiveController>();
         yarp::os::Bottle& dcmControllerOptions = rf.findGroup("DCM_REACTIVE_CONTROLLER");
         dcmControllerOptions.append(generalOptions);
         if(!m_walkingDCMReactiveController->initialize(dcmControllerOptions))
         {
-            yError() << "[WalkingModule::configure] Unable to initialize the controller.";
+            yError() << "[WalkingModule::configure] Unable to initialize DCM Reactive the controller.";
             return false;
         }
     }
