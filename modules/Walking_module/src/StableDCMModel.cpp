@@ -44,8 +44,11 @@ bool StableDCMModel::initialize(const yarp::os::Searchable& config)
         return false;
     }
 
+    // m_omega = sqrt(gravityAcceleration / comHeight);
     m_omega = sqrt((gravityAcceleration*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / comHeight);
     m_corrTerm = comHeight*std::tan(iDynTree::deg2rad(inclPlaneAngle));
+    std::cout << "m_omega DCM stable : " << m_omega << std::endl;
+
 
     // set the sampling time
     double samplingTime;
@@ -82,12 +85,20 @@ bool StableDCMModel::integrateModel()
     yarp::sig::Vector comVelocityYarp(2);
     iDynTree::Vector2 corrTerm;
     
-    double yawFootAngle = 0;
-    corrTerm(0) = - m_corrTerm * std::cos(iDynTree::deg2rad(yawFootAngle));
-    corrTerm(1) = m_corrTerm * std::sin(iDynTree::deg2rad(yawFootAngle));
+    double yawFootAngle = 0.0;
+    //corrTerm(0) = 0;
+    //corrTerm(1) = 0;
+    corrTerm(0) = - m_corrTerm; // * std::cos(iDynTree::deg2rad(yawFootAngle));
+    corrTerm(1) = 0.0; //m_corrTerm * std::sin(iDynTree::deg2rad(yawFootAngle));
 
     iDynTree::toEigen(comVelocityYarp) = -m_omega * ((iDynTree::toEigen(m_comPosition) + iDynTree::toEigen(corrTerm)) -
                                                      iDynTree::toEigen(m_dcmPosition));
+
+    std::cout << "CoM Velocity : " << iDynTree::toEigen(comVelocityYarp) << std::endl;
+    std::cout << "CoM Position : " << iDynTree::toEigen(m_comPosition) << std::endl;
+    std::cout << "Dcm Position : " << iDynTree::toEigen(m_dcmPosition) << std::endl;
+    std::cout << "Omega : " << m_omega << std::endl;
+    std::cout << "CoM height : " << (9.81/(m_omega*m_omega)) << std::endl;
 
     // integrate velocities
     yarp::sig::Vector comPositionYarp(2);

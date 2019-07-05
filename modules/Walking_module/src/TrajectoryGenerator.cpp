@@ -97,7 +97,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double switchOverSwingRatio = config.check("switchOverSwingRatio",
                                                yarp::os::Value(0.4)).asDouble();
     double mergePointRatio = config.check("mergePointRatio", yarp::os::Value(0.5)).asDouble();
-    double inclPlaneAngle = config.check("inclPlaneAngle",yarp::os::Value(0)).asDouble();
+    double inclPlaneAngle = config.check("inclPlaneAngle",yarp::os::Value(0.0)).asDouble();
 
     m_nominalWidth = config.check("nominalWidth", yarp::os::Value(0.04)).asDouble();
 
@@ -148,6 +148,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
 
     m_dcmGenerator = m_trajectoryGenerator.addDCMTrajectoryGenerator();
     m_dcmGenerator->setFootOriginOffset(leftZMPDelta, rightZMPDelta);
+    // m_dcmGenerator->setOmega(sqrt(9.81/comHeight));
     m_dcmGenerator->setOmega(sqrt(9.81*(std::cos(iDynTree::deg2rad(inclPlaneAngle)))/comHeight));
 
     m_correctLeft = true;

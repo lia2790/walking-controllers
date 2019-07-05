@@ -128,7 +128,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
     m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
-    m_inclPlaneAngle = generalOptions.check("incl_plane_angle", yarp::os::Value(10.0)).asDouble();
+    m_inclPlaneAngle = generalOptions.check("incl_plane_angle", yarp::os::Value(0.0)).asDouble();
     std::string name;
     if(!YarpHelper::getStringFromSearchable(generalOptions, "name", name))
     {
@@ -566,7 +566,7 @@ bool WalkingModule::updateModule()
         }
 
         // get feedbacks and evaluate useful quantities
-        if(!m_robotControlHelper->getFeedbacks(10))
+        if(!m_robotControlHelper->getFeedbacks(20))
         {
             yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
             return false;

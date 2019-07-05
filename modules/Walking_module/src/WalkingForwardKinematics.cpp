@@ -194,6 +194,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
+    // m_omega = sqrt(gravityAcceleration / comHeight);
     m_omega = sqrt((gravityAcceleration*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / comHeight);
     m_corrTerm = comHeight*std::tan(iDynTree::deg2rad(inclPlaneAngle));
 
@@ -377,10 +378,12 @@ void WalkingFK::evaluateDCM()
     iDynTree::Vector3 dcm3D;
     iDynTree::Vector3 corrTerm;
 
-    double yawFootAngle = 0;
-    corrTerm(0) = -m_corrTerm * std::cos(iDynTree::deg2rad(yawFootAngle));
-    corrTerm(1) = m_corrTerm * std::sin(iDynTree::deg2rad(yawFootAngle));
-    corrTerm(2) = 0;
+    double yawFootAngle = 0.0;
+    corrTerm(0) = -m_corrTerm; // * std::cos(iDynTree::deg2rad(yawFootAngle));
+    corrTerm(1) = 0.0; //m_corrTerm * std::sin(iDynTree::deg2rad(yawFootAngle));
+    // corrTerm(0) = 0;
+    // corrTerm(1) = 0;
+    corrTerm(2) = 0.0;
 
     // evaluate the 3D-DCM
     if(m_useFilters)
