@@ -190,7 +190,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
     double inclPlaneAngle;
     if(!YarpHelper::getNumberFromSearchable(config, "inclined_plane_angle", inclPlaneAngle))
     {
-        yError() << "[initialize] Unable to get a inclined plane angle from a searchable.";
+        yError() << "[WalkingFK::initialize] Unable to get a inclined plane angle from a searchable.";
         return false;
     }
 

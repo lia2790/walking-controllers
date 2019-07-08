@@ -42,15 +42,15 @@ bool WalkingDCMReactiveController::initialize(const yarp::os::Searchable& config
     }
     double gravityAcceleration = config.check("gravity_acceleration", yarp::os::Value(9.81)).asDouble();
    
-    double inclPlaneAngle;
-    if(!YarpHelper::getNumberFromSearchable(config, "inclPlaneAngle", inclPlaneAngle))
+    double inclined_plane_angle;
+    if(!YarpHelper::getNumberFromSearchable(config, "inclined_plane_angle", inclined_plane_angle))
     {
         yError() << "[initialize] Unable to get a inclined plane angle from a searchable.";
         return false;
     }
 
 
-    m_omega = sqrt((gravityAcceleration*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / comHeight);
+    m_omega = sqrt((gravityAcceleration*std::cos(iDynTree::deg2rad(inclined_plane_angle))) / comHeight);
     // m_omega = sqrt(gravityAcceleration / comHeight);
 
     m_isInitialized = true;
