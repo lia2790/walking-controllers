@@ -195,8 +195,8 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
     }
 
     // m_omega = sqrt(gravityAcceleration / comHeight);
-    m_omega = sqrt((gravityAcceleration*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / comHeight);
-    m_corrTerm = comHeight*std::tan(iDynTree::deg2rad(inclPlaneAngle));
+    m_omega = sqrt((gravityAcceleration*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle))));
+    m_corrTerm = (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle)))*std::tan(iDynTree::deg2rad(inclPlaneAngle));
 
     // init filters
     double samplingTime;
@@ -215,7 +215,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
 
     m_comPositionFiltered.zero();
     m_comVelocityFiltered.zero();
-    m_comPositionFiltered(2) = comHeight;
+    m_comPositionFiltered(2) = (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle)));
 
 
     m_comPositionFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency, samplingTime);

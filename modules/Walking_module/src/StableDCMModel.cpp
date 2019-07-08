@@ -45,8 +45,8 @@ bool StableDCMModel::initialize(const yarp::os::Searchable& config)
     }
 
     // m_omega = sqrt(gravityAcceleration / comHeight);
-    m_omega = sqrt((gravityAcceleration*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / comHeight);
-    m_corrTerm = comHeight*std::tan(iDynTree::deg2rad(inclPlaneAngle));
+    m_omega = sqrt((gravityAcceleration*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle))));
+    m_corrTerm = (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle)))*std::tan(iDynTree::deg2rad(inclPlaneAngle));
     std::cout << "m_omega DCM stable : " << m_omega << std::endl;
 
 

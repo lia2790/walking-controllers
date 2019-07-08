@@ -50,7 +50,7 @@ bool WalkingDCMReactiveController::initialize(const yarp::os::Searchable& config
     }
 
 
-    m_omega = sqrt((gravityAcceleration*std::cos(iDynTree::deg2rad(inclined_plane_angle))) / comHeight);
+    m_omega = sqrt((gravityAcceleration*std::cos(iDynTree::deg2rad(inclined_plane_angle))) / (comHeight*std::cos(iDynTree::deg2rad(inclined_plane_angle))));
     // m_omega = sqrt(gravityAcceleration / comHeight);
 
     m_isInitialized = true;
