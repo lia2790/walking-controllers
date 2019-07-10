@@ -931,9 +931,13 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     }
 
     iDynTree::Position desiredCoMPosition;
-    desiredCoMPosition(0) = m_DCMPositionDesired.front()(0);
+    desiredCoMPosition(0) = m_DCMPositionDesired.front()(0) + (m_comHeightTrajectory.front()*(std::sin(iDynTree::deg2rad(m_inclPlaneAngle))));
     desiredCoMPosition(1) = m_DCMPositionDesired.front()(1);
     desiredCoMPosition(2) = m_comHeightTrajectory.front();
+
+    std::cout<<"inclPlaneAngle : "<<m_inclPlaneAngle<< std::endl;
+    std::cout<<"corrTerm : "<<(m_comHeightTrajectory.front()*(std::sin(m_inclPlaneAngle)))<<std::endl;
+    std::cout<<"desiredCoMPosition : "<<desiredCoMPosition(0)<< ' ' << desiredCoMPosition(1)<< ' ' << desiredCoMPosition(2)<< std::endl;
 
     if(m_IKSolver->usingAdditionalRotationTarget())
     {
@@ -965,6 +969,8 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         yError() << "[WalkingModule::prepareRobot] Inverse Kinematics failed while computing the initial position.";
         return false;
     }
+
+    std::cout<<"m_qDesired : "<< iDynTree::toEigen(m_qDesired) << std::endl;
 
     if(!m_robotControlHelper->setPositionReferences(m_qDesired, 5.0))
     {
