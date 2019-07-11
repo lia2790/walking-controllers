@@ -936,7 +936,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     }
 
     iDynTree::Position desiredCoMPosition;
-    desiredCoMPosition(0) = m_DCMPositionDesired.front()(0) + (m_comHeightTrajectory.front()*(std::sin(iDynTree::deg2rad(m_inclPlaneAngle))));
+    desiredCoMPosition(0) = m_DCMPositionDesired.front()(0) + (m_comHeight*(std::sin(iDynTree::deg2rad(m_inclPlaneAngle))));
     desiredCoMPosition(1) = m_DCMPositionDesired.front()(1);
     desiredCoMPosition(2) = m_comHeightTrajectory.front();
 

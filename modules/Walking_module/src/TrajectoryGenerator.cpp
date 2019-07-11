@@ -143,7 +143,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && m_feetGenerator->setPitchDelta(pitchDelta);
 
     m_heightGenerator = m_trajectoryGenerator.addCoMHeightTrajectoryGenerator();
-    ok = ok && m_heightGenerator->setCoMHeightSettings(comHeight, comHeightDelta);
+    ok = ok && m_heightGenerator->setCoMHeightSettings(comHeight*(std::cos(iDynTree::deg2rad(inclPlaneAngle))), comHeightDelta);
     ok = ok && m_trajectoryGenerator.setMergePointRatio(mergePointRatio);
 
     m_dcmGenerator = m_trajectoryGenerator.addDCMTrajectoryGenerator();
