@@ -22,5 +22,10 @@
     <node>icub-head</node>
   </module>
 
+  <module>
+    <name>WalkingEnvironmentDetectionModule</name>
+    <node>icub-head</node>
+  </module>
+
 
 </application>

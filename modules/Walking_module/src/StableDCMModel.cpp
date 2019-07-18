@@ -49,7 +49,6 @@ bool StableDCMModel::initialize(const yarp::os::Searchable& config)
     m_corrTerm = (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle)))*std::tan(iDynTree::deg2rad(inclPlaneAngle));
     std::cout << "m_omega DCM stable : " << m_omega << std::endl;
 
-
     // set the sampling time
     double samplingTime;
     if(!YarpHelper::getNumberFromSearchable(config, "sampling_time", samplingTime))

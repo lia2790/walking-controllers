@@ -198,6 +198,12 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
     m_omega = sqrt((gravityAcceleration*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle))));
     m_corrTerm = (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle)))*std::tan(iDynTree::deg2rad(inclPlaneAngle));
 
+    std::cout<<"FK Walking INITIALIZATION -------------------------" << std::endl;
+    std::cout<<"inclined plane angle : " << inclPlaneAngle << std::endl;
+    std::cout<<"com Height : "<< comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle)) << std::endl;
+    std::cout<<"m_corrTerm : "<< m_corrTerm << std::endl;
+    std::cout<< "--------------------------------------------------------------" << std::endl;
+
     // init filters
     double samplingTime;
     if(!YarpHelper::getNumberFromSearchable(config, "sampling_time", samplingTime))
@@ -378,11 +384,8 @@ void WalkingFK::evaluateDCM()
     iDynTree::Vector3 dcm3D;
     iDynTree::Vector3 corrTerm;
 
-    double yawFootAngle = 0.0;
-    corrTerm(0) = -m_corrTerm; // * std::cos(iDynTree::deg2rad(yawFootAngle));
-    corrTerm(1) = 0.0; //m_corrTerm * std::sin(iDynTree::deg2rad(yawFootAngle));
-    // corrTerm(0) = 0;
-    // corrTerm(1) = 0;
+    corrTerm(0) = -m_corrTerm; 
+    corrTerm(1) = 0.0;
     corrTerm(2) = 0.0;
 
     // evaluate the 3D-DCM
@@ -392,6 +395,14 @@ void WalkingFK::evaluateDCM()
     else
         iDynTree::toEigen(dcm3D) = iDynTree::toEigen(m_comPosition) +
             (iDynTree::toEigen(m_comVelocity) / m_omega) + iDynTree::toEigen(corrTerm);
+
+    std::cout<<"FK Walking --------------------------------------- : "<< std::endl;
+    std::cout<<"CoM Position : "<< iDynTree::toEigen(m_comPositionFiltered) << std::endl;
+    std::cout<<"CoM Velocity : "<< iDynTree::toEigen(m_comVelocityFiltered) << std::endl;
+    std::cout<<"Omega : "<< m_omega << std::endl;
+    std::cout<<"corrTerm : "<< iDynTree::toEigen(corrTerm) << std::endl;
+    std::cout<<"-----------------------------------------------------------"<<std::endl;
+
 
     // take only the 2D projection
     m_dcm(0) = dcm3D(0);

@@ -194,6 +194,10 @@ bool WalkingZMPController::reset(const iDynTree::Vector2& initialValue)
         return false;
     }
 
+    std::cout<< "CoMZMP Controller INITILIZATION ------------------" << std::endl;
+    std::cout<< "CoM Position : " << iDynTree::toEigen(initialValue) << std::endl;
+    std::cout<< "--------------------------------------------------" << std::endl;
+
     yarp::sig::Vector buffer(2);
     iDynTree::toYarp(initialValue, buffer);
 

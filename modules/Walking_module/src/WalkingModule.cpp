@@ -940,8 +940,10 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     desiredCoMPosition(1) = m_DCMPositionDesired.front()(1);
     desiredCoMPosition(2) = m_comHeightTrajectory.front();
 
+
+    std::cout<<"PREPARE-ROBOT"<< std::endl;
     std::cout<<"inclPlaneAngle : "<<m_inclPlaneAngle<< std::endl;
-    std::cout<<"corrTerm : "<<(m_comHeightTrajectory.front()*(std::sin(m_inclPlaneAngle)))<<std::endl;
+    std::cout<<"corrTerm : "<<(m_comHeight*(std::sin(iDynTree::deg2rad(m_inclPlaneAngle))))<<std::endl;
     std::cout<<"desiredCoMPosition : "<<desiredCoMPosition(0)<< ' ' << desiredCoMPosition(1)<< ' ' << desiredCoMPosition(2)<< std::endl;
 
     if(m_IKSolver->usingAdditionalRotationTarget())
