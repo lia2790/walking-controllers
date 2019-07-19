@@ -403,7 +403,6 @@ void WalkingFK::evaluateDCM()
     std::cout<<"corrTerm : "<< iDynTree::toEigen(corrTerm) << std::endl;
     std::cout<<"-----------------------------------------------------------"<<std::endl;
 
-
     // take only the 2D projection
     m_dcm(0) = dcm3D(0);
     m_dcm(1) = dcm3D(1);

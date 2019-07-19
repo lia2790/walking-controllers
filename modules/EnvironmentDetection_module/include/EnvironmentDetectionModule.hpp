@@ -21,23 +21,13 @@ class EnvironmentDetectionModule : public yarp::os::RFModule
 {
 private:
     double m_dT; /**< RFModule period. */
+    double m_inclined_plane_angle;
 
-    yarp::dev::PolyDriver m_environmentDetector; /**< Environment Detector polydriver. */
+    yarp::dev::PolyDriver m_environmentDetector;
 
     yarp::os::RpcClient m_rpcClientPort; /**< RPC port. */
     std::string m_rpcServerPortName; /**< Name of the walking-module RPC port. */
-    std::string m_rpcClientPortName; /**< Name of the joypad-module RPC port */
-
-    yarp::os::BufferedPort<yarp::sig::Vector> m_robotGoalPort; /**< Port used to specify the desired goal position. */
-    std::string m_robotGoalOutputPortName; /**< Name of the robotGoal port (opened by the joypad module) */
-    std::string m_robotGoalInputPortName; /**< Name of the robotGoal port (opened by the walking module) */
-
-    /**
-     * Standard deadzone function.
-     * @param input input of the deadzone
-     * @return 0 if the abs(input) < abs(deadzone) otherwise return the input scaled.
-     */
-    double deadzone(const double &input);
+    std::string m_rpcClientPortName; /**< Name of the environmentDetector-module RPC port */
 
 public:
 
