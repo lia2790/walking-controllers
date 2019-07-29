@@ -45,7 +45,7 @@ class WalkingIK
     std::string m_lFootFrame;
     std::string m_rFootFrame;
     std::string m_additionalFrame;
-    double m_inclPlaneAngle;
+    // double m_inclPlaneAngle;
 
     iDynTree::Transform m_baseTransform;
     iDynTree::Rotation  m_additionalRotation;

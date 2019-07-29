@@ -53,6 +53,9 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
     bool okLeftWrench = false;
     bool okRightWrench = false;
 
+    bool okLeftFootImu = false;
+    bool okRightFootImu = false;
+
     unsigned int attempt = 0;
     do
     {
@@ -84,7 +87,31 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
             }
         }
 
-        if(okPosition && okVelocity && okLeftWrench && okRightWrench)
+        // read Left foot imu port data
+        if(!okLeftFootImu)
+        {
+            yarp::sig::Vector *leftFootImuRaw = NULL;
+            leftFootImuRaw = m_leftFootImuPort.read(false);
+            if(leftFootImuRaw != NULL)
+            {
+                m_leftFootImuInput = *leftFootImuRaw;
+                okLeftFootImu = true;
+            }
+        }
+
+        // read Right foot imu port data
+        if(!okRightFootImu)
+        {
+            yarp::sig::Vector *rightFootImuRaw = NULL;
+            rightFootImuRaw = m_rightFootImuPort.read(false);
+            if(rightFootImuRaw != NULL)
+            {
+                m_rightFootImuInput = *rightFootImuRaw;
+                okRightFootImu = true;
+            }
+        }
+
+        if(okPosition && okVelocity && okLeftWrench && okRightWrench && okLeftFootImu && okRightFootImu )
         {
             for(unsigned j = 0 ; j < m_actuatedDOFs; j++)
             {
@@ -100,6 +127,17 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
             if(!iDynTree::toiDynTree(m_rightWrenchInput, m_rightWrench))
             {
                 yError() << "[RobotHelper::getFeedbacksRaw] Unable to convert right foot wrench.";
+                return false;
+            }
+
+            if(!iDynTree::toiDynTree(m_leftFootImuInput, m_leftFootImuData))
+            {
+                yError() << "[RobotHelper::getFeedbacksRaw] Unable to convert left foot IMU.";
+                return false;
+            }
+            if(!iDynTree::toiDynTree(m_rightFootImuInput, m_rightFootImuData))
+            {
+                yError() << "[RobotHelper::getFeedbacksRaw] Unable to convert right foot IMU.";
                 return false;
             }
             return true;
@@ -120,6 +158,12 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
 
     if(!okRightWrench)
         yError() << "\t - Right wrench";
+
+    if(!okLeftFootImu)
+        yError() << "\t - Left Foot IMU";
+
+    if(!okRightFootImu)
+        yError() << "\t - Right Foot IMU";
 
     return false;
 }
@@ -392,6 +436,70 @@ bool RobotHelper::configureForceTorqueSensors(const yarp::os::Searchable& config
         m_rightWrenchFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency,
                                                                                     sampligTime);
     }
+    return true;
+}
+
+bool RobotHelper::configureImuSensors(const yarp::os::Searchable& config)
+{
+    std::string portInput, portOutput;
+
+    // check if the config file is empty
+    if(config.isNull())
+    {
+        yError() << "[RobotHelper::configureImuSensors] Empty configuration for the IMU sensors.";
+        return false;
+    }
+
+    std::string name;
+    if(!YarpHelper::getStringFromSearchable(config, "name", name))
+    {
+        yError() << "[RobotHelper::configureImuSensors] Unable to get the string from searchable.";
+        return false;
+    }
+
+    // open and connect left foot wrench
+    if(!YarpHelper::getStringFromSearchable(config, "leftFootImuInputPort_name", portInput))
+    {
+      yError() << "[RobotHelper::configureImuSensors] Unable to get "
+                  "the string from searchable.";
+      return false;
+    }
+    if(!YarpHelper::getStringFromSearchable(config, "leftFootImuOutputPort_name", portOutput))
+    {
+        yError() << "[RobotHelper::configureImuSensors] Unable to get the string from searchable.";
+        return false;
+    }
+    // open port
+    m_leftFootImuPort.open("/" + name + portInput);
+    // connect port
+    if(!yarp::os::Network::connect(portOutput, "/" + name + portInput))
+    {
+        yError() << "[RobotHelper::configureImuSensors] Unable to connect to port "
+                 << portOutput << " to " << "/" + name + portInput;
+        return false;
+    }
+
+    // open and connect right foot wrench
+    if(!YarpHelper::getStringFromSearchable(config, "rightFootImuInputPort_name", portInput))
+    {
+        yError() << "[RobotHelper::configureImuSensors] Unable to get the string from searchable.";
+        return false;
+    }
+    if(!YarpHelper::getStringFromSearchable(config, "rightFootImuOutputPort_name", portOutput))
+    {
+        yError() << "[RobotHelper::configureImuSensors] Unable to get the string from searchable.";
+        return false;
+    }
+    // open port
+    m_rightFootImuPort.open("/" + name + portInput);
+    // connect port
+    if(!yarp::os::Network::connect(portOutput, "/" + name + portInput))
+    {
+        yError() << "[RobotHelper::configureImuSensors] Unable to connect to port "
+                 << portOutput << " to " << "/" + name + portInput;
+        return false;
+    }
+
     return true;
 }
 
@@ -695,6 +803,8 @@ bool RobotHelper::close()
 {
     m_rightWrenchPort.close();
     m_leftWrenchPort.close();
+    m_rightFootImuPort.close();
+    m_leftFootImuPort.close();
     switchToControlMode(VOCAB_CM_POSITION);
     m_controlMode = VOCAB_CM_POSITION;
     if(!m_robotDevice.close())
@@ -723,6 +833,16 @@ const iDynTree::Wrench& RobotHelper::getLeftWrench() const
 const iDynTree::Wrench& RobotHelper::getRightWrench() const
 {
     return m_rightWrench;
+}
+
+const iDynTree::VectorDynSize& RobotHelper::getLeftFootImuData() const
+{
+    return m_leftFootImuData;
+}
+
+const iDynTree::VectorDynSize& RobotHelper::getRightFootImuData() const
+{
+    return m_rightFootImuData;
 }
 
 const iDynTree::VectorDynSize& RobotHelper::getVelocityLimits() const

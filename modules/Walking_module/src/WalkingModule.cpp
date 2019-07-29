@@ -118,6 +118,44 @@ bool WalkingModule::setRobotModel(const yarp::os::Searchable& rf)
     return true;
 }
 
+bool WalkingModule::initializeEstimatorFilter(const yarp::os::Searchable& rf)
+{
+    m_qEKF = std::make_unique<iDynTree::AttitudeQuaternionEKF>();
+    iDynTree::AttitudeQuaternionEKFParameters params;
+
+    params.time_step_in_seconds = rf.check("time_step_in_seconds", yarp::os::Value(0.010)).asDouble(); // 0.010
+    params.accelerometer_noise_variance = rf.check("accelerometer_noise_variance", yarp::os::Value(0.03)).asDouble(); // 0.03
+    params.magnetometer_noise_variance = rf.check("magnetometer_noise_variance", yarp::os::Value(0.0)).asDouble(); // 0.0
+    params.gyroscope_noise_variance = rf.check("gyroscope_noise_variance", yarp::os::Value(0.5)).asDouble(); // 0.5
+    params.gyro_bias_noise_variance = rf.check("gyro_bias_variance", yarp::os::Value(10e-11)).asDouble(); // 10e-11
+    params.initial_orientation_error_variance = rf.check("initial_orientation_error_variance", yarp::os::Value(10e-6)).asDouble(); // 10e-6
+    params.initial_ang_vel_error_variance = rf.check("initial_ang_vel_error_variance", yarp::os::Value(10e-1)).asDouble(); // 10e-1
+    params.initial_gyro_bias_error_variance = rf.check("initial_gyro_bias_error_variance", yarp::os::Value(10e-11)).asDouble(); // 10e-11
+    params.bias_correlation_time_factor = rf.check("bias_correlation_time_factor", yarp::os::Value(10e-3)).asDouble(); // 10e-3
+    params.use_magnetometer_measurements = rf.check("use_magnetometer_measurements", yarp::os::Value(false)).asDouble(); // false
+
+    size_t x_size = m_qEKF->getInternalStateSize();
+
+    // calling setParams resets and intializes the filter
+    m_qEKF->setParameters(params);
+    if(!m_qEKF->initializeFilter())
+        return false;
+    
+    iDynTree::VectorDynSize x0;
+    x0.resize(10);
+    x0.zero();
+    x0(0) = 1.0;
+    x0(1) = 0.0;
+    x0(2) = 0.0;
+    x0(3) = 0.0;
+
+    iDynTree::Span<double> x0_span(x0.data(), x0.size());
+    if(!m_qEKF->setInternalState(x0_span))
+        return false;
+
+    return true;
+}
+
 bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 {
     // module name (used as prefix for opened ports)
@@ -130,6 +168,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
     m_inclPlaneAngle = generalOptions.check("inclined_plane_angle", yarp::os::Value(0.0)).asDouble();
     m_comHeight = generalOptions.check("com_height", yarp::os::Value(0.49)).asDouble();
+    m_comHeightDelta = generalOptions.check("com_height_delta", yarp::os::Value(0.01)).asDouble();
     std::string name;
     if(!YarpHelper::getStringFromSearchable(generalOptions, "name", name))
     {
@@ -152,6 +191,19 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     if(!m_robotControlHelper->configureForceTorqueSensors(forceTorqueSensorsOptions))
     {
         yError() << "[WalkingModule::configure] Unable to configure the Force Torque sensors.";
+        return false;
+    }
+
+    yarp::os::Bottle& imuSensorsOptions = rf.findGroup("IMU_SENSORS");
+    imuSensorsOptions.append(generalOptions);
+    if(!m_robotControlHelper->configureImuSensors(imuSensorsOptions))
+    {
+        yError() << "[WalkingModule::configure] Unable to configure the IMU sensors.";
+        return false;
+    }
+    if(!initializeEstimatorFilter(rf))
+    {
+        yError() << "[WalkingModule::configure] Unable to initialize the Estimator Filter.";
         return false;
     }
 
@@ -698,7 +750,7 @@ bool WalkingModule::updateModule()
                                     std::cos(yawLeft) + std::cos(yawRight));
         iDynTree::Rotation yawRotation, modifiedInertial;
 
-        yawRotation = iDynTree::Rotation::RotZ(meanYaw);
+        yawRotation = iDynTree::Rotation::RPY(0,(iDynTree::deg2rad(m_inclPlaneAngle)),meanYaw);
         yawRotation = yawRotation.inverse();
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
 
@@ -871,6 +923,7 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
 
 bool WalkingModule::prepareRobot(bool onTheFly)
 {
+    std::cout<<"PREPARE-ROBOT"<< std::endl;
     if(m_robotState != WalkingFSM::Configured && m_robotState != WalkingFSM::Stopped)
     {
         yError() << "[WalkingModule::prepareRobot] The robot can be prepared only at the "
@@ -886,6 +939,33 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         yError() << "[WalkingModule::prepareRobot] Unable to get the feedback.";
         return false;
     }
+   /*
+    if(!detectInclinedPlaneAngle(m_robotControlHelper->getLeftFootImuData()))
+    {
+        yError() << "[WalkingModule::prepareRobot] Unable to get data from Left Right Foot Imu sensors.";
+        return false;
+    }
+    if(!m_trajectoryGenerator->setTrajectories(m_comHeight, m_comHeightDelta, m_inclPlaneAngle))
+    {
+        yError() << "[WalkingModule::prepareRobot] Unable to correctly set Trajectories for inclined plane.";
+        return false;
+    }
+    if(!m_stableDCMModel->setStableDCMModel(m_comHeight, m_inclPlaneAngle))
+    {
+        yError() << "[WalkingModule::prepareRobot] Unable to correctly set stable DCM Model for inclined plane.";
+        return false;
+    }
+    if(!m_walkingDCMReactiveController->setWalkingDCMReactiveController(m_comHeight, m_inclPlaneAngle))
+    {
+        yError() << "[WalkingModule::prepareRobot] Unable to correctly set DCM Reactive Controller for inclined plane.";
+        return false;
+    }
+    if(!m_FKSolver->setForwardKinematics(m_comHeight, m_inclPlaneAngle))
+    {
+        yError() << "[WalkingModule::prepareRobot] Unable to correctly set the Forward Kinematics for inclined plane.";
+        return false;
+    }
+    */
 
     if(onTheFly)
     {
@@ -940,8 +1020,6 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     desiredCoMPosition(1) = m_DCMPositionDesired.front()(1);
     desiredCoMPosition(2) = m_comHeightTrajectory.front();
 
-
-    std::cout<<"PREPARE-ROBOT"<< std::endl;
     std::cout<<"inclPlaneAngle : "<<m_inclPlaneAngle<< std::endl;
     std::cout<<"corrTerm : "<<(m_comHeight*(std::sin(iDynTree::deg2rad(m_inclPlaneAngle))))<<std::endl;
     std::cout<<"desiredCoMPosition : "<<desiredCoMPosition(0)<< ' ' << desiredCoMPosition(1)<< ' ' << desiredCoMPosition(2)<< std::endl;
@@ -957,8 +1035,8 @@ bool WalkingModule::prepareRobot(bool onTheFly)
                                     std::cos(yawLeft) + std::cos(yawRight));
         iDynTree::Rotation yawRotation, modifiedInertial;
 
-        // it is important to notice that the inertial frames rotate with the robot
-        yawRotation = iDynTree::Rotation::RotZ(meanYaw);
+        // it is important to notice that the inertial frames ro ate with the robot
+        yawRotation = iDynTree::Rotation::RPY(0,(iDynTree::deg2rad(m_inclPlaneAngle)),meanYaw);
 
         yawRotation = yawRotation.inverse();
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
@@ -977,7 +1055,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         return false;
     }
 
-    std::cout<<"m_qDesired : "<< iDynTree::toEigen(m_qDesired) << std::endl;
+    // std::cout<<"m_qDesired : "<< iDynTree::toEigen(m_qDesired) << std::endl;
 
     if(!m_robotControlHelper->setPositionReferences(m_qDesired, 5.0))
     {
@@ -1151,6 +1229,29 @@ bool WalkingModule::updateFKSolver()
     }
 
     return true;
+}
+
+bool WalkingModule::detectInclinedPlaneAngle(const iDynTree::VectorDynSize& FootImuData)
+{
+    iDynTree::LinAcceleration linAcc; linAcc.zero();
+    iDynTree::GyroscopeMeasurements gyro; gyro.zero();
+    iDynTree::MagnetometerMeasurements mag; mag.zero();
+
+    linAcc(0) = FootImuData(3);
+    linAcc(1) = FootImuData(4);
+    linAcc(2) = FootImuData(5);
+    gyro(0) = FootImuData(6);
+    gyro(1) = FootImuData(7);
+    gyro(2) = FootImuData(8);
+    mag(0) = FootImuData(9);
+    mag(1) = FootImuData(10);
+    mag(2) = FootImuData(11);
+
+    m_qEKF->propagateStates();
+    m_qEKF->updateFilterWithMeasurements(linAcc, gyro, mag);
+    iDynTree::RPY rpy;
+    m_qEKF->getOrientationEstimateAsRPY(rpy);
+    m_inclPlaneAngle = rpy(2);
 }
 
 bool WalkingModule::startWalking()

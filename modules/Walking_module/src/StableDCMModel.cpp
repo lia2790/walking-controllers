@@ -71,6 +71,14 @@ void StableDCMModel::setInput(const iDynTree::Vector2& input)
     m_dcmPosition = input;
 }
 
+bool StableDCMModel::setStableDCMModel(double comHeight, double inclPlaneAngle)
+{
+    m_omega = sqrt((9.8*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle))));
+    m_corrTerm = (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle)))*std::tan(iDynTree::deg2rad(inclPlaneAngle));
+
+    return true;
+}
+
 bool StableDCMModel::integrateModel()
 {
     if(m_comIntegrator == nullptr)

@@ -80,6 +80,13 @@ class RobotHelper
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_rightWrenchFilter; /**< Right wrench low pass filter.*/
     bool m_useWrenchFilter; /**< True if the wrench filter is used. */
 
+    yarp::os::BufferedPort<yarp::sig::Vector> m_leftFootImuPort; /**< Left foot Imu port. */
+    yarp::os::BufferedPort<yarp::sig::Vector> m_rightFootImuPort; /**< Right foot Imu port. */
+    yarp::sig::Vector m_leftFootImuInput; /**< YARP vector that contains left foot Imu Data. */
+    yarp::sig::Vector m_rightFootImuInput; /**< YARP vector that contains right foot Imu Data. */
+    iDynTree::VectorDynSize m_leftFootImuData; /**< iDynTree vector that contains left foot Imu Data. */
+    iDynTree::VectorDynSize m_rightFootImuData; /**< iDynTree vector that contains right foot Imu Data. */
+
     double m_startingPositionControlTime;
     bool m_positionMoveSkipped;
 
@@ -118,6 +125,14 @@ public:
      * @return true in case of success and false otherwise.
      */
     bool configureForceTorqueSensors(const yarp::os::Searchable& config);
+
+    /**
+     * Configure the IMU sensors. The IMU ports are only opened please use yarpamanger
+     * to connect them.
+     * @param config is the reference to a resource finder object.
+     * @return true in case of success and false otherwise.
+     */
+    bool configureImuSensors(const yarp::os::Searchable& config);
 
     bool configurePIDHandler(const yarp::os::Bottle& config);
 
@@ -199,6 +214,9 @@ public:
 
     const iDynTree::Wrench& getLeftWrench() const;
     const iDynTree::Wrench& getRightWrench() const;
+
+    const iDynTree::VectorDynSize& getLeftFootImuData() const;
+    const iDynTree::VectorDynSize& getRightFootImuData() const;
 
     const std::vector<std::string>& getAxesList() const;
 

@@ -45,11 +45,20 @@ public:
      * @return true on success, false otherwise.
      */
     bool initialize(const yarp::os::Searchable& config);
+
     /**
      * Set the controlled input.
      * @param controlledInput of the 3D-LIPM (i.e. Position of the ZMP).
      */
     void setInput(const iDynTree::Vector2& input);
+
+    /**
+     * Set the omega value and the correction term.
+     * @param comHeight is the height if the com based on lipm. 
+     * @param inclPlaneAngle is the angle of the inclined plane.
+     * @return true on success, false otherwise.
+     */
+    bool setStableDCMModel(double comHeight, double inclPlaneAngle);
 
     /**
      * Integrate the model.

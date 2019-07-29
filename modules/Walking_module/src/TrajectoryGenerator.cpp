@@ -92,12 +92,12 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double apexTime = config.check("footApexTime", yarp::os::Value(0.5)).asDouble();
     double comHeight = config.check("com_height", yarp::os::Value(0.49)).asDouble();
     double comHeightDelta = config.check("comHeightDelta", yarp::os::Value(0.01)).asDouble();
+    double inclPlaneAngle = config.check("inclPlaneAngle",yarp::os::Value(0.0)).asDouble();
     double nominalDuration = config.check("nominalDuration", yarp::os::Value(4.0)).asDouble();
     double lastStepSwitchTime = config.check("lastStepSwitchTime", yarp::os::Value(0.5)).asDouble();
     double switchOverSwingRatio = config.check("switchOverSwingRatio",
                                                yarp::os::Value(0.4)).asDouble();
     double mergePointRatio = config.check("mergePointRatio", yarp::os::Value(0.5)).asDouble();
-    double inclPlaneAngle = config.check("inclPlaneAngle",yarp::os::Value(0.0)).asDouble();
 
     m_nominalWidth = config.check("nominalWidth", yarp::os::Value(0.04)).asDouble();
 
@@ -173,6 +173,16 @@ void TrajectoryGenerator::addTerminalStep(bool terminalStep)
     m_trajectoryGenerator.unicyclePlanner()->addTerminalStep(terminalStep);
 }
 
+bool TrajectoryGenerator::setTrajectories(double comHeight, double comHeightDelta, double inclPlaneAngle)
+{
+    if(!m_heightGenerator->setCoMHeightSettings(comHeight*(std::cos(iDynTree::deg2rad(inclPlaneAngle))), comHeightDelta))
+        return false;
+
+    m_dcmGenerator->setOmega(sqrt(9.81*(std::cos(iDynTree::deg2rad(inclPlaneAngle)))/ (comHeight*(std::cos(iDynTree::deg2rad(inclPlaneAngle))))));
+
+    return true;
+}
+
 void TrajectoryGenerator::computeThread()
 {
     while (true)
@@ -229,8 +239,6 @@ void TrajectoryGenerator::computeThread()
         unicyclePlanner->clearDesiredTrajectory();
 
         // add new point
-        // before apply rotation due to inclined plane
-        // desiredPoint(0) = desiredPoint(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
         if(!unicyclePlanner->addDesiredTrajectoryPoint(endTime, desiredPoint))
         {
             // something goes wrong
@@ -303,8 +311,6 @@ bool TrajectoryGenerator::generateFirstTrajectories()
     m_desiredPoint(1) = m_referencePointDistance(1);
 
     // add the initial point
-    // before apply rotation due to inclined plane
-    // m_referencePointDistance(0) = m_referencePointDistance(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
     if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_referencePointDistance))
     {
         yError() << "[generateFirstTrajectories] Error while setting the first reference.";
@@ -312,8 +318,6 @@ bool TrajectoryGenerator::generateFirstTrajectories()
     }
 
     // add the final point
-    // before apply rotation on inclined plane
-    // m_desiredPoint(0) = m_desiredPoint(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
     if(!unicyclePlanner->addDesiredTrajectoryPoint(endTime, m_desiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the new reference.";
@@ -361,8 +365,6 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     m_desiredPoint(1) = m_referencePointDistance(1);
 
     // add the initial point
-    // before apply rotation due to inclined plane
-    // m_referencePointDistance(0) = m_referencePointDistance(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
     if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_referencePointDistance))
     {
         yError() << "[generateFirstTrajectories] Error while setting the first reference.";
@@ -370,8 +372,6 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     }
 
     // add the final point
-    // before apply rotation on inclined plane
-    // m_desiredPoint(0) = m_desiredPoint(0)*std::cos(iDynTree::deg2rad(inclPlaneAngle));
     if(!unicyclePlanner->addDesiredTrajectoryPoint(endTime, m_desiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the new reference.";

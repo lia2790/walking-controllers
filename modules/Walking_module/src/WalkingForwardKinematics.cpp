@@ -76,6 +76,13 @@ bool WalkingFK::setBaseFrames(const std::string& lFootFrame, const std::string& 
 bool WalkingFK::initialize(const yarp::os::Searchable& config,
                            const iDynTree::Model& model)
 {
+    double inclPlaneAngle;
+    if(!YarpHelper::getNumberFromSearchable(config, "inclined_plane_angle", inclPlaneAngle))
+    {
+        yError() << "[WalkingFK::initialize] Unable to get a inclined plane angle from a searchable.";
+        return false;
+    }
+
     // check if the config is empty
     if(!setRobotModel(model))
     {
@@ -186,13 +193,6 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
     double gravityAcceleration = config.check("gravity_acceleration", yarp::os::Value(9.81)).asDouble();
-
-    double inclPlaneAngle;
-    if(!YarpHelper::getNumberFromSearchable(config, "inclined_plane_angle", inclPlaneAngle))
-    {
-        yError() << "[WalkingFK::initialize] Unable to get a inclined plane angle from a searchable.";
-        return false;
-    }
 
     // m_omega = sqrt(gravityAcceleration / comHeight);
     m_omega = sqrt((gravityAcceleration*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle))));
@@ -350,6 +350,12 @@ bool WalkingFK::setInternalRobotState(const iDynTree::VectorDynSize& positionFee
     m_dcmEvaluated = false;
 
     return true;
+}
+
+bool WalkingFK::setForwardKinematics(const double comHeight, const double inclPlaneAngle)
+{
+    m_omega = sqrt((9.8*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle))));
+    m_corrTerm = (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle)))*std::tan(iDynTree::deg2rad(inclPlaneAngle));
 }
 
 void WalkingFK::evaluateCoM()

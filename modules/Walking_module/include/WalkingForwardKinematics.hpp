@@ -140,6 +140,14 @@ public:
      */
     bool setInternalRobotState(const iDynTree::VectorDynSize& positionFeedbackInRadians,
                                const iDynTree::VectorDynSize& velocityFeedbackInRadians);
+    
+    /**
+     * Set the omega value and the correction term.
+     * @param comHeight is the com height in according with lipm.
+     * @param inclPlaneAngle is the angle of the inclined plane.
+     * @return true in case of the success, false otherwise.
+     */
+    bool setForwardKinematics(const double comHeight, const double inclPlaneAngle);
 
     /**
      * Get the CoM position.

@@ -75,6 +75,13 @@ void WalkingDCMReactiveController::setReferenceSignal(const iDynTree::Vector2& d
     m_dcmVelocityDesired = dcmVelocityDesired;
 }
 
+bool WalkingDCMReactiveController::setWalkingDCMReactiveController(const double comHeight, const double inclPlaneAngle)
+{
+    m_omega = sqrt((9.8*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle))));
+
+    return true;
+}
+
 bool WalkingDCMReactiveController::evaluateControl()
 {
     if(!m_isInitialized)

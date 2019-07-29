@@ -212,6 +212,14 @@ public:
     bool getMergePoints(std::vector<size_t>& mergePoints);
 
     /**
+     * Set the comHeight trajectory and set the omega value inside the dcmGenerator.
+     * @param comHeigh is the height of the com for lipm.
+     * @param comHeightDelta is a tolerance on the com height.
+     * @param inclPlaneAngle is the angle of an inclined plane.
+     */
+    bool setTrajectories(double comHeight, double comHeightDelta, double inclPlaneAngle);
+
+    /**
      * Reset the planner
      */
     void reset();

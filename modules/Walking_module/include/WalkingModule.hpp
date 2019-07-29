@@ -22,6 +22,8 @@
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
 #include <iDynTree/ModelIO/ModelLoader.h>
+#include <iDynTree/Estimation/AttitudeQuaternionEKF.h>
+#include <iDynTree/Estimation/AttitudeMahonyFilter.h>
 
 #include <RobotHelper.hpp>
 #include <TrajectoryGenerator.hpp>
@@ -75,6 +77,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::unique_ptr<RetargetingClient> m_retargetingClient; /**< Pointer to the stable DCM dynamics. */
     std::unique_ptr<LoggerClient> m_walkingLogger; /**< Pointer to the Walking Logger object. */
     std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
+    std::unique_ptr<iDynTree::AttitudeQuaternionEKF> m_qEKF; /**< Pointer to the Attitude quaternion EKF object. */
 
     double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
     double m_desiredJointsWeight; /**< Desired joint weight matrix. */
@@ -98,15 +101,15 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
                                             In general a main frame of a foot is the fix frame only during the
                                             stance and the switch out phases. */
 
-
     iDynTree::ModelLoader m_loader; /**< Model loader class. */
 
     iDynTree::VectorDynSize m_qDesired; /**< Vector containing the results of the IK algorithm [rad]. */
     iDynTree::VectorDynSize m_dqDesired; /**< Vector containing the results of the IK algorithm [rad]. */
 
     iDynTree::Rotation m_inertial_R_worldFrame; /**< Rotation between the inertial and the world frame. */
-    double m_inclPlaneAngle;
-    double m_comHeight;
+    double m_inclPlaneAngle; /**< angle of the inclined plane. */
+    double m_comHeight; /**< height of the centre of the mass. */
+    double m_comHeightDelta; /**< com height tolerance. */
 
     yarp::os::Port m_rpcPort; /**< Remote Procedure Call port. */
     yarp::os::BufferedPort<yarp::sig::Vector> m_desiredUnyciclePositionPort; /**< Desired robot position port. */
@@ -127,6 +130,13 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
      * @return true in case of success and false otherwise.
      */
     bool setRobotModel(const yarp::os::Searchable& rf);
+
+    /**
+     * Get the estimatir filter parameters from the resource finder and set it.
+     * @param rf is the reference to a resource finder object.
+     * @return true in case of success and false otherwise.
+     */
+    bool initializeEstimatorFilter(const yarp::os::Searchable& rf);
 
     /**
      * Propagate time.
@@ -167,6 +177,13 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
      * @return true in case of success and false otherwise.
      */
     bool evaluateZMP(iDynTree::Vector2& zmp);
+
+    /**
+     * Detect the angle of the plane and update its value.
+     * @param FootImuData imu sensor data comes from one foot
+     * @return true in case of success and false otherwise.
+     */
+    bool detectInclinedPlaneAngle(const iDynTree::VectorDynSize& FootImuData);
 
     /**
      * Generate the first trajectory.

@@ -51,11 +51,19 @@ public:
 
     /**
      * Set the desired reference signals.
-     * @param dcmPositionDesired is the desired position of the DCM;
+     * @param dcmPositionDesired is the desired position of the DCM.
      * @param dcmVelocityDesired is the desired velocity of the DCM.
      */
     void setReferenceSignal(const iDynTree::Vector2& dcmPositionDesired,
                             const iDynTree::Vector2& dcmVelocityDesired);
+
+    /**
+     * Set the omega value.
+     * @param comHeight is the com height.
+     * @param inclPlaneAngle is the angle of the inclined plane.
+     * @return true in the case of success, false otherwise.
+     */
+    bool setWalkingDCMReactiveController(const double comHeight, const double inclPlaneAngle);
 
     /**
      * Evaluate the control output.
