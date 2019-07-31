@@ -41,10 +41,10 @@ if ~isempty(varargin)
         % legend
         new_legend = [old_legend(1:end-1), varargin{:}];
     end
-    %h = legend(varargin, 'Location', 'northoutside', 'Orientation','horizontal');
-    h = legend(varargin, 'Location', 'best');
+    h = legend(varargin, 'Location', 'northoutside', 'Orientation','horizontal');
+    %h = legend(varargin, 'Location', 'best');
     set(h,'Interpreter','latex')
-    set(h,'FontSize', 10);
+    set(h,'FontSize', 15);
 end
 
 % change linewidth

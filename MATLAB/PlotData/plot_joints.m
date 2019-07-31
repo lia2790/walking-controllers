@@ -10,6 +10,8 @@ parts.right_leg = {'r_hip_pitch', 'r_hip_roll', 'r_hip_yaw', 'r_knee', 'r_ankle_
 type = 'trq';
 des = 1;
 
+close all
+
 
 for part = fieldnames(parts)'
     figure;
@@ -48,13 +50,16 @@ for part = fieldnames(parts)'
         jointValue = joint{:};
         if(des)
             plot(time, eval([jointValue '_des_' type]), time, eval([jointValue '_' type]))
-            label = [label, [jointValue '_des_' type], [jointValue '_' type]];            
+            hold on;
+            label = [label, ['desired'], ['measured']]; 
+            plotLines;
         else
             plot(time, eval([jointValue '_' type]))
             label = [label, [jointValue '_' type]];
         end
+        str = regexprep(jointValue, '_', ' ');
    
-        plot_aesthetic([type ' ' part{:}], 'time (s)' , '', '', label{:});
+        plot_aesthetic([str], 'time (s)' , 'torque (Nm)', '', label{:}, 'Init SS', 'Init DS');
         
         i = i + 1;
     end

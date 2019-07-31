@@ -4,7 +4,7 @@ prefix = 'dcm';
 
 
 subplot(1,3,1)
-plot(time, eval([prefix '_des_x']), time, eval([prefix '_x']))
+plot(time, eval([prefix '_des_x']), time, eval([prefix '_x']), time, ds)
 plot_aesthetic('Position - X','Time (s)', 'Positon (m)', ' ', 'Desired' , 'Measured');
 
 subplot(1,3,2)
