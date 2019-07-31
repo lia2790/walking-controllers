@@ -45,13 +45,6 @@ bool WalkingTaskBasedTorqueController::initialize(const yarp::os::Searchable& co
         return false;
     }
 
-    temp = comConfig.find("kd_ss");
-    if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kdSingleSupport))
-    {
-        yError() << "[Initialize] Unable to find the kd stance";
-        return false;
-    }
-
     temp = comConfig.find("kp_ds");
     if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kpDoubleSupport))
     {
@@ -59,11 +52,34 @@ bool WalkingTaskBasedTorqueController::initialize(const yarp::os::Searchable& co
         return false;
     }
 
-    temp = comConfig.find("kd_ds");
-    if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kdDoubleSupport))
+    bool useDefaultKd = comConfig.check("useDefaultKd", yarp::os::Value("False")).asBool();
+    if(!useDefaultKd)
     {
-        yError() << "[Initialize] Unable to find the kd stance";
-        return false;
+        temp = comConfig.find("kd_ss");
+        if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kdSingleSupport))
+        {
+            yError() << "[Initialize] Unable to find the kd stance";
+            return false;
+        }
+
+
+        temp = comConfig.find("kd_ds");
+        if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kdDoubleSupport))
+        {
+            yError() << "[Initialize] Unable to find the kd stance";
+            return false;
+        }
+    }
+    else
+    {
+        double scaling;
+        if(!YarpHelper::getNumberFromSearchable(comConfig, "scaling", scaling))
+        {
+            yError() << "[initialize] Unable to get the scaling factor.";
+            return false;
+        }
+        iDynTree::toEigen(m_kdDoubleSupport) = 2 / scaling * iDynTree::toEigen(m_kpDoubleSupport).array().sqrt();
+        iDynTree::toEigen(m_kdSingleSupport) = 2 / scaling * iDynTree::toEigen(m_kpSingleSupport).array().sqrt();
     }
 
     double samplingTime = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
