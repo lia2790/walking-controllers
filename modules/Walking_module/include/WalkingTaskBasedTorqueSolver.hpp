@@ -339,7 +339,7 @@ public:
     bool setDesiredFeetTrajectory(const iDynTree::Transform& stanceFootToWorldTransform,
                                   const iDynTree::Transform& swingFootToWorldTransform,
                                   const iDynTree::Twist& swingFootTwist,
-                                  const iDynTree::Vector6& swingFootAcceleration);
+                                  const iDynTree::SpatialAcc& swingFootAcceleration);
 
     bool setFeetState(const iDynTree::Transform& stanceFootToWorldTransform,
                       const iDynTree::Twist& stanceFootTwist,

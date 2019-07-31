@@ -562,8 +562,8 @@ bool TrajectoryGenerator::getFeetTwist(std::vector<iDynTree::Twist>& lFootTwist,
     return true;
 }
 
-bool TrajectoryGenerator::getFeetAcceleration(std::vector<iDynTree::Vector6>& lFootAccleration,
-                                              std::vector<iDynTree::Vector6>& rFootAcceleration)
+bool TrajectoryGenerator::getFeetAcceleration(std::vector<iDynTree::SpatialAcc>& lFootAccleration,
+                                              std::vector<iDynTree::SpatialAcc>& rFootAcceleration)
 {
     if(!isTrajectoryComputed())
     {

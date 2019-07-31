@@ -80,8 +80,8 @@ public:
                                   const iDynTree::Transform& desiredRightFootToWorldTransform,
                                   const iDynTree::Twist& leftFootTwist,
                                   const iDynTree::Twist& rightFootTwist,
-                                  const iDynTree::Vector6& leftFootAcceleration,
-                                  const iDynTree::Vector6& rightFootAcceleration);
+                                  const iDynTree::SpatialAcc& leftFootAcceleration,
+                                  const iDynTree::SpatialAcc& rightFootAcceleration);
 
     bool setFeetState(const iDynTree::Transform& leftFootToWorldTransform,
                       const iDynTree::Twist& leftFootTwist,

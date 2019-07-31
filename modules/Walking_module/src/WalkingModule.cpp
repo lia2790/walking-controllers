@@ -629,11 +629,11 @@ bool WalkingModule::solveTaskBased(const iDynTree::Rotation& desiredNeckOrientat
 
     iDynTree::Transform leftFootTransform =  m_leftTrajectory.front();
     iDynTree::Twist leftFootTwist = m_leftTwistTrajectory.front();
-    iDynTree::Vector6 leftFootAcceleration = m_leftAccelerationTrajectory.front();
+    iDynTree::SpatialAcc leftFootAcceleration = m_leftAccelerationTrajectory.front();
 
     iDynTree::Transform rightFootTransform =  m_rightTrajectory.front();
     iDynTree::Twist rightFootTwist = m_rightTwistTrajectory.front();
-    iDynTree::Vector6 rightFootAcceleration = m_rightAccelerationTrajectory.front();
+    iDynTree::SpatialAcc rightFootAcceleration = m_rightAccelerationTrajectory.front();
 
     // if(m_waitCondition)
     {
@@ -1690,8 +1690,8 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     std::vector<iDynTree::Transform> rightTrajectory;
     std::vector<iDynTree::Twist> leftTwistTrajectory;
     std::vector<iDynTree::Twist> rightTwistTrajectory;
-    std::vector<iDynTree::Vector6> leftAccelerationTrajectory;
-    std::vector<iDynTree::Vector6> rightAccelerationTrajectory;
+    std::vector<iDynTree::SpatialAcc> leftAccelerationTrajectory;
+    std::vector<iDynTree::SpatialAcc> rightAccelerationTrajectory;
     std::vector<iDynTree::Vector2> DCMPositionDesired;
     std::vector<iDynTree::Vector2> DCMVelocityDesired;
     std::vector<iDynTree::Vector2> ZMPPositionDesired;

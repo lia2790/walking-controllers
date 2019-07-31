@@ -88,8 +88,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::deque<iDynTree::Twist> m_leftTwistTrajectory; /**< Deque containing the twist trajectory of the left foot. */
     std::deque<iDynTree::Twist> m_rightTwistTrajectory; /**< Deque containing the twist trajectory of the right foot. */
 
-    std::deque<iDynTree::Vector6> m_leftAccelerationTrajectory; /**< Deque containing the twist trajectory of the left foot. */
-    std::deque<iDynTree::Vector6> m_rightAccelerationTrajectory; /**< Deque containing the twist trajectory of the right foot. */
+    std::deque<iDynTree::SpatialAcc> m_leftAccelerationTrajectory; /**< Deque containing the twist trajectory of the left foot. */
+    std::deque<iDynTree::SpatialAcc> m_rightAccelerationTrajectory; /**< Deque containing the twist trajectory of the right foot. */
 
     std::deque<iDynTree::Vector2> m_DCMPositionDesired; /**< Deque containing the desired DCM position. */
     std::deque<iDynTree::Vector2> m_DCMVelocityDesired; /**< Deque containing the desired DCM velocity. */

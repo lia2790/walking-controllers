@@ -182,8 +182,8 @@ public:
     bool getFeetTwist(std::vector<iDynTree::Twist>& lFootTwist,
                       std::vector<iDynTree::Twist>& rFootTwist);
 
-    bool getFeetAcceleration(std::vector<iDynTree::Vector6>& lFootAccleration,
-                             std::vector<iDynTree::Vector6>& rFootAcceleration);
+    bool getFeetAcceleration(std::vector<iDynTree::SpatialAcc>& lFootAccleration,
+                             std::vector<iDynTree::SpatialAcc>& rFootAcceleration);
 
 
     /**
