@@ -646,6 +646,8 @@ bool WalkingModule::solveTaskBased(const iDynTree::Rotation& desiredNeckOrientat
             leftFootPosition(2) = m_footHeight;
 
             leftFootTransform.setPosition(leftFootPosition);
+
+            yInfo() << "foot height " <<m_footHeight;
         }
 
         // we are in the wait condition (from SS -> DS right foot)
@@ -657,9 +659,9 @@ bool WalkingModule::solveTaskBased(const iDynTree::Rotation& desiredNeckOrientat
             rightFootPosition(2) = m_footHeight;
 
             rightFootTransform.setPosition(rightFootPosition);
-        }
 
-        yInfo() << "foot height " <<m_footHeight;
+            yInfo() << "foot height " <<m_footHeight;
+        }
     }
 
     if(!m_taskBasedTorqueSolver->setDesiredFeetTrajectory(leftFootTransform, rightFootTransform,
@@ -856,8 +858,10 @@ bool WalkingModule::updateModule()
                 initTimeTrajectory = m_time + m_newTrajectoryMergeCounter * m_dT;
 
                 iDynTree::Transform measuredTransform = m_isLeftFixedFrame.front() ?
-                    m_rightTrajectory[m_newTrajectoryMergeCounter] :
-                    m_leftTrajectory[m_newTrajectoryMergeCounter];
+                    m_FKSolver->getRightFootToWorldTransform() :
+                    m_FKSolver->getLeftFootToWorldTransform();
+                    // m_rightTrajectory[m_newTrajectoryMergeCounter] :
+                    // m_leftTrajectory[m_newTrajectoryMergeCounter];
 
                 // ask for a new trajectory
                 if(!askNewTrajectories(initTimeTrajectory, !m_isLeftFixedFrame.front(),
