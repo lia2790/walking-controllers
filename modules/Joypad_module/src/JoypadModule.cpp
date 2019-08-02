@@ -238,7 +238,9 @@ bool JoypadModule::updateModule()
         goal.clear();
         goal.push_back(x);
         goal.push_back(y);
+        yInfo() << goal.toString();
         m_robotGoalPort.write();
+
     }
     return true;
 }

@@ -778,16 +778,16 @@ bool WalkingModule::updateModule()
         }
         if(motionDone)
         {
-            if(!m_useTorque)
-            {
-                // if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION_DIRECT))
-                // {
-                //     yError() << "[updateModule] Failed in setting POSITION DIRECT mode.";
-                //     yInfo() << "[updateModule] Try to prepare again";
-                //     reset();
-                //     m_robotState = WalkingFSM::Stopped;
-                //     return true;
-                // }
+            // if(!m_useTorque)
+            // {
+                if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION_DIRECT))
+                {
+                    yError() << "[updateModule] Failed in setting POSITION DIRECT mode.";
+                    yInfo() << "[updateModule] Try to prepare again";
+                    reset();
+                    m_robotState = WalkingFSM::Stopped;
+                    return true;
+                }
 
                 // send the reference again in order to reduce error
                 if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
@@ -800,7 +800,7 @@ bool WalkingModule::updateModule()
                     return true;
                 }
 
-            }
+          // }
 
             yarp::sig::Vector buffer(m_qDesired.size());
             yarp::sig::Vector bufferZero(m_qDesired.size());
@@ -858,10 +858,10 @@ bool WalkingModule::updateModule()
                 initTimeTrajectory = m_time + m_newTrajectoryMergeCounter * m_dT;
 
                 iDynTree::Transform measuredTransform = m_isLeftFixedFrame.front() ?
-                    m_FKSolver->getRightFootToWorldTransform() :
-                    m_FKSolver->getLeftFootToWorldTransform();
-                    // m_rightTrajectory[m_newTrajectoryMergeCounter] :
-                    // m_leftTrajectory[m_newTrajectoryMergeCounter];
+                    // m_FKSolver->getRightFootToWorldTransform() :
+                    // m_FKSolver->getLeftFootToWorldTransform();
+                    m_rightTrajectory[m_newTrajectoryMergeCounter] :
+                    m_leftTrajectory[m_newTrajectoryMergeCounter];
 
                 // ask for a new trajectory
                 if(!askNewTrajectories(initTimeTrajectory, !m_isLeftFixedFrame.front(),
