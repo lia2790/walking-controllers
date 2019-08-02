@@ -1,5 +1,4 @@
-close all;
-
+figure
 
 subplot(1,3,1)
 plot(time, eval('com_des_x'), time, eval('com_x'))
