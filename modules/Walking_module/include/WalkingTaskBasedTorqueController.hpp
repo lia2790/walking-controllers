@@ -29,7 +29,7 @@ class WalkingTaskBasedTorqueController
     std::unique_ptr<TaskBasedTorqueSolverSingleSupport> m_singleSupportSolver;
     std::unique_ptr<TaskBasedTorqueSolverDoubleSupport> m_doubleSupportSolver;
 
-
+    bool m_useCoM;
     std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_kpCoMSmoother; /**< Minimum jerk trajectory for the kp com gain. */
     std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_kdCoMSmoother; /**< Minimum jerk trajectory for the kd com gain. */
 

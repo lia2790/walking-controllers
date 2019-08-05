@@ -37,66 +37,75 @@ bool WalkingTaskBasedTorqueController::initialize(const yarp::os::Searchable& co
     }
 
     auto comConfig = config.findGroup("COM");
-    yarp::os::Value temp;
-    temp = comConfig.find("kp_ss");
-    if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kpSingleSupport))
+    if(!comConfig.isNull())
     {
-        yError() << "[Initialize] Unable to find the kp stance";
-        return false;
-    }
-
-    temp = comConfig.find("kp_ds");
-    if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kpDoubleSupport))
-    {
-        yError() << "[Initialize] Unable to find the kp stance";
-        return false;
-    }
-
-    bool useDefaultKd = comConfig.check("useDefaultKd", yarp::os::Value("False")).asBool();
-    if(!useDefaultKd)
-    {
-        temp = comConfig.find("kd_ss");
-        if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kdSingleSupport))
+        yarp::os::Value temp;
+        temp = comConfig.find("kp_ss");
+        if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kpSingleSupport))
         {
-            yError() << "[Initialize] Unable to find the kd stance";
+            yError() << "[Initialize] Unable to find the kp stance";
             return false;
         }
 
-
-        temp = comConfig.find("kd_ds");
-        if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kdDoubleSupport))
+        temp = comConfig.find("kp_ds");
+        if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kpDoubleSupport))
         {
-            yError() << "[Initialize] Unable to find the kd stance";
+            yError() << "[Initialize] Unable to find the kp stance";
             return false;
         }
+
+        bool useDefaultKd = comConfig.check("useDefaultKd", yarp::os::Value("False")).asBool();
+        if(!useDefaultKd)
+        {
+            temp = comConfig.find("kd_ss");
+            if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kdSingleSupport))
+            {
+                yError() << "[Initialize] Unable to find the kd stance";
+                return false;
+            }
+
+
+            temp = comConfig.find("kd_ds");
+            if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kdDoubleSupport))
+            {
+                yError() << "[Initialize] Unable to find the kd stance";
+                return false;
+            }
+        }
+        else
+        {
+            double scaling;
+            if(!YarpHelper::getNumberFromSearchable(comConfig, "scaling", scaling))
+            {
+                yError() << "[initialize] Unable to get the scaling factor.";
+                return false;
+            }
+            iDynTree::toEigen(m_kdDoubleSupport) = 2 / scaling * iDynTree::toEigen(m_kpDoubleSupport).array().sqrt();
+            iDynTree::toEigen(m_kdSingleSupport) = 2 / scaling * iDynTree::toEigen(m_kpSingleSupport).array().sqrt();
+        }
+
+        double samplingTime = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
+        double smoothingTime;
+        if(!YarpHelper::getNumberFromSearchable(comConfig, "smoothingTime", smoothingTime))
+        {
+            yError() << "[initialize] Unable to get the double from searchable.";
+            return false;
+        }
+
+        m_kpCoMSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(3, samplingTime,
+                                                                       smoothingTime);
+        m_kdCoMSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(3, samplingTime,
+                                                                       smoothingTime);
+
+        m_kpCoMSmoother->init(yarp::sig::Vector(3, m_kpDoubleSupport.data()));
+        m_kdCoMSmoother->init(yarp::sig::Vector(3, m_kdDoubleSupport.data()));
+
+        m_useCoM = true;
     }
     else
     {
-        double scaling;
-        if(!YarpHelper::getNumberFromSearchable(comConfig, "scaling", scaling))
-        {
-            yError() << "[initialize] Unable to get the scaling factor.";
-            return false;
-        }
-        iDynTree::toEigen(m_kdDoubleSupport) = 2 / scaling * iDynTree::toEigen(m_kpDoubleSupport).array().sqrt();
-        iDynTree::toEigen(m_kdSingleSupport) = 2 / scaling * iDynTree::toEigen(m_kpSingleSupport).array().sqrt();
+        m_useCoM = false;
     }
-
-    double samplingTime = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
-    double smoothingTime;
-    if(!YarpHelper::getNumberFromSearchable(comConfig, "smoothingTime", smoothingTime))
-    {
-        yError() << "[initialize] Unable to get the double from searchable.";
-        return false;
-    }
-
-    m_kpCoMSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(3, samplingTime,
-                                                                   smoothingTime);
-    m_kdCoMSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(3, samplingTime,
-                                                                   smoothingTime);
-
-    m_kpCoMSmoother->init(yarp::sig::Vector(3, m_kpDoubleSupport.data()));
-    m_kdCoMSmoother->init(yarp::sig::Vector(3, m_kdDoubleSupport.data()));
 
     m_actuatedDOFs = actuatedDOFs;
 
@@ -155,12 +164,15 @@ void WalkingTaskBasedTorqueController::setFeetState(const bool &leftInContact, c
             }
         }
 
-        m_kpCoMSmoother->computeNextValues(yarp::sig::Vector(3, m_kpDoubleSupport.data()));
-        m_kdCoMSmoother->computeNextValues(yarp::sig::Vector(3, m_kdDoubleSupport.data()));
+        if(m_useCoM)
+        {
+            m_kpCoMSmoother->computeNextValues(yarp::sig::Vector(3, m_kpDoubleSupport.data()));
+            m_kdCoMSmoother->computeNextValues(yarp::sig::Vector(3, m_kdDoubleSupport.data()));
 
-        iDynTree::Vector3 kp(m_kpCoMSmoother->getPos().data(), 3);
-        iDynTree::Vector3 kd(m_kdCoMSmoother->getPos().data(), 3);
-        m_doubleSupportSolver->setCoMGains(kp, kd);
+            iDynTree::Vector3 kp(m_kpCoMSmoother->getPos().data(), 3);
+            iDynTree::Vector3 kd(m_kdCoMSmoother->getPos().data(), 3);
+            m_doubleSupportSolver->setCoMGains(kp, kd);
+        }
 
         m_isDoubleSupportPhase = true;
         yInfo() << "[setFeetState] Double support phase";
@@ -186,12 +198,15 @@ void WalkingTaskBasedTorqueController::setFeetState(const bool &leftInContact, c
             }
         }
 
-        m_kpCoMSmoother->computeNextValues(yarp::sig::Vector(3, m_kpSingleSupport.data()));
-        m_kdCoMSmoother->computeNextValues(yarp::sig::Vector(3, m_kdSingleSupport.data()));
+        if(m_useCoM)
+        {
+            m_kpCoMSmoother->computeNextValues(yarp::sig::Vector(3, m_kpSingleSupport.data()));
+            m_kdCoMSmoother->computeNextValues(yarp::sig::Vector(3, m_kdSingleSupport.data()));
 
-        iDynTree::Vector3 kp(m_kpCoMSmoother->getPos().data(), 3);
-        iDynTree::Vector3 kd(m_kdCoMSmoother->getPos().data(), 3);
-        m_singleSupportSolver->setCoMGains(kp, kd);
+            iDynTree::Vector3 kp(m_kpCoMSmoother->getPos().data(), 3);
+            iDynTree::Vector3 kd(m_kdCoMSmoother->getPos().data(), 3);
+            m_singleSupportSolver->setCoMGains(kp, kd);
+        }
 
         m_isDoubleSupportPhase = false;
         yInfo() << "[setFeetState] Single support phase";
