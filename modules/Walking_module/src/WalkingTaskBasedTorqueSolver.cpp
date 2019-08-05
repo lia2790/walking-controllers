@@ -362,19 +362,11 @@ bool TaskBasedTorqueSolver::instantiateMotorReflectedInertia(const yarp::os::Sea
 
 bool TaskBasedTorqueSolver::instantiateNeckSoftConstraint(const yarp::os::Searchable& config)
 {
+    bool useNeckAsConstraint = config.check("useAsConstraint", yarp::os::Value("False")).asBool();
     yarp::os::Value tempValue;
     if(config.isNull())
     {
         yError() << "[instantiateNeckSoftConstraint] Empty configuration neck soft constraint.";
-        return false;
-    }
-
-    // get the neck weight
-    tempValue = config.find("neckWeight");
-    iDynTree::VectorDynSize neckWeight(3);
-    if(!YarpHelper::yarpListToiDynTreeVectorDynSize(tempValue, neckWeight))
-    {
-        yError() << "[instantiateNeckSoftConstraint] Initialization failed while reading neckWeight.";
         return false;
     }
 
@@ -411,19 +403,44 @@ bool TaskBasedTorqueSolver::instantiateNeckSoftConstraint(const yarp::os::Search
     m_neckBiasAcceleration.resize(3);
     m_neckJacobian.resize(3, m_actuatedDOFs + 6);
 
-    std::shared_ptr<CartesianCostFunction> ptr;
-    ptr = std::make_shared<CartesianCostFunction>(CartesianElement::Type::ORIENTATION);
-    ptr->setSubMatricesStartingPosition(0, 0);
+    if(!useNeckAsConstraint)
+    {
+        // get the neck weight
+        tempValue = config.find("neckWeight");
+        iDynTree::VectorDynSize neckWeight(3);
+        if(!YarpHelper::yarpListToiDynTreeVectorDynSize(tempValue, neckWeight))
+        {
+            yError() << "[instantiateNeckSoftConstraint] Initialization failed while reading neckWeight.";
+            return false;
+        }
 
-    ptr->setWeight(neckWeight);
-    ptr->setBiasAcceleration(m_neckBiasAcceleration);
-    ptr->setRoboticJacobian(m_neckJacobian);
-    ptr->orientationController()->setGains(c0, kd, kp);
 
-    m_costFunctions.insert(std::make_pair("neck", ptr));
-    m_hessianMatrices.insert(std::make_pair("neck", std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
-    m_gradientVectors.insert(std::make_pair("neck", std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
+        std::shared_ptr<CartesianCostFunction> ptr;
+        ptr = std::make_shared<CartesianCostFunction>(CartesianElement::Type::ORIENTATION);
+        ptr->setSubMatricesStartingPosition(0, 0);
 
+        ptr->setWeight(neckWeight);
+        ptr->setBiasAcceleration(m_neckBiasAcceleration);
+        ptr->setRoboticJacobian(m_neckJacobian);
+        ptr->orientationController()->setGains(c0, kd, kp);
+
+        m_costFunctions.insert(std::make_pair("neck", ptr));
+        m_hessianMatrices.insert(std::make_pair("neck", std::make_unique<Eigen::SparseMatrix<double>>(m_numberOfVariables, m_numberOfVariables)));
+        m_gradientVectors.insert(std::make_pair("neck", std::make_unique<Eigen::VectorXd>(Eigen::VectorXd::Zero(m_numberOfVariables))));
+    }
+    else
+    {
+        std::shared_ptr<CartesianConstraint> ptr;
+        ptr = std::make_shared<CartesianConstraint>(CartesianElement::Type::ORIENTATION);
+        ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 0);
+
+        ptr->setBiasAcceleration(m_neckBiasAcceleration);
+        ptr->setRoboticJacobian(m_neckJacobian);
+        ptr->orientationController()->setGains(c0, kd, kp);
+
+        m_constraints.insert(std::make_pair("neck", ptr));
+        m_numberOfConstraints += ptr->getNumberOfConstraints();
+    }
     return true;
 }
 
@@ -883,38 +900,57 @@ bool TaskBasedTorqueSolver::setDesiredNeckTrajectory(const iDynTree::Rotation& d
 {
 
     auto cost = m_costFunctions.find("neck");
-    if(cost == m_costFunctions.end())
+    if(cost != m_costFunctions.end())
     {
-        yError() << "[setDesiredNeckTrajectory] unable to find the neck trajectory element. "
-                 << "Please call 'initialize()' method";
-        return false;
+        auto ptr = std::static_pointer_cast<CartesianCostFunction>(cost->second);
+        ptr->orientationController()->setDesiredTrajectory(desiredNeckAcceleration,
+                                                           desiredNeckVelocity,
+                                                           desiredNeckOrientation * m_additionalRotation);
+
+        m_desiredNeckOrientation = desiredNeckOrientation * m_additionalRotation;
+        return true;
     }
 
-    auto ptr = std::static_pointer_cast<CartesianCostFunction>(cost->second);
-    ptr->orientationController()->setDesiredTrajectory(desiredNeckAcceleration,
-                                                       desiredNeckVelocity,
-                                                       desiredNeckOrientation * m_additionalRotation);
+    auto constraint = m_constraints.find("neck");
+    if(constraint != m_constraints.end())
+    {
+        auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
+        ptr->orientationController()->setDesiredTrajectory(desiredNeckAcceleration,
+                                                           desiredNeckVelocity,
+                                                           desiredNeckOrientation * m_additionalRotation);
 
-    m_desiredNeckOrientation = desiredNeckOrientation * m_additionalRotation;
+        m_desiredNeckOrientation = desiredNeckOrientation * m_additionalRotation;
+        return true;
+    }
 
-    return true;
+    yError() << "[setDesiredNeckTrajectory] Unable to find neither the cost nor the constraint, this is not possibile";
+    return false;
 }
 
 bool TaskBasedTorqueSolver::setNeckState(const iDynTree::Rotation& neckOrientation,
                                          const iDynTree::Twist& neckVelocity)
 {
     auto cost = m_costFunctions.find("neck");
-    if(cost == m_costFunctions.end())
+    if(cost != m_costFunctions.end())
     {
-        yError() << "[setDesiredNeckTrajectory] unable to find the neck trajectory element. "
-                 << "Please call 'initialize()' method";
-        return false;
+
+        auto ptr = std::static_pointer_cast<CartesianCostFunction>(cost->second);
+        ptr->orientationController()->setFeedback(neckVelocity.getAngularVec3(), neckOrientation);
+
+        return true;
     }
 
-    auto ptr = std::static_pointer_cast<CartesianCostFunction>(cost->second);
-    ptr->orientationController()->setFeedback(neckVelocity.getAngularVec3(), neckOrientation);
+    auto constraint = m_constraints.find("neck");
+    if(constraint != m_constraints.end())
+    {
+        auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
+        ptr->orientationController()->setFeedback(neckVelocity.getAngularVec3(), neckOrientation);
 
-    return true;
+        return true;
+    }
+
+    yError() << "[setDesiredNeckTrajectory] Unable to find neither the cost nor the constraint, this is not possibile";
+    return false;
 }
 
 void TaskBasedTorqueSolver::setNeckJacobian(const iDynTree::MatrixDynSize& jacobian)
