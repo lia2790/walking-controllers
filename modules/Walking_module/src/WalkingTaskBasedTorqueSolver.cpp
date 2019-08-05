@@ -2178,7 +2178,8 @@ bool TaskBasedTorqueSolverSingleSupport::instantiateFeetConstraint(const yarp::o
 {
     m_useSwingFootAsConstraint = config.check("useAsConstraint", yarp::os::Value("False")).asBool();
     m_useSwingFootAsCostFunction = config.check("useAsCostFunction", yarp::os::Value("False")).asBool();
-    m_controlContact = config.check("controlContact", yarp::os::Value("False")).asBool();
+    // m_controlContact = config.check("controlContact", yarp::os::Value("False")).asBool();
+    m_controlContact = false;
 
     yInfo() << "m_useSwingFootAsConstraint " << m_useSwingFootAsConstraint;
 
@@ -2628,6 +2629,7 @@ bool TaskBasedTorqueSolverSingleSupport::setDesiredFeetTrajectory(const iDynTree
                                                            swingFootToWorldTransform.getRotation());
     }
 
+    // in single support we cannot control the position of the stance foot
     if(m_controlContact)
     {
         auto constraint = m_constraints.find("stance_foot");
@@ -2774,25 +2776,26 @@ bool TaskBasedTorqueSolverSingleSupport::instantiateAngularMomentumConstraint(co
         m_useAngularMomentumConstraint = false;
         return true;
     }
-    m_useAngularMomentumConstraint = true;
-
-    double kp;
-    if(!YarpHelper::getNumberFromSearchable(config, "kp", kp))
+    m_useAngularMomentumConstraint = config.check("useAsConstraint", yarp::os::Value("False")).asBool();
+    if(m_useAngularMomentumConstraint)
     {
-        yError() << "[instantiateAngularMomentumConstraint] Unable to get proportional gain";
-        return false;
+        double kp;
+        if(!YarpHelper::getNumberFromSearchable(config, "kp", kp))
+        {
+            yError() << "[instantiateAngularMomentumConstraint] Unable to get proportional gain";
+            return false;
+        }
+
+        std::shared_ptr<AngularMomentumConstraintSingleSupport> ptr;
+        ptr = std::make_shared<AngularMomentumConstraintSingleSupport>();
+        ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6 + m_actuatedDOFs + m_actuatedDOFs);
+        ptr->setKp(kp);
+
+        ptr->setStanceFootToWorldTransform(m_stanceFootToWorldTransform);
+
+        m_constraints.insert(std::make_pair("angular_momentum_constraint", ptr));
+        m_numberOfConstraints += ptr->getNumberOfConstraints();
     }
-
-    std::shared_ptr<AngularMomentumConstraintSingleSupport> ptr;
-    ptr = std::make_shared<AngularMomentumConstraintSingleSupport>();
-    ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6 + m_actuatedDOFs + m_actuatedDOFs);
-    ptr->setKp(kp);
-
-    ptr->setStanceFootToWorldTransform(m_stanceFootToWorldTransform);
-
-    m_constraints.insert(std::make_pair("angular_momentum_constraint", ptr));
-    m_numberOfConstraints += ptr->getNumberOfConstraints();
-
     return true;
 }
 
@@ -2804,26 +2807,27 @@ bool TaskBasedTorqueSolverDoubleSupport::instantiateAngularMomentumConstraint(co
         m_useAngularMomentumConstraint = false;
         return true;
     }
-    m_useAngularMomentumConstraint = true;
-
-    double kp;
-    if(!YarpHelper::getNumberFromSearchable(config, "kp", kp))
+    m_useAngularMomentumConstraint = config.check("useAsConstraint", yarp::os::Value("False")).asBool();
+    if(m_useAngularMomentumConstraint)
     {
-        yError() << "[instantiateAngularMomentumConstraint] Unable to get proportional gain";
-        return false;
+        double kp;
+        if(!YarpHelper::getNumberFromSearchable(config, "kp", kp))
+        {
+            yError() << "[instantiateAngularMomentumConstraint] Unable to get proportional gain";
+            return false;
+        }
+
+        std::shared_ptr<AngularMomentumConstraintDoubleSupport> ptr;
+        ptr = std::make_shared<AngularMomentumConstraintDoubleSupport>();
+        ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6 + m_actuatedDOFs + m_actuatedDOFs);
+        ptr->setKp(kp);
+
+        ptr->setLeftFootToWorldTransform(m_leftFootToWorldTransform);
+        ptr->setRightFootToWorldTransform(m_rightFootToWorldTransform);
+
+        m_constraints.insert(std::make_pair("angular_momentum_constraint", ptr));
+        m_numberOfConstraints += ptr->getNumberOfConstraints();
     }
-
-    std::shared_ptr<AngularMomentumConstraintDoubleSupport> ptr;
-    ptr = std::make_shared<AngularMomentumConstraintDoubleSupport>();
-    ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6 + m_actuatedDOFs + m_actuatedDOFs);
-    ptr->setKp(kp);
-
-    ptr->setLeftFootToWorldTransform(m_leftFootToWorldTransform);
-    ptr->setRightFootToWorldTransform(m_rightFootToWorldTransform);
-
-    m_constraints.insert(std::make_pair("angular_momentum_constraint", ptr));
-    m_numberOfConstraints += ptr->getNumberOfConstraints();
-
     return true;
 }
 
