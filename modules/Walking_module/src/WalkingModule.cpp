@@ -31,8 +31,6 @@ iDynTree::Vector3 m_desiredDCMPosition;
 iDynTree::Vector3 m_desiredDCMVelocity;
 iDynTree::Transform m_desiredLeftFootToWorldTransform;
 
-int dummyIndex = 0;
-bool leftBase = true;
 void WalkingModule::propagateTime()
 {
     // propagate time
@@ -1763,15 +1761,6 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
 
 bool WalkingModule::updateFKSolver()
 {
-    dummyIndex++;
-    if(dummyIndex == 100)
-    {
-        dummyIndex = 0;
-        leftBase = !leftBase;
-        yInfo() << " leftBase " << leftBase;
-    }
-
-
     if(m_robotControlHelper->isExternalRobotBaseUsed())
     {
         m_FKSolver->evaluateWorldToBaseTransformation(m_robotControlHelper->getBaseTransform(),
@@ -2073,6 +2062,8 @@ bool WalkingModule::stopWalking()
         yError() << "[stopWalking] Cannot stop the walking controller.";
         return false;
     }
+    // switch the robot in position
+    m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION);
 
     reset();
 
