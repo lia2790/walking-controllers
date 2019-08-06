@@ -39,72 +39,70 @@ bool WalkingTaskBasedTorqueController::initialize(const yarp::os::Searchable& co
     auto comConfig = config.findGroup("COM");
     if(!comConfig.isNull())
     {
-        yarp::os::Value temp;
-        temp = comConfig.find("kp_ss");
-        if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kpSingleSupport))
+        m_useCoM = comConfig.check("useSmoother", yarp::os::Value("False")).asBool();
+        if(m_useCoM)
         {
-            yError() << "[Initialize] Unable to find the kp stance";
-            return false;
-        }
-
-        temp = comConfig.find("kp_ds");
-        if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kpDoubleSupport))
-        {
-            yError() << "[Initialize] Unable to find the kp stance";
-            return false;
-        }
-
-        bool useDefaultKd = comConfig.check("useDefaultKd", yarp::os::Value("False")).asBool();
-        if(!useDefaultKd)
-        {
-            temp = comConfig.find("kd_ss");
-            if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kdSingleSupport))
+            yarp::os::Value temp;
+            temp = comConfig.find("kp_ss");
+            if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kpSingleSupport))
             {
-                yError() << "[Initialize] Unable to find the kd stance";
+                yError() << "[Initialize] Unable to find the kp stance";
                 return false;
             }
 
-
-            temp = comConfig.find("kd_ds");
-            if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kdDoubleSupport))
+            temp = comConfig.find("kp_ds");
+            if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kpDoubleSupport))
             {
-                yError() << "[Initialize] Unable to find the kd stance";
+                yError() << "[Initialize] Unable to find the kp stance";
                 return false;
             }
-        }
-        else
-        {
-            double scaling;
-            if(!YarpHelper::getNumberFromSearchable(comConfig, "scaling", scaling))
+
+            bool useDefaultKd = comConfig.check("useDefaultKd", yarp::os::Value("False")).asBool();
+            if(!useDefaultKd)
             {
-                yError() << "[initialize] Unable to get the scaling factor.";
+                temp = comConfig.find("kd_ss");
+                if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kdSingleSupport))
+                {
+                    yError() << "[Initialize] Unable to find the kd stance";
+                    return false;
+                }
+
+
+                temp = comConfig.find("kd_ds");
+                if(!YarpHelper::yarpListToiDynTreeVectorFixSize(temp, m_kdDoubleSupport))
+                {
+                    yError() << "[Initialize] Unable to find the kd stance";
+                    return false;
+                }
+            }
+            else
+            {
+                double scaling;
+                if(!YarpHelper::getNumberFromSearchable(comConfig, "scaling", scaling))
+                {
+                    yError() << "[initialize] Unable to get the scaling factor.";
+                    return false;
+                }
+                iDynTree::toEigen(m_kdDoubleSupport) = 2 / scaling * iDynTree::toEigen(m_kpDoubleSupport).array().sqrt();
+                iDynTree::toEigen(m_kdSingleSupport) = 2 / scaling * iDynTree::toEigen(m_kpSingleSupport).array().sqrt();
+            }
+
+            double samplingTime = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
+            double smoothingTime;
+            if(!YarpHelper::getNumberFromSearchable(comConfig, "smoothingTime", smoothingTime))
+            {
+                yError() << "[initialize] Unable to get the double from searchable.";
                 return false;
             }
-            iDynTree::toEigen(m_kdDoubleSupport) = 2 / scaling * iDynTree::toEigen(m_kpDoubleSupport).array().sqrt();
-            iDynTree::toEigen(m_kdSingleSupport) = 2 / scaling * iDynTree::toEigen(m_kpSingleSupport).array().sqrt();
+
+            m_kpCoMSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(3, samplingTime,
+                                                                           smoothingTime);
+            m_kdCoMSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(3, samplingTime,
+                                                                           smoothingTime);
+
+            m_kpCoMSmoother->init(yarp::sig::Vector(3, m_kpDoubleSupport.data()));
+            m_kdCoMSmoother->init(yarp::sig::Vector(3, m_kdDoubleSupport.data()));
         }
-
-        double samplingTime = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
-        double smoothingTime;
-        if(!YarpHelper::getNumberFromSearchable(comConfig, "smoothingTime", smoothingTime))
-        {
-            yError() << "[initialize] Unable to get the double from searchable.";
-            return false;
-        }
-
-        m_kpCoMSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(3, samplingTime,
-                                                                       smoothingTime);
-        m_kdCoMSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(3, samplingTime,
-                                                                       smoothingTime);
-
-        m_kpCoMSmoother->init(yarp::sig::Vector(3, m_kpDoubleSupport.data()));
-        m_kdCoMSmoother->init(yarp::sig::Vector(3, m_kdDoubleSupport.data()));
-
-        m_useCoM = true;
-    }
-    else
-    {
-        m_useCoM = false;
     }
 
     m_actuatedDOFs = actuatedDOFs;
