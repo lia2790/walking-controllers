@@ -1,7 +1,8 @@
 ds = (lf_des_z == 0) & (rf_des_z == 0);
 
 
-initSS = [];
+initSS_left = [];
+initSS_right = [];
 initDS = [];
 
 isDS = 0;
@@ -18,7 +19,11 @@ for i = 1:length(ds)
     if(ds(i) == 0)
         isDS  = 0 ;
         if(isSS == 0)
-            initSS = [initSS, i];
+            if(rf_des_z(i) ~= 0)
+                initSS_left = [initSS_left, i];
+            else
+                initSS_right = [initSS_right, i];
+            end
             isSS = 1;
         end
     end

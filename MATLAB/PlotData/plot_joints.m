@@ -12,6 +12,7 @@ des = 1;
 
 close all
 
+ energy = struct();
 
 for part = fieldnames(parts)'
     figure;
@@ -27,19 +28,23 @@ for part = fieldnames(parts)'
     rows = 0
     
     if(~mod(l,3))
-        cols = 3;
-        rows = l / 3;
+        rows = 3;
+        cols = l / 3;
     end
     
     if(~mod(l,2))
-        cols = 2;
-        rows = l / 2;
+        rows = 2;
+        cols = l / 2;
     end
     
     i = 1;    
     
     rows 
     cols
+    
+
+    
+   energy.(part{:}) = []
     
     for joint = parts.(part{:})       
     
@@ -48,23 +53,28 @@ for part = fieldnames(parts)'
         subplot(rows, cols, i)
         
         jointValue = joint{:};
-        if(des)
-            plot(time, eval([jointValue '_des_' type]), time, eval([jointValue '_' type]))
-            hold on;
-            label = [label, ['desired'], ['measured']]; 
-            plotLines;
+        if(~strcmp(type, 'pow'))
+           if(des)
+               plot(time, eval([jointValue '_des_' type]))
+               hold on;
+               label = [label, ['measured']];
+               plotLines;
+           else
+               plot(time, eval([jointValue '_' type]))
+               plotLines;
+               label = [label, 'measured'];
+           end
         else
-            plot(time, eval([jointValue '_' type]))
-            label = [label, [jointValue '_' type]];
+            e = eval([jointValue '_trq']) .* eval([jointValue '_vel']);
+            energy.(part{:}) = [energy.(part{:}), sum(e(e>0)) * 0.01];
+            plot(time, eval([jointValue '_trq']) .* eval([jointValue '_vel']));
+            plotLines;
+            label = [label, 'measured'];
         end
         str = regexprep(jointValue, '_', ' ');
-   
-        plot_aesthetic([str], 'time (s)' , 'torque (Nm)', '', label{:}, 'Init SS', 'Init DS');
+        plot_aesthetic([str], 'time (s)' , 'Acceleration ($rad/s^2$)', '', label{:}, 'Left stance', 'Right stance', 'Init DS');
         
         i = i + 1;
     end
-    
-   
-    
    
 end

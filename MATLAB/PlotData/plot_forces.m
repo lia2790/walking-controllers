@@ -1,5 +1,5 @@
 figure
-foot_name = 'lf';
+foot_name = 'rf';
 
 foot_name_label = 'Left Foot';
 if(strcmp(foot_name, 'rf'))
@@ -49,30 +49,29 @@ disp ('plotting')
 subplot(2,3,1)
 plot(time, force_x_des_rotated, time, eval([foot_name '_force_x']))
 plotLines;
-plot_aesthetic([foot_name_label ' Force - X'],'Time (s)', 'Force (N)', ' ', 'Desired' ,  'Measured', 'Init SS', 'Init DS');
-ylim([-40 20])
+plot_aesthetic([foot_name_label ' Force - X'],'Time (s)', 'Force (N)', ' ','Desired' , 'Measured', 'Left stance', 'Right stance', 'Init DS');
 
 subplot(2,3,2)
 plot(time, force_y_des_rotated, time, eval([foot_name '_force_y']))
 plotLines;
-plot_aesthetic([foot_name_label ' Force - Y'],'Time (s)', 'Force (N)', ' ', 'Desired' ,  'Measured', 'Init SS', 'Init DS');
+plot_aesthetic([foot_name_label ' Force - Y'],'Time (s)', 'Force (N)', ' ', 'Desired' , 'Measured', 'Left stance', 'Right stance', 'Init DS');
 
 subplot(2,3,3)
 plot(time, force_z_des_rotated ,time, eval([foot_name '_force_z']))
 plotLines;
-plot_aesthetic([foot_name_label ' Force - Z'],'Time (s)', 'Force (N)', ' ', 'Desired' ,  'Measured', 'Init SS', 'Init DS');
+plot_aesthetic([foot_name_label ' Force - Z'],'Time (s)', 'Force (N)', ' ', 'Desired' , 'Measured', 'Left stance', 'Right stance', 'Init DS');
 
 subplot(2,3,4)
 plot(time, torque_x_des_rotated, time, eval([foot_name '_torque_x']))
 plotLines;
-plot_aesthetic([foot_name_label ' Torque - X'],'Time (s)', 'Moment (Nm)', ' ', 'Desired' ,  'Measured', 'Init SS', 'Init DS');
+plot_aesthetic([foot_name_label ' Torque - X'],'Time (s)', 'Moment (Nm)', ' ','Desired' , 'Measured', 'Left stance', 'Right stance', 'Init DS'); 
 
 subplot(2,3,5)
 plot(time, torque_y_des_rotated, time, eval([foot_name '_torque_y']))
 plotLines;
-plot_aesthetic([foot_name_label ' Torque - Y'],'Time (s)', 'Moment (Nm)', ' ', 'Desired' ,  'Measured', 'Init SS', 'Init DS');
+plot_aesthetic([foot_name_label ' Torque - Y'],'Time (s)', 'Moment (Nm)', ' ', 'Desired' , 'Measured', 'Left stance', 'Right stance', 'Init DS');
 
 subplot(2,3,6)
 plot(time, torque_z_des_rotated, time, eval([foot_name '_torque_z']))
 plotLines;
-plot_aesthetic([foot_name_label ' Torque - Z'],'Time (s)', 'Moment (Nm)', ' ', 'Desired' ,  'Measured', 'Init SS', 'Init DS');
+plot_aesthetic([foot_name_label ' Torque - Z'],'Time (s)', 'Moment (Nm)', ' ', 'Desired' , 'Measured', 'Left stance', 'Right stance', 'Init DS');

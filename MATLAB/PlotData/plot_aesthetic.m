@@ -44,12 +44,12 @@ if ~isempty(varargin)
     h = legend(varargin, 'Location', 'northoutside', 'Orientation','horizontal');
     %h = legend(varargin, 'Location', 'best');
     set(h,'Interpreter','latex')
-    set(h,'FontSize', 15);
+    set(h,'FontSize', 13);
 end
 
 % change linewidth
 h = findobj(gcf,'type','line');
-set(h,'linewidth',1.2)
+set(h,'linewidth',1.5)
 
 % set the title
 if ~isempty(Title)
