@@ -237,7 +237,7 @@ bool JoypadModule::updateModule()
         yarp::sig::Vector& goal= m_robotGoalPort.prepare();
         goal.clear();
         goal.push_back(x);
-        goal.push_back(y);
+        goal.push_back(0);
         yInfo() << goal.toString();
         m_robotGoalPort.write();
 
