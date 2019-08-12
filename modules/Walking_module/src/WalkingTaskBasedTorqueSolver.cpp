@@ -51,9 +51,9 @@ bool TaskBasedTorqueSolver::instantiateCoMConstraint(const yarp::os::Searchable&
         return true;
     }
 
-    bool asLinearMomentum = config.check("as_linear_momentum", yarp::os::Value("False")).asBool();
-    if(asLinearMomentum)
-        return true;
+    // bool asLinearMomentum = config.check("as_linear_momentum", yarp::os::Value("False")).asBool();
+    // if(asLinearMomentum)
+    //     return true;
 
     m_useCoMConstraint = true;
 
@@ -645,8 +645,11 @@ bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
-    instantiateCoMAsLinearMomentumConstraint(comConstraintOptions);
-
+    if(!instantiateCoMAsLinearMomentumConstraint(comConstraintOptions))
+    {
+        yError() << "[initialize] Unable to instantiate the CoM constraint as linear momentum.";
+        return false;
+    }
 
     yarp::os::Bottle& linearMomentumOptions = config.findGroup("LINEAR_MOMENTUM");
     instantiateLinearMomentumConstraint(linearMomentumOptions);
@@ -1955,7 +1958,7 @@ void TaskBasedTorqueSolverDoubleSupport::instantiateLinearMomentumConstraint(con
     return;
 }
 
-void TaskBasedTorqueSolverDoubleSupport::instantiateCoMAsLinearMomentumConstraint(const yarp::os::Searchable& config)
+bool TaskBasedTorqueSolverDoubleSupport::instantiateCoMAsLinearMomentumConstraint(const yarp::os::Searchable& config)
 {
     bool asLinearMomentum = config.check("as_linear_momentum", yarp::os::Value("False")).asBool();
     if(asLinearMomentum)
@@ -1965,10 +1968,45 @@ void TaskBasedTorqueSolverDoubleSupport::instantiateCoMAsLinearMomentumConstrain
         // only the forces are used to control the linear momentum
         ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6 + m_actuatedDOFs + m_actuatedDOFs);
 
+        bool useDefaultKd = config.check("useDefaultKd", yarp::os::Value("False")).asBool();
+
+        yarp::os::Value tempValue;
+        iDynTree::Vector3 kp;
+        tempValue = config.find("kp");
+        if(!YarpHelper::yarpListToiDynTreeVectorFixSize(tempValue, kp))
+        {
+            yError() << "[initialize] Unable to convert a YARP list to an iDynTree::VectorFixSize, "
+                     << "joint regularization";
+            return false;
+        }
+
+        iDynTree::Vector3 kd;
+        if(useDefaultKd)
+        {
+            double scaling;
+            if(!YarpHelper::getNumberFromSearchable(config, "scaling", scaling))
+            {
+                yError() << "[initialize] Unable to get the scaling factor.";
+                return false;
+            }
+            iDynTree::toEigen(kd) = 2 / scaling * iDynTree::toEigen(kp).array().sqrt();
+        }
+        else
+        {
+            tempValue = config.find("kd");
+            if(!YarpHelper::yarpListToiDynTreeVectorFixSize(tempValue, kd))
+            {
+                yError() << "[initialize] Unable to convert a YARP list to an iDynTree::VectorFixSize, "
+                         << "joint regularization";
+                return false;
+            }
+        }
+
+        ptr->positionController()->setGains(kp, kd);
         m_constraints.insert(std::make_pair("com_linear_momentum_constraint", ptr));
         m_numberOfConstraints += ptr->getNumberOfConstraints();
     }
-    return;
+    return true;
 }
 
 bool TaskBasedTorqueSolverDoubleSupport::instantiateLinearMomentumCostFunction(const yarp::os::Searchable& config)
@@ -2521,7 +2559,7 @@ void TaskBasedTorqueSolverSingleSupport::instantiateLinearMomentumConstraint(con
 }
 
 
-void TaskBasedTorqueSolverSingleSupport::instantiateCoMAsLinearMomentumConstraint(const yarp::os::Searchable& config)
+bool TaskBasedTorqueSolverSingleSupport::instantiateCoMAsLinearMomentumConstraint(const yarp::os::Searchable& config)
 {
     bool asLinearMomentum = config.check("as_linear_momentum", yarp::os::Value("False")).asBool();
     if(asLinearMomentum)
@@ -2531,10 +2569,46 @@ void TaskBasedTorqueSolverSingleSupport::instantiateCoMAsLinearMomentumConstrain
         // only the forces are used to control the linear momentum
         ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6 + m_actuatedDOFs + m_actuatedDOFs);
 
+        bool useDefaultKd = config.check("useDefaultKd", yarp::os::Value("False")).asBool();
+
+        yarp::os::Value tempValue;
+        iDynTree::Vector3 kp;
+        tempValue = config.find("kp");
+        if(!YarpHelper::yarpListToiDynTreeVectorFixSize(tempValue, kp))
+        {
+            yError() << "[initialize] Unable to convert a YARP list to an iDynTree::VectorFixSize, "
+                     << "joint regularization";
+            return false;
+        }
+
+        iDynTree::Vector3 kd;
+        if(useDefaultKd)
+        {
+            double scaling;
+            if(!YarpHelper::getNumberFromSearchable(config, "scaling", scaling))
+            {
+                yError() << "[initialize] Unable to get the scaling factor.";
+                return false;
+            }
+            iDynTree::toEigen(kd) = 2 / scaling * iDynTree::toEigen(kp).array().sqrt();
+        }
+        else
+        {
+            tempValue = config.find("kd");
+            if(!YarpHelper::yarpListToiDynTreeVectorFixSize(tempValue, kd))
+            {
+                yError() << "[initialize] Unable to convert a YARP list to an iDynTree::VectorFixSize, "
+                         << "joint regularization";
+                return false;
+            }
+        }
+
+
+        ptr->positionController()->setGains(kp, kd);
         m_constraints.insert(std::make_pair("com_linear_momentum_constraint", ptr));
         m_numberOfConstraints += ptr->getNumberOfConstraints();
     }
-    return;
+    return true;
 }
 
 
