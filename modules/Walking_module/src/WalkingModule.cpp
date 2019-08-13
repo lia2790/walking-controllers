@@ -303,7 +303,9 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
         m_taskBasedTorqueSolver = std::make_unique<WalkingTaskBasedTorqueController>();
         if(!m_taskBasedTorqueSolver->initialize(taskBasedSolverOptions, m_robotControlHelper->getActuatedDoFs(),
-                                                negativeJointTorqueLimits, jointTorqueLimits))
+                                                negativeJointTorqueLimits, jointTorqueLimits,
+                                                m_robotControlHelper->getJointAngleUpperLimits(),
+                                                m_robotControlHelper->getJointAngleLowerLimits()))
         {
             yError() << "[configure] Failed to configure the task-based solver";
             return false;

@@ -179,6 +179,35 @@ void CartesianConstraint::evaluateBounds(Eigen::VectorXd &upperBounds, Eigen::Ve
         upperBounds.block(m_jacobianStartingRow, 0, m_sizeOfElement, 1);
 }
 
+
+JointsPositionLimit::JointsPositionLimit(const double & dT, const int &numberOfJoints) :
+    m_dT(dT)
+{
+    m_sizeOfElement = numberOfJoints;
+    m_jointsUpperLimit.resize(numberOfJoints);
+    m_jointsLowerLimit.resize(numberOfJoints);
+}
+
+void JointsPositionLimit::setJointsLimit(const iDynTree::VectorDynSize &jointsUpperLimit,
+                                         const iDynTree::VectorDynSize &jointsLowerLimit)
+{
+    m_jointsUpperLimit = jointsUpperLimit;
+    m_jointsLowerLimit = jointsLowerLimit;
+}
+
+void JointsPositionLimit::setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian)
+{
+    for(int i = 0; i < m_sizeOfElement; i++)
+        jacobian.insert(m_jacobianStartingRow + i, m_jacobianStartingColumn + i) = 0.5 * m_dT * m_dT;
+}
+
+void JointsPositionLimit::evaluateBounds(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds)
+{
+    upperBounds.segment(m_jacobianStartingRow, m_sizeOfElement) = iDynTree::toEigen(m_jointsUpperLimit) - iDynTree::toEigen(*m_jointPosition) - m_dT * iDynTree::toEigen(*m_jointVelocity);
+
+    lowerBounds.segment(m_jacobianStartingRow, m_sizeOfElement) = iDynTree::toEigen(m_jointsLowerLimit) - iDynTree::toEigen(*m_jointPosition) - m_dT * iDynTree::toEigen(*m_jointVelocity);
+}
+
 ForceConstraint::ForceConstraint(const int& numberOfPoints, const double& staticFrictionCoefficient,
                                  const double& torsionalFrictionCoefficient, const double& minimalNormalForce,
                                  const iDynTree::Vector2& footLimitX, const iDynTree::Vector2& footLimitY)

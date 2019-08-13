@@ -43,7 +43,9 @@ public:
     bool initialize(const yarp::os::Searchable& config,
                     const int& actuatedDOFs,
                     const iDynTree::VectorDynSize& minJointTorque,
-                    const iDynTree::VectorDynSize& maxJointTorque);
+                    const iDynTree::VectorDynSize& maxJointTorque,
+                    const iDynTree::VectorDynSize& jointPositionUpperLimit,
+                    const iDynTree::VectorDynSize& jointPositionLowerLimit);
 
     void reset(const iDynTree::VectorDynSize& jointTorque,
                const iDynTree::Wrench& leftWrench,

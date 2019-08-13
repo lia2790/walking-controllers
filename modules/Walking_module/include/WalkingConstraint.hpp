@@ -211,6 +211,37 @@ public:
     void evaluateBounds(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds) override;
 };
 
+class JointsPositionLimit : public LinearConstraint
+{
+    iDynTree::VectorDynSize const * m_jointPosition;
+    iDynTree::VectorDynSize const * m_jointVelocity;
+
+    iDynTree::VectorDynSize m_jointsUpperLimit;
+    iDynTree::VectorDynSize m_jointsLowerLimit;
+
+    double m_dT;
+
+public:
+    JointsPositionLimit(const double &dT, const int &systemSize);
+
+    void setJointPosition(const iDynTree::VectorDynSize &jointPosition){m_jointPosition = &jointPosition;};
+
+    void setJointVelocity(const iDynTree::VectorDynSize &jointVelocity){m_jointVelocity = &jointVelocity;};
+
+    void setJointsLimit(const iDynTree::VectorDynSize &jointsUpperLimit,
+                        const iDynTree::VectorDynSize &jointsLowerLimit);
+
+    /**
+     * Evaluate the jacobian
+     */
+    void setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian) override;
+
+    /**
+     * Evaluate the lower and upper bounds
+     */
+    void evaluateBounds(Eigen::VectorXd &upperBounds, Eigen::VectorXd &lowerBounds) override;
+};
+
 /**
  * ForceConstraint class allows to obtain a contact force that satisfies the unilateral constraint,
  * the friction cone and the COP position.

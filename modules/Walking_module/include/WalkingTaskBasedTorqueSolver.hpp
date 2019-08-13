@@ -108,6 +108,11 @@ protected:
 
     virtual bool instantiateForceRegularizationConstraint(const yarp::os::Searchable& config) = 0;
 
+    void instantiateJointsPositionLimit(const yarp::os::Searchable& config,
+                                        const int& actuatedDOFs,
+                                        const iDynTree::VectorDynSize& jointPositionUpperLimit,
+                                        const iDynTree::VectorDynSize& jointPositionLowerLimit);
+
     bool setHessianMatrix();
 
     bool setGradientVector();
@@ -150,7 +155,9 @@ public:
     bool initialize(const yarp::os::Searchable& config,
                     const int& actuatedDOFs,
                     const iDynTree::VectorDynSize& minJointTorque,
-                    const iDynTree::VectorDynSize& maxJointTorque);
+                    const iDynTree::VectorDynSize& maxJointTorque,
+                    const iDynTree::VectorDynSize& jointPositionUpperLimit,
+                    const iDynTree::VectorDynSize& jointPositionLowerLimit);
 
     bool setCoMGains(const iDynTree::Vector3& kp, const iDynTree::Vector3& kd);
 

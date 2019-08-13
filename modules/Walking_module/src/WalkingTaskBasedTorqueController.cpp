@@ -17,20 +17,22 @@
 
 
 bool WalkingTaskBasedTorqueController::initialize(const yarp::os::Searchable& config,
-                                                  const int& actuatedDOFs,
-                                                  const iDynTree::VectorDynSize& minJointTorque,
-                                                  const iDynTree::VectorDynSize& maxJointTorque)
+                                                      const int& actuatedDOFs,
+                                                      const iDynTree::VectorDynSize& minJointTorque,
+                                                      const iDynTree::VectorDynSize& maxJointTorque,
+                                                      const iDynTree::VectorDynSize& jointPositionUpperLimit,
+                                                      const iDynTree::VectorDynSize& jointPositionLowerLimit)
 {
     // instantiate solvers
     m_singleSupportSolver = std::make_unique<TaskBasedTorqueSolverSingleSupport>();
     m_doubleSupportSolver = std::make_unique<TaskBasedTorqueSolverDoubleSupport>();
 
-    if(!m_singleSupportSolver->initialize(config, actuatedDOFs, minJointTorque, maxJointTorque))
+    if(!m_singleSupportSolver->initialize(config, actuatedDOFs, minJointTorque, maxJointTorque, jointPositionUpperLimit, jointPositionLowerLimit))
     {
         yError() << "[Initialize] Unable to initialize the single support solver";
         return false;
     }
-    if(!m_doubleSupportSolver->initialize(config, actuatedDOFs, minJointTorque, maxJointTorque))
+    if(!m_doubleSupportSolver->initialize(config, actuatedDOFs, minJointTorque, maxJointTorque,jointPositionUpperLimit, jointPositionLowerLimit))
     {
         yError() << "[Initialize] Unable to initialize the double support solver";
         return false;

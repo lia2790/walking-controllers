@@ -596,10 +596,33 @@ bool TaskBasedTorqueSolver::instantiateTorqueRegularizationConstraint(const yarp
     return true;
 }
 
+void TaskBasedTorqueSolver::instantiateJointsPositionLimit(const yarp::os::Searchable& config,
+                                                           const int& actuatedDOFs,
+                                                           const iDynTree::VectorDynSize& jointPositionUpperLimit,
+                                                           const iDynTree::VectorDynSize& jointPositionLowerLimit)
+
+{
+    double samplingTime = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
+
+    std::shared_ptr<JointsPositionLimit> ptr;
+    ptr = std::make_shared<JointsPositionLimit>(samplingTime, m_actuatedDOFs);
+
+    ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 6);
+    ptr->setJointsLimit(jointPositionUpperLimit, jointPositionLowerLimit);
+    ptr->setJointPosition(m_jointPosition);
+    ptr->setJointVelocity(m_jointVelocity);
+
+    m_constraints.insert(std::make_pair("joints_limit_constraint", ptr));
+    m_numberOfConstraints += ptr->getNumberOfConstraints();
+
+}
+
 bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
                                        const int& actuatedDOFs,
                                        const iDynTree::VectorDynSize& minJointTorque,
-                                       const iDynTree::VectorDynSize& maxJointTorque)
+                                       const iDynTree::VectorDynSize& maxJointTorque,
+                                       const iDynTree::VectorDynSize& jointPositionUpperLimit,
+                                       const iDynTree::VectorDynSize& jointPositionLowerLimit)
 {
 
     // m_profiler = std::make_unique<TimeProfiler>();
@@ -636,6 +659,8 @@ bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
         yError() << "[initialize] Empty configuration for Task based torque solver.";
         return false;
     }
+
+    instantiateJointsPositionLimit(config, actuatedDOFs, jointPositionUpperLimit, jointPositionLowerLimit);
 
     // instantiate constraints
     yarp::os::Bottle& comConstraintOptions = config.findGroup("COM");
