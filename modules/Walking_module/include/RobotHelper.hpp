@@ -20,6 +20,8 @@
 #include <yarp/dev/IPositionControl.h>
 #include <yarp/dev/IPositionDirect.h>
 #include <yarp/dev/IVelocityControl.h>
+#include <yarp/dev/ITorqueControl.h>
+#include <yarp/dev/MultipleAnalogSensorsInterfaces.h>
 #include <yarp/sig/Vector.h>
 #include <yarp/os/Timer.h>
 
@@ -41,8 +43,10 @@ class RobotHelper
     yarp::dev::IPositionDirect *m_positionDirectInterface{nullptr}; /**< Direct position control interface. */
     yarp::dev::IPositionControl *m_positionInterface{nullptr}; /**< Position control interface. */
     yarp::dev::IVelocityControl *m_velocityInterface{nullptr}; /**< Position control interface. */
+    yarp::dev::ITorqueControl *m_torqueInterface{nullptr}; /**< Torque control interface. */
     yarp::dev::IControlMode *m_controlModeInterface{nullptr}; /**< Control mode interface. */
     yarp::dev::IControlLimits *m_limitsInterface{nullptr}; /**< Encorders interface. */
+    yarp::dev::IThreeAxisLinearAccelerometers *m_linearAccelerometersInterface{nullptr}; /**< Accelerometer interface.*/
 
     std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
 
@@ -54,9 +58,11 @@ class RobotHelper
     yarp::sig::Vector m_velocityFeedbackDeg; /**< Current joint velocity [deg/s]. */
     iDynTree::VectorDynSize m_positionFeedbackRad; /**< Current joint position [rad]. */
     iDynTree::VectorDynSize m_velocityFeedbackRad; /**< Current joint velocity [rad/s]. */
+    iDynTree::VectorDynSize m_torqueFeedback; /**< Current joint torque [Nm]. */
 
     iDynTree::VectorDynSize m_desiredJointPositionRad; /**< Desired Joint Position [rad]. */
     iDynTree::VectorDynSize m_desiredJointValueDeg; /**< Desired joint position or velocity [deg or deg/s]. */
+    iDynTree::VectorDynSize m_desiredTorque; /**< Desired Joint Position [Nm]. */
 
     iDynTree::VectorDynSize m_jointVelocitiesBounds; /**< Joint Velocity bounds [rad/s]. */
     iDynTree::VectorDynSize m_jointPositionsUpperBounds; /**< Joint Position upper bound [rad]. */
@@ -80,12 +86,16 @@ class RobotHelper
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_rightWrenchFilter; /**< Right wrench low pass filter.*/
     bool m_useWrenchFilter; /**< True if the wrench filter is used. */
 
-    yarp::os::BufferedPort<yarp::sig::Vector> m_leftFootImuPort; /**< Left foot Imu port. */
-    yarp::os::BufferedPort<yarp::sig::Vector> m_rightFootImuPort; /**< Right foot Imu port. */
-    yarp::sig::Vector m_leftFootImuInput; /**< YARP vector that contains left foot Imu Data. */
-    yarp::sig::Vector m_rightFootImuInput; /**< YARP vector that contains right foot Imu Data. */
-    iDynTree::VectorDynSize m_leftFootImuData; /**< iDynTree vector that contains left foot Imu Data. */
-    iDynTree::VectorDynSize m_rightFootImuData; /**< iDynTree vector that contains right foot Imu Data. */
+    yarp::sig::Vector m_leftFootThreeAxisLinearAccelerometersMeasure; /**< YARP vector that contains left foot acceleration measure. */
+    yarp::sig::Vector m_rightFootThreeAxisLinearAccelerometersMeasure; /**< YARP vector that contains right foot acceleration measure. */
+ 
+    iDynTree::VectorDynSize m_leftFootThreeAxisLinearAccelerometersMeasureData; /**< YARP vector that contains left foot acceleration measure. */
+    iDynTree::VectorDynSize m_rightFootThreeAxisLinearAccelerometersMeasureData; /**< YARP vector that contains right foot acceleration measure. */
+
+    size_t m_indxLeftFootAccel; /**< Left foot accelerometer index. */
+    size_t m_indxRightFootAccel; /**< Right foot acceleromete index. */
+    std::string m_leftFootAccelName; /** < Left foot accelerometer name sensor. */
+    std::string m_rightFootAccelName; /** < Right foot accelerometer name sensor. */
 
     double m_startingPositionControlTime;
     bool m_positionMoveSkipped;
@@ -105,7 +115,7 @@ class RobotHelper
     /**
      * Switch the control mode.
      * @param controlMode is the control mode.
-     * @return true in case of success and false otherwise.
+     * @return true in case of success or false otherwise.
      */
     bool switchToControlMode(const int& controlMode);
 public:
@@ -114,7 +124,7 @@ public:
      * Configure the Robot.
      * @param config is the reference to a resource finder object.
      * @param name robot name
-     * @return true in case of success and false otherwise.
+     * @return true in case of success or false otherwise.
      */
     bool configureRobot(const yarp::os::Searchable& rf);
 
@@ -122,23 +132,15 @@ public:
      * Configure the Force torque sensors. The FT ports are only opened please use yarpamanger
      * to connect them.
      * @param config is the reference to a resource finder object.
-     * @return true in case of success and false otherwise.
+     * @return true in case of success or false otherwise.
      */
     bool configureForceTorqueSensors(const yarp::os::Searchable& config);
-
-    /**
-     * Configure the IMU sensors. The IMU ports are only opened please use yarpamanger
-     * to connect them.
-     * @param config is the reference to a resource finder object.
-     * @return true in case of success and false otherwise.
-     */
-    bool configureImuSensors(const yarp::os::Searchable& config);
 
     bool configurePIDHandler(const yarp::os::Bottle& config);
 
     /**
      * Get all the feedback signal from the interfaces
-     * @return true in case of success and false otherwise.
+     * @return true in case of success or false otherwise.
      */
     bool getFeedbacks(unsigned int maxAttempts = 1);
 
@@ -148,7 +150,7 @@ public:
      * Set the desired position reference. (The position will be sent using PositionControl mode)
      * @param jointPositionsRadians desired final joint position;
      * @param positioningTimeSec minimum jerk trajectory duration.
-     * @return true in case of success and false otherwise.
+     * @return true in case of success or false otherwise.
      */
     bool setPositionReferences(const iDynTree::VectorDynSize& jointPositionsRadians,
                                const double& positioningTimeSec);
@@ -158,7 +160,7 @@ public:
      * Set the desired position reference.
      * (The position will be sent using DirectPositionControl mode)
      * @param desiredPositionsRad desired final joint position;
-     * @return true in case of success and false otherwise.
+     * @return true in case of success or false otherwise.
      */
     bool setDirectPositionReferences(const iDynTree::VectorDynSize&  desiredPositionsRad);
 
@@ -166,19 +168,26 @@ public:
      * Set the desired velocity reference.
      * (The position will be sent using DirectPositionControl mode)
      * @param desiredVelocityRad desired joints velocity;
-     * @return true in case of success and false otherwise.
+     * @return true in case of success or false otherwise.
      */
     bool setVelocityReferences(const iDynTree::VectorDynSize& desiredVelocityRad);
 
     /**
+     * Set the desired torque reference.
+     * @param desiredTorque desired joints torque;
+     * @return true in case of success or false otherwise.
+     */
+    bool setTorqueReferences(const iDynTree::VectorDynSize& desiredTorque);
+
+    /**
      * Reset filters.
-     * @return true in case of success and false otherwise.
+     * @return true in case of success or false otherwise.
      */
     bool resetFilters();
 
     /**
      * Close the polydrives.
-     * @return true in case of success and false otherwise.
+     * @return true in case of success or false otherwise.
      */
     bool close();
 
@@ -193,6 +202,24 @@ public:
      * @return the joint velocities in radiants per second
      */
     const iDynTree::VectorDynSize& getJointVelocity() const;
+
+    /**
+     * Get the joint torques
+     * @return the joint torque in Newton per meter
+     */
+    const iDynTree::VectorDynSize& getJointTorque() const;
+
+    /**
+     * Get the accelerometers measurements from left foot imu sensor
+     * @return the accelerometers measurements from left foot imu sensor meters^2/seconds
+     */
+    const iDynTree::VectorDynSize& getLeftFootThreeAxisLinearAccelerometersMeasureData() const;
+
+    /**
+     * Get the accelerometers measurements from right foot imu sensor
+     * @return the accelerometers measurements from right foot imu sensor meters^2/seconds
+     */
+    const iDynTree::VectorDynSize& getRightFootThreeAxisLinearAccelerometersMeasureData() const;
 
     /**
      * Get the joint upper limit
@@ -214,9 +241,6 @@ public:
 
     const iDynTree::Wrench& getLeftWrench() const;
     const iDynTree::Wrench& getRightWrench() const;
-
-    const iDynTree::VectorDynSize& getLeftFootImuData() const;
-    const iDynTree::VectorDynSize& getRightFootImuData() const;
 
     const std::vector<std::string>& getAxesList() const;
 

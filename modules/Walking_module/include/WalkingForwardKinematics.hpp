@@ -17,6 +17,7 @@
 
 //iDynTree
 #include <iDynTree/KinDynComputations.h>
+#include <iDynTree/Model/FreeFloatingState.h>
 
 // iCub-ctrl
 #include <iCub/ctrl/filters.h>
@@ -54,6 +55,9 @@ class WalkingFK
     iDynTree::Position m_comPositionFiltered; /**< Filtered position of the CoM. */
     iDynTree::Vector3 m_comVelocityFiltered; /**< Filtered velocity of the CoM. */
     bool m_useFilters; /**< If it is true the filters will be used. */
+
+    double m_totalMass; /**< is the total mass of the robot, m. */
+    iDynTree::FreeFloatingGeneralizedTorques m_generalizedGravityTorques; /** < Generalized gravity Torques vector. */
 
     bool m_firstStep; /**< True only during the first step. */
 
@@ -97,7 +101,7 @@ public:
 
     /**
      * Evaluate the first world to base transformation.
-     * @note: The The first reference frame is always the left foot.
+     * @note: The first reference frame is always the left foot.
      * @note: please use this method only with evaluateWorldToBaseTransformation(const bool& isLeftFixedFrame);
      * @param leftFootTransform transformation from the world to the left foot frame (l_sole);
      * @return true/false in case of success/failure.
@@ -204,6 +208,19 @@ public:
     iDynTree::Transform getRootLinkToWorldTransform();
 
     /**
+     * Return the transformation from base frame to world.
+     * @return world_H_base_frame.
+     */
+    iDynTree::Transform getWorldToBaseTransform();
+
+    /**
+     * Return the transformation from com frame to world frame 
+     * ( the rotation part is assumed to be equal to the world rotation,
+     * @return world_H_com_frame.
+     */
+    iDynTree::Transform getCoMTransform();
+
+    /**
      * Return the root link velocity.
      * @return the root link velocity expressed with the mixed representation.
      */
@@ -217,45 +234,156 @@ public:
 
     /**
      * Get the left foot jacobian.
-     * @oaram jacobian is the left foot jacobian matrix
+     * @param jacobian is the left foot jacobian matrix
      * @return true/false in case of success/failure.
      */
     bool getLeftFootJacobian(iDynTree::MatrixDynSize &jacobian);
 
     /**
      * Get the right foot jacobian.
-     * @oaram jacobian is the right foot jacobian matrix
+     * @param jacobian is the right foot jacobian matrix
      * @return true/false in case of success/failure.
      */
     bool getRightFootJacobian(iDynTree::MatrixDynSize &jacobian);
 
     /**
      * Get the left hand jacobian.
-     * @oaram jacobian is the left hand jacobian matrix
+     * @param jacobian is the left hand jacobian matrix.
      * @return true/false in case of success/failure.
      */
     bool getLeftHandJacobian(iDynTree::MatrixDynSize &jacobian);
 
     /**
      * Get the right hand jacobian.
-     * @oaram jacobian is the right hand jacobian matrix
+     * @param jacobian is the right hand jacobian matrix.
      * @return true/false in case of success/failure.
      */
     bool getRightHandJacobian(iDynTree::MatrixDynSize &jacobian);
 
     /**
      * Get the neck jacobian.
-     * @oaram jacobian is the neck jacobian matrix
+     * @param jacobian is the neck jacobian matrix.
      * @return true/false in case of success/failure.
      */
     bool getNeckJacobian(iDynTree::MatrixDynSize &jacobian);
 
     /**
      * Get the CoM jacobian.
-     * @oaram jacobian is the CoM jacobian matrix
+     * @param jacobian is the CoM jacobian matrix.
      * @return true/false in case of success/failure.
      */
     bool getCoMJacobian(iDynTree::MatrixDynSize &jacobian);
+
+    /**
+     * Get the generalzied gravity force vector.
+     * @param freeFloatingGeneralizedTorques the generalized gravity force vector.
+     * @return true/false in case of success/failure.
+     */
+    bool getGeneralizedGravityTorques(iDynTree::FreeFloatingGeneralizedTorques& freeFloatingGeneralizedTorques);
+
+    /**
+     * Get the Free Floating Mass Matrix.
+     * @param floatingMassMatrix is the mass matrix of the system.
+     * @return true/false in case of success/failure.
+     */
+    bool getFreeFloatingMassMatrix(iDynTree::MatrixDynSize &freeFloatingMassMatrix);
+
+    /**
+     * Set a velocity transformation from a given jacobian.
+     * @param bToAJacobian is the Jacobian expresses from B to A.
+     * @param bToAVelocityTransform is the velocity transformation from B to A.
+     * @return true/false in case of success/failure.
+     */
+    bool setVelocityTransformation(iDynTree::MatrixDynSize& bToAJacobian, iDynTree::MatrixDynSize& bToAVelocityTransform);
+
+    /**
+     * Set a velocity transformation from a frame (B) to the frame attached to the CoM (C) : ( B_T_C) 
+     * the relative generalized representation is given as follows : ( A_c , R_b , s )
+     * @param Rb is the rotation of the frame B with respect to the world/inertial frame
+     * @param bRc is the CoM position vector expressed with respect to the frame B
+     * @param bJc is the jacobian matrix from the frame C to the frame B
+     * @return true/false in case of success/failure.
+     */
+    bool setWorldToCoMVelocityTransformation(iDynTree::MatrixDynSize Rb, iDynTree::MatrixDynSize bRc, iDynTree::MatrixDynSize bJc, iDynTree::MatrixDynSize& AToCoMVelocityTransform);
+
+    /**
+     *  
+     * @return true/false in case of success/failure.
+     */
+    bool toMatrixDynSize(iDynTree::Rotation &Rot, iDynTree::MatrixDynSize &Mat);
+
+    /**
+     *  
+     * @return true/false in case of success/failure.
+     */
+    bool toVectorDynSize(iDynTree::Position &pos, iDynTree::VectorDynSize &vec);
+
+    /**
+     * Get the total mass of the robot.
+     * @return true/false in case of success/failure.
+     */
+    bool getTotalMass(double& totalMass);
+
+    /**
+     * Get the jacobian matrix from CoM to left foot : Jlc 
+     * @return true/false in case of success/failure.
+     */
+    bool getCoMToLeftFootJacobian(iDynTree::MatrixDynSize &jacobian);
+
+    /**
+     * Get the jacobian matrix from CoM to right foot : Jrc 
+     * @return true/false in case of success/failure.
+     */
+    bool getCoMToRightFootJacobian(iDynTree::MatrixDynSize &jacobian);
+
+    /**
+     * Get the jacobian matrix from CoM to the feet : Jlrc = [ Jlc | Jrc ]
+     * @return true/false in case of success/failure.
+     */
+    bool getCoMToFeetJacobian(iDynTree::MatrixDynSize &jacobian);
+
+    /**
+     *
+     * @return true/false in case of success/failure.
+     */
+    bool getSkewMatrix(iDynTree::VectorDynSize &vec, iDynTree::MatrixDynSize &skewMatrix);
+
+    /**
+     *
+     * @return true/false in case of success/failure.
+     */
+    bool getAdjointMatrix(iDynTree::MatrixDynSize &Rotation, iDynTree::VectorDynSize &position, iDynTree::MatrixDynSize &adjointMatrix);
+
+    /**
+     *
+     * @return true/false in case of success/failure.
+     */
+    bool getGraspMatrix(iDynTree::MatrixDynSize &Rotation, iDynTree::VectorDynSize &position, iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &graspMatrix);
+
+    /**
+     *
+     * @return true/false in case of success/failure.
+     */
+    bool getLeftFootToCoMGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &leftFootToCoMGraspMatrix);
+
+    /**
+     *
+     * @return true/false in case of success/failure.
+     */
+    bool getRightFootToCoMGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &rightFootToCoMGraspMatrix);
+
+    /**
+     *
+     * @return true/false in case of success/failure.
+     */
+    bool getFeetToCoMGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &feetToCoMGraspMatrix);
+
+    /**
+     *
+     * @return true/false in case of success/failure.
+     */
+    bool getPseudoInverseOfGraspMatrix(iDynTree::MatrixDynSize &graspMatrix, iDynTree::MatrixDynSize &pseudoInverseGraspMatrix);
+
 };
 
 #endif

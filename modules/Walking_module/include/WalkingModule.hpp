@@ -30,6 +30,9 @@
 #include <WalkingDCMModelPredictiveController.hpp>
 #include <WalkingDCMReactiveController.hpp>
 #include <WalkingZMPController.hpp>
+#include <WalkingImpedanceController.hpp>
+#include <WalkingGTorqueController.hpp>
+#include <WalkingPDFeedForwardController.hpp>
 #include <WalkingInverseKinematics.hpp>
 #include <WalkingQPInverseKinematics.hpp>
 #include <WalkingQPInverseKinematics_osqp.hpp>
@@ -63,12 +66,16 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     bool m_useQPIK; /**< True if the QP-IK is used. */
     bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
     bool m_dumpData; /**< True if data are saved. */
+    int  m_controlMode; /**< True if the control mode is position control. */
 
     std::unique_ptr<RobotHelper> m_robotControlHelper; /**< Robot control helper. */
     std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */
     std::unique_ptr<WalkingController> m_walkingController; /**< Pointer to the walking DCM MPC object. */
     std::unique_ptr<WalkingDCMReactiveController> m_walkingDCMReactiveController; /**< Pointer to the walking DCM reactive controller object. */
     std::unique_ptr<WalkingZMPController> m_walkingZMPController; /**< Pointer to the walking ZMP controller object. */
+    std::unique_ptr<WalkingImpedanceController> m_walkingImpedanceController; /**< Pointer to the Impedance controller object. */
+    std::unique_ptr<WalkingGTorqueController> m_walkingGTorqueController; /**< Pointer to the Gravity Compensation Torque controller object. */
+    std::unique_ptr<WalkingPDFeedForwardController> m_walkingPDFeedForwardController; /**< Pointer to the PD FeedForward controller object. */
     std::unique_ptr<WalkingIK> m_IKSolver; /**< Pointer to the inverse kinematics solver. */
     std::unique_ptr<WalkingQPIK> m_QPIKSolver; /**< Pointer to the inverse kinematics solver. */
     std::unique_ptr<WalkingFK> m_FKSolver; /**< Pointer to the forward kinematics solver. */
@@ -77,7 +84,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::unique_ptr<RetargetingClient> m_retargetingClient; /**< Pointer to the stable DCM dynamics. */
     std::unique_ptr<LoggerClient> m_walkingLogger; /**< Pointer to the Walking Logger object. */
     std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
-    std::unique_ptr<iDynTree::AttitudeQuaternionEKF> m_qEKF; /**< Pointer to the Attitude quaternion EKF object. */
+    std::unique_ptr<iDynTree::AttitudeMahonyFilter> m_MahonyFilter; /**< Pointer to the Attitude quaternion EKF object. */
 
     double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
     double m_desiredJointsWeight; /**< Desired joint weight matrix. */
@@ -110,6 +117,10 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     double m_inclPlaneAngle; /**< angle of the inclined plane. */
     double m_comHeight; /**< height of the centre of the mass. */
     double m_comHeightDelta; /**< com height tolerance. */
+    std::string m_leftFootFrameName; /** < frame name of the left foot : left sole. */
+    std::string m_rightFootFrameName; /** < frame name of the right foot : right sole. */
+    std::string m_leftFootImuFrameName; /** < frame name of the imu on the left foot. */
+    std::string m_rightFootImuFrameName; /** < frame name of the imu on the right foot. */
 
     yarp::os::Port m_rpcPort; /**< Remote Procedure Call port. */
     yarp::os::BufferedPort<yarp::sig::Vector> m_desiredUnyciclePositionPort; /**< Desired robot position port. */
@@ -120,6 +131,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::mutex m_mutex; /**< Mutex. */
 
     iDynTree::Vector2 m_desiredPosition;
+    iDynTree::MatrixDynSize m_contactModel; /**< Matrix that defines the contact Model. */
 
     // debug
     std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
@@ -157,6 +169,14 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     bool updateFKSolver();
 
     /**
+     *
+     *
+     *
+     * @return true in case of success and false otherwise.
+     */
+    bool checkContact(iDynTree::MatrixDynSize &comToContactFeetJacobian, iDynTree::MatrixDynSize &comToContactFeetGraspMatrix);
+
+    /**
      * Set the QP-IK problem.
      * @param solver is the pointer to the solver (osqp or qpOASES)
      * @param desiredCoMPosition desired CoM position;
@@ -180,10 +200,13 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     /**
      * Detect the angle of the plane and update its value.
-     * @param FootImuData imu sensor data comes from one foot
-     * @return true in case of success and false otherwise.
+     * @param SensorData imu sensor data comes from one foot (acc, gyro, magnet)
+     * @param usingFilter is a boolean value that active the use of the filter in the estimation
+     * @param sensorFrameName is the frame name of the sensor.
+     * @param destinationFrameName is the frame name of the destination location where we want to perform the value
+     * @return true in case of success, false otherwise.
      */
-    bool detectInclinedPlaneAngle(const iDynTree::VectorDynSize& FootImuData);
+    bool detectInclinedPlaneAngle(const iDynTree::VectorDynSize& SensorData, bool usingFilter, const std::string &sensorFrameName, const std::string &destinationFrameName);
 
     /**
      * Generate the first trajectory.

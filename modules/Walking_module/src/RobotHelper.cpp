@@ -50,11 +50,15 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
     bool okPosition = false;
     bool okVelocity = false;
 
+    bool okTorque = false;
+
     bool okLeftWrench = false;
     bool okRightWrench = false;
 
-    bool okLeftFootImu = false;
-    bool okRightFootImu = false;
+    bool okLeftFootAccel = false;
+    bool okRightFootAccel = false;   
+
+    double timeStamp = 0;
 
     unsigned int attempt = 0;
     do
@@ -65,6 +69,15 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
         if(!okVelocity)
             okVelocity = m_encodersInterface->getEncoderSpeeds(m_velocityFeedbackDeg.data());
 
+        if(!okTorque)
+            okTorque = m_torqueInterface->getTorques(m_torqueFeedback.data());
+/*
+        if(!okLeftFootAccel)
+            okLeftFootAccel = m_linearAccelerometersInterface->getThreeAxisLinearAccelerometerMeasure(m_indxLeftFootAccel,m_leftFootThreeAxisLinearAccelerometersMeasure, timeStamp);
+
+        if(!okRightFootAccel)
+            okRightFootAccel = m_linearAccelerometersInterface->getThreeAxisLinearAccelerometerMeasure(m_indxRightFootAccel,m_rightFootThreeAxisLinearAccelerometersMeasure, timeStamp);
+*/
         if(!okLeftWrench)
         {
             yarp::sig::Vector *leftWrenchRaw = NULL;
@@ -87,31 +100,9 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
             }
         }
 
-        // read Left foot imu port data
-        if(!okLeftFootImu)
-        {
-            yarp::sig::Vector *leftFootImuRaw = NULL;
-            leftFootImuRaw = m_leftFootImuPort.read(false);
-            if(leftFootImuRaw != NULL)
-            {
-                m_leftFootImuInput = *leftFootImuRaw;
-                okLeftFootImu = true;
-            }
-        }
+        bool okImuMeasure = true ; // okLeftFootAccel && okRightFootAccel;
 
-        // read Right foot imu port data
-        if(!okRightFootImu)
-        {
-            yarp::sig::Vector *rightFootImuRaw = NULL;
-            rightFootImuRaw = m_rightFootImuPort.read(false);
-            if(rightFootImuRaw != NULL)
-            {
-                m_rightFootImuInput = *rightFootImuRaw;
-                okRightFootImu = true;
-            }
-        }
-
-        if(okPosition && okVelocity && okLeftWrench && okRightWrench && okLeftFootImu && okRightFootImu )
+        if(okPosition && okVelocity && okLeftWrench && okRightWrench && okTorque && okImuMeasure)
         {
             for(unsigned j = 0 ; j < m_actuatedDOFs; j++)
             {
@@ -129,17 +120,18 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
                 yError() << "[RobotHelper::getFeedbacksRaw] Unable to convert right foot wrench.";
                 return false;
             }
-
-            if(!iDynTree::toiDynTree(m_leftFootImuInput, m_leftFootImuData))
-            {
-                yError() << "[RobotHelper::getFeedbacksRaw] Unable to convert left foot IMU.";
-                return false;
-            }
-            if(!iDynTree::toiDynTree(m_rightFootImuInput, m_rightFootImuData))
+        /*
+            if(!iDynTree::toiDynTree(m_leftFootThreeAxisLinearAccelerometersMeasure, m_leftFootThreeAxisLinearAccelerometersMeasureData))
             {
                 yError() << "[RobotHelper::getFeedbacksRaw] Unable to convert right foot IMU.";
                 return false;
             }
+            if(!iDynTree::toiDynTree(m_rightFootThreeAxisLinearAccelerometersMeasure, m_rightFootThreeAxisLinearAccelerometersMeasureData))
+            {
+                yError() << "[RobotHelper::getFeedbacksRaw] Unable to convert right foot IMU.";
+                return false;
+            } 
+        */
             return true;
         }
         yarp::os::Time::delay(0.001);
@@ -153,18 +145,21 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
     if(!okVelocity)
         yError() << "\t - Velocity encoders";
 
+    if(!okTorque)
+        yError() << "\t - Joint torque";
+
     if(!okLeftWrench)
         yError() << "\t - Left wrench";
 
     if(!okRightWrench)
         yError() << "\t - Right wrench";
+/*
+    if(!okLeftFootAccel)
+        yError() << "\t - Left Foot Accelerometer measurement from IMU";
 
-    if(!okLeftFootImu)
-        yError() << "\t - Left Foot IMU";
-
-    if(!okRightFootImu)
-        yError() << "\t - Right Foot IMU";
-
+    if(!okRightFootAccel)
+        yError() << "\t - Right Foot Accelerometer measurement from IMU";
+*/
     return false;
 }
 
@@ -181,7 +176,33 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
         yError() << "[RobotHelper::configureRobot] Unable to get the string from searchable.";
         return false;
     }
+/*
+    if(!YarpHelper::getStringFromSearchable(config, "leftFootAccelName", m_leftFootAccelName))
+    {
+        yError() << "[RobotHelper::configureRobot] Unable to get the string name of the left foot accelerometer from searchable.";
+        return false;
+    }
 
+    if(!YarpHelper::getStringFromSearchable(config, "rightFootAccelName", m_rightFootAccelName))
+    {
+        yError() << "[RobotHelper::configureRobot] Unable to get the string name of the right foot accelerometer from searchable.";
+        return false;
+    }
+
+    std::string result;
+    size_t nAccel = m_linearAccelerometersInterface->getNrOfThreeAxisLinearAccelerometers();
+    for(int i = 0 ; i < nAccel ; i++)
+    {
+        bool ok = m_linearAccelerometersInterface->getThreeAxisLinearAccelerometerName(i,result);
+        if(m_leftFootAccelName == result)   
+            m_indxLeftFootAccel = i;
+        else
+        {
+            if(m_rightFootAccelName == result)   
+                m_indxRightFootAccel = i;
+        }
+    }
+*/
     yarp::os::Value *axesListYarp;
     if(!config.check("joints_list", axesListYarp))
     {
@@ -253,6 +274,12 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
         return false;
     }
 
+    if(!m_robotDevice.view(m_torqueInterface) || !m_torqueInterface)
+    {
+        yError() << "[configureRobot] Cannot obtain ITorqueControl interface";
+        return false;
+    }
+
     if(!m_robotDevice.view(m_positionDirectInterface) || !m_positionDirectInterface)
     {
         yError() << "[configureRobot] Cannot obtain IPositionDirect interface";
@@ -270,7 +297,13 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
         yError() << "[configureRobot] Cannot obtain IControlMode interface";
         return false;
     }
-
+/*
+    if(!m_robotDevice.view(m_linearAccelerometersInterface) || !m_linearAccelerometersInterface)
+    {
+        yError() << "[configureRobot] Cannot obtain IThreeAxisLinearAccelerometers interface";
+        return false;
+    }
+*/
     // resize the buffers
     m_positionFeedbackDeg.resize(m_actuatedDOFs, 0.0);
     m_velocityFeedbackDeg.resize(m_actuatedDOFs, 0.0);
@@ -278,6 +311,8 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
     m_velocityFeedbackRad.resize(m_actuatedDOFs);
     m_desiredJointPositionRad.resize(m_actuatedDOFs);
     m_desiredJointValueDeg.resize(m_actuatedDOFs);
+    m_torqueFeedback.resize(m_actuatedDOFs);
+    m_desiredTorque.resize(m_actuatedDOFs);
     m_jointVelocitiesBounds.resize(m_actuatedDOFs);
     m_jointPositionsUpperBounds.resize(m_actuatedDOFs);
     m_jointPositionsLowerBounds.resize(m_actuatedDOFs);
@@ -439,69 +474,6 @@ bool RobotHelper::configureForceTorqueSensors(const yarp::os::Searchable& config
     return true;
 }
 
-bool RobotHelper::configureImuSensors(const yarp::os::Searchable& config)
-{
-    std::string portInput, portOutput;
-
-    // check if the config file is empty
-    if(config.isNull())
-    {
-        yError() << "[RobotHelper::configureImuSensors] Empty configuration for the IMU sensors.";
-        return false;
-    }
-
-    std::string name;
-    if(!YarpHelper::getStringFromSearchable(config, "name", name))
-    {
-        yError() << "[RobotHelper::configureImuSensors] Unable to get the string from searchable.";
-        return false;
-    }
-
-    // open and connect left foot wrench
-    if(!YarpHelper::getStringFromSearchable(config, "leftFootImuInputPort_name", portInput))
-    {
-      yError() << "[RobotHelper::configureImuSensors] Unable to get "
-                  "the string from searchable.";
-      return false;
-    }
-    if(!YarpHelper::getStringFromSearchable(config, "leftFootImuOutputPort_name", portOutput))
-    {
-        yError() << "[RobotHelper::configureImuSensors] Unable to get the string from searchable.";
-        return false;
-    }
-    // open port
-    m_leftFootImuPort.open("/" + name + portInput);
-    // connect port
-    if(!yarp::os::Network::connect(portOutput, "/" + name + portInput))
-    {
-        yError() << "[RobotHelper::configureImuSensors] Unable to connect to port "
-                 << portOutput << " to " << "/" + name + portInput;
-        return false;
-    }
-
-    // open and connect right foot wrench
-    if(!YarpHelper::getStringFromSearchable(config, "rightFootImuInputPort_name", portInput))
-    {
-        yError() << "[RobotHelper::configureImuSensors] Unable to get the string from searchable.";
-        return false;
-    }
-    if(!YarpHelper::getStringFromSearchable(config, "rightFootImuOutputPort_name", portOutput))
-    {
-        yError() << "[RobotHelper::configureImuSensors] Unable to get the string from searchable.";
-        return false;
-    }
-    // open port
-    m_rightFootImuPort.open("/" + name + portInput);
-    // connect port
-    if(!yarp::os::Network::connect(portOutput, "/" + name + portInput))
-    {
-        yError() << "[RobotHelper::configureImuSensors] Unable to connect to port "
-                 << portOutput << " to " << "/" + name + portInput;
-        return false;
-    }
-
-    return true;
-}
 
 bool RobotHelper::configurePIDHandler(const yarp::os::Bottle& config)
 {
@@ -799,12 +771,47 @@ bool RobotHelper::setVelocityReferences(const iDynTree::VectorDynSize& desiredVe
     return true;
 }
 
+bool RobotHelper::setTorqueReferences(const iDynTree::VectorDynSize& desiredTorque)
+{
+    if(m_controlMode != VOCAB_CM_TORQUE)
+    {
+        if(!switchToControlMode(VOCAB_CM_TORQUE))
+        {
+            yError() << "[RobotHelper::setTorqueReferences] Unable to switch in torque control mode";
+            return false;
+        }
+        m_controlMode = VOCAB_CM_TORQUE;
+    }
+
+    if(m_torqueInterface == nullptr)
+    {
+        yError() << "[RobotHelper::setTorqueReferences] Torque I/F is not ready.";
+        return false;
+    }
+
+    std::cout << "size of desiredTorque : " << desiredTorque.size() << " number of actuated DOFS : " << m_actuatedDOFs << std::endl ;
+    if(desiredTorque.size() != m_actuatedDOFs)
+    {
+        yError() << "[RobotHelper::setTorqueReferences] Dimension mismatch between desired torque "
+                 << "vector and the number of controlled joints." ;
+
+        return false;
+    }
+
+    m_desiredTorque = desiredTorque;
+
+    if(!m_torqueInterface->setRefTorques(m_desiredTorque.data()))
+    {
+        yError() << "[RobotHelper::setTorqueReferences] Error during setting the desired torque.";
+        return false;
+    }
+    return true;
+}
+
 bool RobotHelper::close()
 {
     m_rightWrenchPort.close();
     m_leftWrenchPort.close();
-    m_rightFootImuPort.close();
-    m_leftFootImuPort.close();
     switchToControlMode(VOCAB_CM_POSITION);
     m_controlMode = VOCAB_CM_POSITION;
     if(!m_robotDevice.close())
@@ -825,6 +832,11 @@ const iDynTree::VectorDynSize& RobotHelper::getJointVelocity() const
     return m_velocityFeedbackRad;
 }
 
+const iDynTree::VectorDynSize& RobotHelper::getJointTorque() const
+{
+    return m_torqueFeedback;
+}
+
 const iDynTree::Wrench& RobotHelper::getLeftWrench() const
 {
     return m_leftWrench;
@@ -835,14 +847,14 @@ const iDynTree::Wrench& RobotHelper::getRightWrench() const
     return m_rightWrench;
 }
 
-const iDynTree::VectorDynSize& RobotHelper::getLeftFootImuData() const
+const iDynTree::VectorDynSize& RobotHelper::getLeftFootThreeAxisLinearAccelerometersMeasureData() const
 {
-    return m_leftFootImuData;
+    return m_leftFootThreeAxisLinearAccelerometersMeasureData;
 }
 
-const iDynTree::VectorDynSize& RobotHelper::getRightFootImuData() const
+const iDynTree::VectorDynSize& RobotHelper::getRightFootThreeAxisLinearAccelerometersMeasureData() const
 {
-    return m_rightFootImuData;
+    return m_rightFootThreeAxisLinearAccelerometersMeasureData;
 }
 
 const iDynTree::VectorDynSize& RobotHelper::getVelocityLimits() const

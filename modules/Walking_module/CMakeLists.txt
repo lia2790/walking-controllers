@@ -31,6 +31,9 @@ set(${EXE_TARGET_NAME}_SRC
   src/MPCSolver.cpp
   src/WalkingDCMModelPredictiveController.cpp
   src/WalkingDCMReactiveController.cpp
+  src/WalkingImpedanceController.cpp
+  src/WalkingGTorqueController.cpp
+  src/WalkingPDFeedForwardController.cpp
   src/WalkingModule.cpp
   src/WalkingInverseKinematics.cpp
   src/WalkingQPInverseKinematics.cpp
@@ -56,6 +59,9 @@ set(${EXE_TARGET_NAME}_HDR
   include/WalkingQPInverseKinematics_qpOASES.hpp
   include/WalkingForwardKinematics.hpp
   include/WalkingZMPController.hpp
+  include/WalkingImpedanceController.hpp
+  include/WalkingGTorqueController.hpp
+  include/WalkingPDFeedForwardController.hpp
   include/StableDCMModel.hpp
   include/WalkingPIDHandler.hpp
   include/RetargetingClient.hpp

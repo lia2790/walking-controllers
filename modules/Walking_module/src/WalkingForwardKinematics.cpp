@@ -57,8 +57,8 @@ bool WalkingFK::setBaseFrames(const std::string& lFootFrame, const std::string& 
         return false;
     }
     iDynTree::LinkIndex linkLeftIndex = m_kinDyn.model().getFrameLink(m_frameLeftIndex);
-    m_baseFrameLeft = m_kinDyn.model().getLinkName(linkLeftIndex);
     m_frameHlinkLeft = m_kinDyn.getRelativeTransform(m_frameLeftIndex, linkLeftIndex);
+    m_baseFrameLeft = m_kinDyn.model().getLinkName(linkLeftIndex);
 
     m_frameRightIndex = m_kinDyn.model().getFrameIndex(rFootFrame);
     if(m_frameRightIndex == iDynTree::FRAME_INVALID_INDEX)
@@ -67,8 +67,9 @@ bool WalkingFK::setBaseFrames(const std::string& lFootFrame, const std::string& 
         return false;
     }
     iDynTree::LinkIndex linkRightIndex = m_kinDyn.model().getFrameLink(m_frameRightIndex);
-    m_baseFrameRight = m_kinDyn.model().getLinkName(linkRightIndex);
     m_frameHlinkRight = m_kinDyn.getRelativeTransform(m_frameRightIndex, linkRightIndex);
+    m_baseFrameRight = m_kinDyn.model().getLinkName(linkRightIndex);
+    
 
     return true;
 }
@@ -237,6 +238,10 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
 
     m_useFilters = config.check("use_filters", yarp::os::Value(false)).asBool();
     m_firstStep = true;
+
+    //initialized generalized gravity force vector.
+    m_generalizedGravityTorques.resize(m_kinDyn.model());
+
     return true;
 }
 
@@ -307,12 +312,12 @@ bool WalkingFK::evaluateWorldToBaseTransformation(const iDynTree::Transform& lef
                          << "base on link " << m_baseFrameLeft;
                 return false;
             }
-            m_prevContactLeft = true;
+            m_prevContactLeft = true; // m_frameHlinkLeft
         }
     }
     else
     {
-        // evaluate the new world to base transformation only if the previous if the previous fixed frame was
+        // evaluate the new world to base transformation only if the previous fixed frame was
         // the left foot
         if(m_prevContactLeft || m_firstStep)
         {
@@ -324,7 +329,7 @@ bool WalkingFK::evaluateWorldToBaseTransformation(const iDynTree::Transform& lef
                 return false;
             }
             m_prevContactLeft = false;
-        }
+        } 
     }
 
     m_firstStep = false;
@@ -338,12 +343,19 @@ bool WalkingFK::setInternalRobotState(const iDynTree::VectorDynSize& positionFee
     gravity.zero();
     gravity(2) = -9.81;
 
+    // m_worldToBaseTransform 
+
     if(!m_kinDyn.setRobotState(m_worldToBaseTransform, positionFeedbackInRadians,
                                iDynTree::Twist::Zero(), velocityFeedbackInRadians,
                                gravity))
     {
         yError() << "[WalkingFK::setInternalRobotState] Error while updating the state.";
         return false;
+    }
+
+    if(!m_kinDyn.generalizedGravityForces(m_generalizedGravityTorques))
+    {
+        yError() << "[WalkingFK::setInternalRobotState] Error while evaluating the generalized gravity vector. ";
     }
 
     m_comEvaluated = false;
@@ -356,6 +368,7 @@ bool WalkingFK::setForwardKinematics(const double comHeight, const double inclPl
 {
     m_omega = sqrt((9.8*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle))));
     m_corrTerm = (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle)))*std::tan(iDynTree::deg2rad(inclPlaneAngle));
+    return true;
 }
 
 void WalkingFK::evaluateCoM()
@@ -487,6 +500,11 @@ iDynTree::Transform WalkingFK::getRootLinkToWorldTransform()
     return m_kinDyn.getWorldTransform(m_frameRootIndex);
 }
 
+iDynTree::Transform WalkingFK::getWorldToBaseTransform()
+{
+    return m_worldToBaseTransform;
+}
+
 iDynTree::Twist WalkingFK::getRootLinkVelocity()
 {
     return m_kinDyn.getFrameVel(m_frameRootIndex);
@@ -525,4 +543,289 @@ bool WalkingFK::getNeckJacobian(iDynTree::MatrixDynSize &jacobian)
 bool WalkingFK::getCoMJacobian(iDynTree::MatrixDynSize &jacobian)
 {
     return m_kinDyn.getCenterOfMassJacobian(jacobian);
+}
+
+bool WalkingFK::getGeneralizedGravityTorques(iDynTree::FreeFloatingGeneralizedTorques& freeFloatingGeneralizedTorques)
+{
+    return m_kinDyn.generalizedGravityForces(freeFloatingGeneralizedTorques);
+}
+
+bool WalkingFK::getFreeFloatingMassMatrix(iDynTree::MatrixDynSize &freeFloatingMassMatrix)
+{
+    return m_kinDyn.getFreeFloatingMassMatrix(freeFloatingMassMatrix);
+}
+
+bool WalkingFK::setVelocityTransformation(iDynTree::MatrixDynSize& bToAJacobian, iDynTree::MatrixDynSize& bToAVelocityTransform)
+{
+    bToAVelocityTransform.resize(bToAJacobian.cols(),bToAJacobian.cols());
+    bToAVelocityTransform.zero();
+
+    for(int i = 0 ; i < bToAJacobian.rows() ; i++ )
+    {
+        for(int j = 0 ; j < bToAJacobian.cols() ; j++ )
+        {
+            bToAVelocityTransform(i,j) = bToAJacobian(i,j);
+        }
+    }
+    for( int i = 6 ; i < bToAJacobian.cols() - 6 ; i++ )
+    {
+        bToAVelocityTransform(i,i) = 1;
+    }
+
+    return true;
+}
+
+bool WalkingFK::setWorldToCoMVelocityTransformation(iDynTree::MatrixDynSize Rb, iDynTree::MatrixDynSize bRc, iDynTree::MatrixDynSize bJc, iDynTree::MatrixDynSize& AToCoMVelocityTransform)
+{
+    AToCoMVelocityTransform.resize(Rb.cols() + bRc.cols() + bJc.cols(), Rb.cols() + bRc.cols() + bJc.cols());
+    AToCoMVelocityTransform.zero();
+
+    for(int i = 0 ; i < Rb.rows() ; i++ )
+    {
+        for(int j = 0 ; j < Rb.cols() ; j++ )
+        {
+            AToCoMVelocityTransform(i,j) = Rb(i,j);
+        }   
+    }
+
+    for(int i = 0 ; i < bRc.rows() ; i++ )
+    {
+        for(int j = Rb.cols() ; j < bRc.cols() ; j++ )
+        {
+            AToCoMVelocityTransform(i,j) = bRc(i,j);
+        }   
+    }
+
+    for(int i = 0 ; i < bJc.rows() ; i++ )
+    {
+        for(int j = Rb.cols() + bRc.cols() ; j < bJc.cols() ; j++ )
+        {
+            AToCoMVelocityTransform(i,j) = bRc(i,j);
+        }   
+    }
+
+    for(int i = bRc.rows() ; i < bRc.rows() ; i++ )
+    {
+            AToCoMVelocityTransform(i,i) = 1;   
+    }
+
+    for(int i = bRc.rows() + bRc.rows() ; i < bJc.rows() ; i++ )
+    {
+            AToCoMVelocityTransform(i,i) = 1;
+    }
+
+    return true;
+}
+
+bool WalkingFK::getTotalMass(double& totalMass)
+{
+    iDynTree::MatrixDynSize Mb;
+    m_kinDyn.getFreeFloatingMassMatrix(Mb);
+
+    iDynTree::MatrixDynSize Jgb;
+    m_kinDyn.getCenterOfMassJacobian(Jgb);
+
+    iDynTree::MatrixDynSize gTb;
+    this->setVelocityTransformation(Jgb,gTb);
+
+    iDynTree::MatrixDynSize bTg;
+    iDynTree::toEigen(bTg) = iDynTree::toEigen(gTb).inverse();
+
+    iDynTree::MatrixDynSize Mg;
+    iDynTree::toEigen(Mg) = iDynTree::toEigen(bTg).transpose() * iDynTree::toEigen(Mb) * iDynTree::toEigen(bTg);
+
+    totalMass = Mg(0,0);
+
+    return true;
+}
+
+bool WalkingFK::getCoMToLeftFootJacobian(iDynTree::MatrixDynSize &jacobian)
+{
+    iDynTree::MatrixDynSize Jla;
+    this->getLeftFootJacobian(Jla);
+
+    iDynTree::MatrixDynSize Jca;
+    this->getCoMJacobian(Jca);
+
+    iDynTree::MatrixDynSize cTa;
+    this->setVelocityTransformation(Jca, cTa);
+
+    iDynTree::MatrixDynSize Jlc;
+    iDynTree::toEigen(Jlc) = iDynTree::toEigen(Jla) * iDynTree::toEigen(cTa).inverse();
+
+    jacobian = Jlc;
+
+    return true;
+}
+
+bool WalkingFK::getCoMToRightFootJacobian(iDynTree::MatrixDynSize &jacobian)
+{
+    iDynTree::MatrixDynSize Jra;
+    this->getRightFootJacobian(Jra);
+
+    iDynTree::MatrixDynSize Jca;
+    this->getCoMJacobian(Jca);
+
+    iDynTree::MatrixDynSize cTa;
+    this->setVelocityTransformation(Jca, cTa);
+
+    iDynTree::MatrixDynSize Jrc;
+    iDynTree::toEigen(Jrc) = iDynTree::toEigen(Jra) * iDynTree::toEigen(cTa).inverse();
+
+    jacobian = Jrc;
+
+    return true;
+}
+
+bool WalkingFK::getCoMToFeetJacobian(iDynTree::MatrixDynSize &jacobian)
+{
+    iDynTree::MatrixDynSize Jlc;
+    this->getCoMToLeftFootJacobian(Jlc);
+
+    iDynTree::MatrixDynSize Jrc;
+    this->getCoMToRightFootJacobian(Jrc);
+
+    jacobian.resize(Jrc.rows(),Jrc.cols() + Jlc.cols());
+    jacobian.zero();
+
+    iDynTree::toEigen(jacobian).block(0,0,Jlc.rows(),Jlc.cols()) = iDynTree::toEigen(Jlc); // Jacobian from com to left foot
+    iDynTree::toEigen(jacobian).block(0,Jlc.cols(),Jrc.rows(),Jrc.cols()) = iDynTree::toEigen(Jrc); // Jacobian from right foot
+
+    return true;
+}
+
+bool WalkingFK::getSkewMatrix(iDynTree::VectorDynSize &vec, iDynTree::MatrixDynSize &skewMatrix)
+{
+    skewMatrix.resize(3,3); skewMatrix.zero();
+
+    skewMatrix(0,1) = -vec(2);
+    skewMatrix(0,2) =  vec(1);
+    skewMatrix(1,0) =  vec(2);
+    skewMatrix(1,2) = -vec(0);
+    skewMatrix(2,0) = -vec(1);
+    skewMatrix(2,1) =  vec(0);
+
+    return true;
+}
+
+bool WalkingFK::getAdjointMatrix(iDynTree::MatrixDynSize &Rotation, iDynTree::VectorDynSize &position, iDynTree::MatrixDynSize &adjointMatrix)
+{
+    adjointMatrix.resize(6,6); adjointMatrix.zero();
+
+    iDynTree::MatrixDynSize skewMatrix;
+    this->getSkewMatrix(position,skewMatrix);
+
+    iDynTree::toEigen(adjointMatrix).block(0,0,Rotation.rows(),Rotation.cols()) = iDynTree::toEigen(Rotation);
+    iDynTree::toEigen(adjointMatrix).block(0,Rotation.cols(),skewMatrix.rows(),Rotation.cols()) = iDynTree::toEigen(skewMatrix) * iDynTree::toEigen(Rotation);
+    iDynTree::toEigen(adjointMatrix).block(Rotation.rows(),Rotation.cols(),Rotation.rows(),Rotation.cols()) = iDynTree::toEigen(Rotation);
+
+    return true;
+}
+
+bool WalkingFK::getGraspMatrix(iDynTree::MatrixDynSize &Rotation, iDynTree::VectorDynSize &position, iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &graspMatrix)
+{
+    iDynTree::MatrixDynSize adjointMatrix;
+    this->getAdjointMatrix(Rotation, position, adjointMatrix);
+
+    iDynTree::toEigen(graspMatrix) = iDynTree::toEigen(adjointMatrix).transpose() * iDynTree::toEigen(contactModelMatrix);
+
+    return true;
+}
+
+iDynTree::Transform WalkingFK::getCoMTransform()
+{
+    iDynTree::Transform wTc;
+    wTc = iDynTree::Transform::Identity();
+    wTc.setPosition(this->getCoMPosition());
+
+    return wTc;
+}
+
+bool WalkingFK::toMatrixDynSize(iDynTree::Rotation &Rot, iDynTree::MatrixDynSize &Mat)
+{
+    for(int i = 0; i < Rot.rows(); i++)
+    {
+         for(int j = 0; j < Rot.cols(); j++)
+            Mat(i,j) = Rot.getVal(i,j);
+    }
+
+    return true;
+}
+
+bool WalkingFK::toVectorDynSize(iDynTree::Position &pos, iDynTree::VectorDynSize &vec)
+{
+    for(int i = 0; i < pos.size(); i++)
+            vec(i) = pos.getVal(i);
+
+    return true;
+}
+
+bool WalkingFK::getLeftFootToCoMGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &leftFootToCoMGraspMatrix)
+{ 
+    iDynTree::Transform wTc;
+    wTc = this->getCoMTransform();
+
+    iDynTree::Transform wTl;
+    wTl = this->getLeftFootToWorldTransform();
+
+    iDynTree::Transform cTl;
+    cTl = wTc.inverse() * wTl;
+
+    iDynTree::Rotation Rcl_; Rcl_ = cTl.getRotation();
+    iDynTree::Position Pcl_; Pcl_ = cTl.getPosition();
+
+    iDynTree::MatrixDynSize Rcl; this->toMatrixDynSize(Rcl_,Rcl);
+    iDynTree::VectorDynSize Pcl; this->toVectorDynSize(Pcl_,Pcl);
+
+    this->getGraspMatrix(Rcl,Pcl,contactModelMatrix,leftFootToCoMGraspMatrix);
+
+    return true;
+}
+
+bool WalkingFK::getRightFootToCoMGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &rightFootToCoMGraspMatrix)
+{
+    iDynTree::Transform wTc;
+    wTc = this->getCoMTransform();
+
+    iDynTree::Transform wTr;
+    wTr = this->getRightFootToWorldTransform();
+
+    iDynTree::Transform cTr;
+    cTr = wTc.inverse() * wTr;
+
+    iDynTree::Rotation Rcr_; Rcr_ = cTr.getRotation();
+    iDynTree::Position Pcr_; Pcr_ = cTr.getPosition();
+
+    iDynTree::MatrixDynSize Rcr; this->toMatrixDynSize(Rcr_,Rcr);
+    iDynTree::VectorDynSize Pcr; this->toVectorDynSize(Pcr_,Pcr);
+
+    this->getGraspMatrix(Rcr,Pcr,contactModelMatrix,rightFootToCoMGraspMatrix);
+
+    return true;
+}
+
+bool WalkingFK::getFeetToCoMGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &feetToCoMGraspMatrix)
+{
+    iDynTree::MatrixDynSize rightFootToCoMGraspMatrix;
+    this->getRightFootToCoMGraspMatrix(contactModelMatrix, rightFootToCoMGraspMatrix);
+
+    iDynTree::MatrixDynSize leftFootToCoMGraspMatrix;
+    this->getLeftFootToCoMGraspMatrix(contactModelMatrix, leftFootToCoMGraspMatrix);
+
+    feetToCoMGraspMatrix.resize(rightFootToCoMGraspMatrix.rows(), rightFootToCoMGraspMatrix.cols() + leftFootToCoMGraspMatrix.cols());
+    feetToCoMGraspMatrix.zero();
+
+    iDynTree::toEigen(feetToCoMGraspMatrix).block(0,0,leftFootToCoMGraspMatrix.rows(),leftFootToCoMGraspMatrix.cols()) = iDynTree::toEigen(leftFootToCoMGraspMatrix);
+    iDynTree::toEigen(feetToCoMGraspMatrix).block(0,leftFootToCoMGraspMatrix.cols(),rightFootToCoMGraspMatrix.rows(),rightFootToCoMGraspMatrix.cols()) = iDynTree::toEigen(rightFootToCoMGraspMatrix);
+
+    return true;
+}
+
+bool WalkingFK::getPseudoInverseOfGraspMatrix(iDynTree::MatrixDynSize &graspMatrix, iDynTree::MatrixDynSize &pseudoInverseGraspMatrix)
+{
+    iDynTree::MatrixDynSize G;
+    iDynTree::toEigen(G) = iDynTree::toEigen(graspMatrix) * iDynTree::toEigen(graspMatrix).transpose();
+    iDynTree::toEigen(pseudoInverseGraspMatrix) = iDynTree::toEigen(graspMatrix).transpose() * iDynTree::toEigen(G).inverse();
+
+    return true;
 }

@@ -216,6 +216,7 @@ public:
      * @param comHeigh is the height of the com for lipm.
      * @param comHeightDelta is a tolerance on the com height.
      * @param inclPlaneAngle is the angle of an inclined plane.
+     * @return true/false in case of success/failure.
      */
     bool setTrajectories(double comHeight, double comHeightDelta, double inclPlaneAngle);
 

@@ -120,27 +120,21 @@ bool WalkingModule::setRobotModel(const yarp::os::Searchable& rf)
 
 bool WalkingModule::initializeEstimatorFilter(const yarp::os::Searchable& rf)
 {
-    m_qEKF = std::make_unique<iDynTree::AttitudeQuaternionEKF>();
-    iDynTree::AttitudeQuaternionEKFParameters params;
+    m_MahonyFilter = std::make_unique<iDynTree::AttitudeMahonyFilter>();
+    iDynTree::AttitudeMahonyFilterParameters m_MahonyFilter_params;
 
-    params.time_step_in_seconds = rf.check("time_step_in_seconds", yarp::os::Value(0.010)).asDouble(); // 0.010
-    params.accelerometer_noise_variance = rf.check("accelerometer_noise_variance", yarp::os::Value(0.03)).asDouble(); // 0.03
-    params.magnetometer_noise_variance = rf.check("magnetometer_noise_variance", yarp::os::Value(0.0)).asDouble(); // 0.0
-    params.gyroscope_noise_variance = rf.check("gyroscope_noise_variance", yarp::os::Value(0.5)).asDouble(); // 0.5
-    params.gyro_bias_noise_variance = rf.check("gyro_bias_variance", yarp::os::Value(10e-11)).asDouble(); // 10e-11
-    params.initial_orientation_error_variance = rf.check("initial_orientation_error_variance", yarp::os::Value(10e-6)).asDouble(); // 10e-6
-    params.initial_ang_vel_error_variance = rf.check("initial_ang_vel_error_variance", yarp::os::Value(10e-1)).asDouble(); // 10e-1
-    params.initial_gyro_bias_error_variance = rf.check("initial_gyro_bias_error_variance", yarp::os::Value(10e-11)).asDouble(); // 10e-11
-    params.bias_correlation_time_factor = rf.check("bias_correlation_time_factor", yarp::os::Value(10e-3)).asDouble(); // 10e-3
-    params.use_magnetometer_measurements = rf.check("use_magnetometer_measurements", yarp::os::Value(false)).asDouble(); // false
+    yarp::os::Bottle& generalOptions = rf.findGroup("MAHONY_FILTER");
 
-    size_t x_size = m_qEKF->getInternalStateSize();
+    m_MahonyFilter_params.kp = generalOptions.check("kp", yarp::os::Value(0.010)).asDouble(); 
+    m_MahonyFilter_params.ki = generalOptions.check("ki", yarp::os::Value(0.010)).asDouble(); 
+    m_MahonyFilter_params.time_step_in_seconds = generalOptions.check("time_step_in_seconds", yarp::os::Value(0.010)).asDouble(); // 0.010
+    m_MahonyFilter_params.use_magnetometer_measurements = generalOptions.check("use_magnetometer_measurements", yarp::os::Value(false)).asDouble(); // false
 
-    // calling setParams resets and intializes the filter
-    m_qEKF->setParameters(params);
-    if(!m_qEKF->initializeFilter())
-        return false;
-    
+    m_MahonyFilter->setGainkp(m_MahonyFilter_params.kp);
+    m_MahonyFilter->setGainki(m_MahonyFilter_params.ki);
+    m_MahonyFilter->setTimeStepInSeconds(m_MahonyFilter_params.time_step_in_seconds);
+    m_MahonyFilter->useMagnetoMeterMeasurements(m_MahonyFilter_params.use_magnetometer_measurements);
+
     iDynTree::VectorDynSize x0;
     x0.resize(10);
     x0.zero();
@@ -150,7 +144,7 @@ bool WalkingModule::initializeEstimatorFilter(const yarp::os::Searchable& rf)
     x0(3) = 0.0;
 
     iDynTree::Span<double> x0_span(x0.data(), x0.size());
-    if(!m_qEKF->setInternalState(x0_span))
+    if(!m_MahonyFilter->setInternalState(x0_span))
         return false;
 
     return true;
@@ -169,6 +163,16 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_inclPlaneAngle = generalOptions.check("inclined_plane_angle", yarp::os::Value(0.0)).asDouble();
     m_comHeight = generalOptions.check("com_height", yarp::os::Value(0.49)).asDouble();
     m_comHeightDelta = generalOptions.check("com_height_delta", yarp::os::Value(0.01)).asDouble();
+    m_controlMode = generalOptions.check("control_mode", yarp::os::Value(1)).asDouble();
+
+    m_contactModel.resize(6,3);
+    m_contactModel.zero();
+    m_contactModel(0,0) = 1;
+    m_contactModel(1,1) = 1;
+    m_contactModel(2,2) = 1;
+
+    std::cout << " Control Mode : " << m_controlMode << std::endl;
+
     std::string name;
     if(!YarpHelper::getStringFromSearchable(generalOptions, "name", name))
     {
@@ -194,24 +198,48 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    std::cout<< " - FT_SENSORS configuration done" << std::endl;
+
     yarp::os::Bottle& imuSensorsOptions = rf.findGroup("IMU_SENSORS");
     imuSensorsOptions.append(generalOptions);
-    if(!m_robotControlHelper->configureImuSensors(imuSensorsOptions))
+    if(!YarpHelper::getStringFromSearchable(imuSensorsOptions, "left_foot_frame_name", m_leftFootFrameName))
     {
-        yError() << "[WalkingModule::configure] Unable to configure the IMU sensors.";
+        yError() << "[WalkingModule::configure] Unable to get the string left foot frame name from searchable.";
         return false;
     }
+    if(!YarpHelper::getStringFromSearchable(imuSensorsOptions, "right_foot_frame_name", m_rightFootFrameName))
+    {
+        yError() << "[WalkingModule::configure] Unable to get the string right foot frame name from searchable.";
+        return false;
+    }
+    if(!YarpHelper::getStringFromSearchable(imuSensorsOptions, "left_imu_frame_name", m_leftFootImuFrameName))
+    {
+        yError() << "[WalkingModule::configure] Unable to get the left imu frame name string from searchable.";
+        return false;
+    }
+    if(!YarpHelper::getStringFromSearchable(imuSensorsOptions, "right_imu_frame_name", m_rightFootImuFrameName))
+    {
+        yError() << "[WalkingModule::configure] Unable to get the string right imu frame name from searchable.";
+        return false;
+    }
+
+    std::cout<< " - IMU_SENSORS configuration done" << std::endl;
+
     if(!initializeEstimatorFilter(rf))
     {
-        yError() << "[WalkingModule::configure] Unable to initialize the Estimator Filter.";
+        yError() << "[WalkingModule::configure] Unable to initialize the Estimator Filter for angle detection.";
         return false;
     }
+
+    std::cout<< " - initialization Mahony filter done" << std::endl;
 
     if(!setRobotModel(rf))
     {
         yError() << "[configure] Unable to set the robot model.";
         return false;
     }
+
+    std::cout<< " - set robot model done" << std::endl;
 
     // open RPC port for external command
     std::string rpcPortName = "/" + getName() + "/rpc";
@@ -222,6 +250,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    std::cout<< " - open RPC port done " << std::endl;
+
     std::string desiredUnyciclePositionPortName = "/" + getName() + "/goal:i";
     if(!m_desiredUnyciclePositionPort.open(desiredUnyciclePositionPortName))
     {
@@ -229,15 +259,19 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    std::cout<< " - open Unicycle port done " << std::endl;
+
     // initialize the trajectory planner
-    m_trajectoryGenerator = std::make_unique<TrajectoryGenerator>();
-    yarp::os::Bottle& trajectoryPlannerOptions = rf.findGroup("TRAJECTORY_PLANNER");
-    trajectoryPlannerOptions.append(generalOptions);
+    m_trajectoryGenerator = std::make_unique<TrajectoryGenerator>(); std::cout<< "- 1 -" << std::endl;
+    yarp::os::Bottle& trajectoryPlannerOptions = rf.findGroup("TRAJECTORY_PLANNER"); std::cout<< "- 2 -" << std::endl;
+    trajectoryPlannerOptions.append(generalOptions); std::cout<< "- 3 -" << std::endl;
     if(!m_trajectoryGenerator->initialize(trajectoryPlannerOptions))
     {
         yError() << "[configure] Unable to initialize the planner.";
         return false;
     }
+
+    std::cout<< " - configure Trajectory planner done" << std::endl;
 
     if(m_useMPC)
     {
@@ -264,6 +298,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         }
     }
 
+    std::cout<< " - configure DCM controller done" << std::endl;
+
     // initialize the ZMP controller
     m_walkingZMPController = std::make_unique<WalkingZMPController>();
     yarp::os::Bottle& zmpControllerOptions = rf.findGroup("ZMP_CONTROLLER");
@@ -274,6 +310,44 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    std::cout<< " - configure ZMP controller done" << std::endl;
+
+    // initialize the Impedance controller
+    m_walkingImpedanceController = std::make_unique<WalkingImpedanceController>();
+    yarp::os::Bottle& ImpedanceControllerOptions = rf.findGroup("IMPEDANCE_CONTROLLER");
+    ImpedanceControllerOptions.append(generalOptions);
+    if(!m_walkingImpedanceController->initialize(ImpedanceControllerOptions))
+    {
+        yError() << "[WalkingModule::configure] Unable to initialize the Impedance controller.";
+        return false;
+    }
+
+    std::cout<< " - configure IMP controller done" << std::endl;
+
+    // initialize the pd feedforward torque controller
+    m_walkingPDFeedForwardController = std::make_unique<WalkingPDFeedForwardController>();
+    yarp::os::Bottle& PDFeedForwardControllerOptions = rf.findGroup("PDFEEDFORWARD_CONTROLLER");
+    PDFeedForwardControllerOptions.append(generalOptions);
+    if(!m_walkingPDFeedForwardController->initialize(PDFeedForwardControllerOptions))
+    {
+        yError() << "[WalkingModule::configure] Unable to initialize the pdfeedforward controller.";
+        return false;
+    }
+
+    std::cout<< " - configure PDFF controller done" << std::endl;
+
+    // initialize the grav comp torque controller
+    m_walkingGTorqueController = std::make_unique<WalkingGTorqueController>();
+    yarp::os::Bottle& GTorqueControllerOptions = rf.findGroup("GTORQUE_CONTROLLER");
+    GTorqueControllerOptions.append(generalOptions);
+    if(!m_walkingGTorqueController->initialize(GTorqueControllerOptions))
+    {
+        yError() << "[WalkingModule::configure] Unable to initialize the grav comp torque controller.";
+        return false;
+    }
+
+    std::cout<< " - configure TOR controller done" << std::endl;
+
     // initialize the inverse kinematics solver
     m_IKSolver = std::make_unique<WalkingIK>();
     yarp::os::Bottle& inverseKinematicsSolverOptions = rf.findGroup("INVERSE_KINEMATICS_SOLVER");
@@ -283,6 +357,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         yError() << "[WalkingModule::configure] Failed to configure the ik solver";
         return false;
     }
+
+    std::cout<< " - configure Inverse Kinematics done" << std::endl;
 
     if(m_useQPIK)
     {
@@ -304,6 +380,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         }
     }
 
+    std::cout<< " - configure Inverse Kinematics QP done" << std::endl;
+
     // initialize the forward kinematics solver
     m_FKSolver = std::make_unique<WalkingFK>();
     yarp::os::Bottle& forwardKinematicsSolverOptions = rf.findGroup("FORWARD_KINEMATICS_SOLVER");
@@ -313,6 +391,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         yError() << "[WalkingModule::configure] Failed to configure the fk solver";
         return false;
     }
+
+    std::cout<< " - configure Forward Kinematics done" << std::endl;
 
     // initialize the linear inverted pendulum model
     m_stableDCMModel = std::make_unique<StableDCMModel>();
@@ -418,6 +498,10 @@ bool WalkingModule::close()
     m_QPIKSolver.reset(nullptr);
     m_FKSolver.reset(nullptr);
     m_stableDCMModel.reset(nullptr);
+    m_walkingImpedanceController.reset(nullptr);
+    m_walkingGTorqueController.reset(nullptr);
+    m_walkingPDFeedForwardController.reset(nullptr);
+    m_MahonyFilter.reset(nullptr);
 
     return true;
 }
@@ -511,7 +595,7 @@ bool WalkingModule::updateModule()
             return true;
         }
         if(motionDone)
-        {
+        {   
             // send the reference again in order to reduce error
             if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
             {
@@ -754,8 +838,6 @@ bool WalkingModule::updateModule()
         yawRotation = yawRotation.inverse();
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
 
-        
-
         if(m_useQPIK)
         {
             // integrate dq because velocity control mode seems not available
@@ -793,7 +875,7 @@ bool WalkingModule::updateModule()
         {
             if(m_IKSolver->usingAdditionalRotationTarget())
             {
-                if(!m_IKSolver->updateIntertiaToWorldFrameRotation(modifiedInertial))
+                if(!m_IKSolver->updateInertiaToWorldFrameRotation(modifiedInertial))
                 {
                     yError() << "[WalkingModule::updateModule] Error updating the inertia to world frame rotation.";
                     return false;
@@ -815,10 +897,156 @@ bool WalkingModule::updateModule()
         }
         m_profiler->setEndTime("IK");
 
-        if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+        // select control mode : 0 - position control  1 - impedance torque control  2 - pdfeedforward + grav comp torque control
+        std::cout << " ---------------- START WALKING UPDATE MODULE ---------------------------- " << std::endl;
+        std::cout << " Control Mode : 0 position control - 1 impedance torque control - 2 pdfeedforward torque control " << std::endl;
+        std::cout << " Type of control selected : " << m_controlMode << std::endl;
+        std::cout << " ----------------------------------------------------- " << std::endl;
+
+        switch(m_controlMode)
         {
-            yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
-            return false;
+            case 0:
+                {
+                    std::cout << " POSITION CONTROL : " << std::endl;
+                    std::cout << " ----------------------------------------------------- " << std::endl;
+
+                    if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+                    {
+                        yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
+                        return false;
+                    }
+                }
+                break;
+            case 1:
+                {
+                    std::cout << " IMPEDANCE TORQUE CONTROL : " << std::endl;
+                    std::cout << " ----------------------------------------------------- " << std::endl;
+
+                    iDynTree::FreeFloatingGeneralizedTorques freeFloatingGeneralizedTorques;
+                    m_FKSolver->getGeneralizedGravityTorques(freeFloatingGeneralizedTorques);
+
+                    // set reference, desired signals and the gravitational term
+                    m_walkingImpedanceController->setReferenceSignal(m_qDesired,m_dqDesired);
+                    m_walkingImpedanceController->setFeedback(m_robotControlHelper->getJointPosition(),m_robotControlHelper->getJointVelocity());
+                    m_walkingImpedanceController->setGravityCompensationTerm(freeFloatingGeneralizedTorques.jointTorques());
+
+                    // evaluate the impedance control law
+                    if(!m_walkingImpedanceController->evaluateControl())
+                    {
+                        yError() << "[WalkingModule::updateModule] Error during evaluation the impedance control law.";
+                        return false;
+                    }
+
+                    std::cout << " desiredTorques size : " << m_walkingImpedanceController->getControllerOutput().size() << std::endl;
+                    std::cout << " ----------------------------------------------------------------------------------------------------" << std::endl;
+                    std::cout << " desiredTorques : " << iDynTree::toEigen(m_walkingImpedanceController->getControllerOutput()) << std::endl;
+                    std::cout << " ----------------------------------------------------------------------------------------------------" << std::endl;
+                    std::cout << " actuated Torques size : " << m_robotControlHelper->getActuatedDoFs() << std::endl;
+
+                    // send reference torque to the robot
+                    if(!m_robotControlHelper->setTorqueReferences(m_walkingImpedanceController->getControllerOutput()))
+                    {
+                        yError() << "[WalkingModule::updateModule] Error while setting the reference torque to iCub.";
+                        return false;
+                    }
+                }
+                break;
+            case 2:
+                {
+                    std::cout << " PDFEEDFORWARD + TORQUE CONTROL : " << std::endl;
+                    std::cout << " ----------------------------------------------------- " << std::endl;
+                    
+                    iDynTree::VectorDynSize comPosition; comPosition.resize(m_FKSolver->getCoMPosition().size());
+                    iDynTree::VectorDynSize comVelocity; comVelocity.resize(m_FKSolver->getCoMVelocity().size());
+                    comPosition(0) = m_FKSolver->getCoMPosition().getVal(0);
+                    comPosition(1) = m_FKSolver->getCoMPosition().getVal(1);
+                    comPosition(2) = m_FKSolver->getCoMPosition().getVal(2);             
+                    comVelocity(0) = m_FKSolver->getCoMVelocity().getVal(0);
+                    comVelocity(1) = m_FKSolver->getCoMVelocity().getVal(1);
+                    comVelocity(2) = m_FKSolver->getCoMVelocity().getVal(2); 
+
+                    // FEEDFORWARD CONTROL
+                    if(!m_walkingPDFeedForwardController->setFeedbackSignals(comPosition,comVelocity))
+                    {
+                        yError() << "[WalkingModule::updateModule] Error while setting the feedback signal of pdfeedforward controller.";
+                        return false;
+                    }
+
+                    iDynTree::VectorDynSize desiredCoMPosition_; desiredCoMPosition_.resize(desiredCoMPosition.size());
+                    iDynTree::VectorDynSize desiredCoMVelocity_; desiredCoMVelocity_.resize(desiredCoMVelocity.size());
+                    desiredCoMPosition_(0) = desiredCoMPosition.getVal(0);
+                    desiredCoMPosition_(1) = desiredCoMPosition.getVal(1);
+                    desiredCoMPosition_(2) = desiredCoMPosition.getVal(2);             
+                    desiredCoMVelocity_(0) = desiredCoMVelocity.getVal(0);
+                    desiredCoMVelocity_(1) = desiredCoMVelocity.getVal(1);
+                    desiredCoMVelocity_(2) = desiredCoMVelocity.getVal(2);
+                    if(!m_walkingPDFeedForwardController->setDesiredSignals(desiredCoMPosition_,desiredCoMVelocity_))
+                    {
+                        yError() << "[WalkingModule::updateModule] Error while setting the feedback signal pdfeedforward controller.";
+                        return false;
+                    }
+                    iDynTree::VectorDynSize feedForward; feedForward.resize(desiredCoMPosition.size()); feedForward.zero();
+                    if(!m_walkingPDFeedForwardController->setFeedForwardSignal(feedForward))
+                    {
+                        yError() << "[WalkingModule::updateModule] Error while setting the feedback signal pdfeedforward controller.";
+                        return false;
+                    }
+                    if(!m_walkingPDFeedForwardController->evaluateControl())
+                    {
+                        yError() << "[WalkingModule::updateModule] Error while evaluating the control law of pdfeedforward controller.";
+                        return false;
+                    }
+
+                    // compute gravity force
+                    iDynTree::VectorDynSize gravityForce; gravityForce.resize(3); gravityForce.zero();
+                    iDynTree::VectorDynSize gravity(1); gravity(0) = 9.81;
+                    double totalMass = 0; m_FKSolver->getTotalMass(totalMass);
+                    gravityForce(2) = - totalMass * gravity(0);
+
+                    // compute input force pdfeedfowrad + gravity
+                    iDynTree::VectorDynSize InputCoMForce; 
+                    InputCoMForce.resize(m_walkingPDFeedForwardController->getControllerOutput().size()); InputCoMForce.zero();
+                    iDynTree::toEigen(InputCoMForce) = iDynTree::toEigen(m_walkingPDFeedForwardController->getControllerOutput()) + iDynTree::toEigen(gravityForce);
+                    iDynTree::VectorDynSize InputCoMWrench;
+                    InputCoMWrench.resize(InputCoMForce.size() + InputCoMForce.size()); InputCoMWrench.zero();
+                    iDynTree::toEigen(InputCoMWrench).segment(0,2) = iDynTree::toEigen(InputCoMForce);
+
+                    // check contact
+                    iDynTree::MatrixDynSize comToContactFeetJacobian;
+                    iDynTree::MatrixDynSize comToContactFeetGraspMatrix;
+                    checkContact(comToContactFeetJacobian,comToContactFeetGraspMatrix);
+
+                    // compute the contact force
+                    iDynTree::VectorDynSize InputContactFeetForces;
+                    iDynTree::toEigen(InputContactFeetForces) = iDynTree::toEigen(comToContactFeetGraspMatrix) * iDynTree::toEigen(InputCoMWrench);
+
+                    // TORQUE CONTROL
+                    if(!m_walkingGTorqueController->setParams(comToContactFeetJacobian,InputContactFeetForces,m_robotControlHelper->getJointVelocity()))
+                    {
+                        yError() << "[WalkingModule::updateModule] Error while setting the feedback signal torque controller.";
+                        return false;
+                    }
+
+                    if(!m_walkingGTorqueController->evaluateControl())
+                    {
+                        yError() << "[WalkingModule::updateModule] Error while evaluating the control law of g torque controller.";
+                        return false;
+                    }
+
+                    // SEND SIGNAL TO THE ROBOT IN TORQUE CONTROL
+                    if(!m_robotControlHelper->setTorqueReferences(m_walkingGTorqueController->getControllerOutput()))
+                    {
+                        yError() << "[WalkingModule::updateModule] Error while setting the reference torque to iCub.";
+                        return false;
+                    }
+                }
+                break;
+            default:
+                {
+                    std::cout<< " please select the control mode. " << std::endl;
+                }
+
+                break;
         }
 
         m_profiler->setEndTime("Total");
@@ -852,7 +1080,8 @@ bool WalkingModule::updateModule()
                                       rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
-                                      errorL, errorR);
+                                      errorL, errorR,
+                                      m_qDesired, m_robotControlHelper->getJointPosition());
         }
 
         propagateTime();
@@ -939,33 +1168,40 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         yError() << "[WalkingModule::prepareRobot] Unable to get the feedback.";
         return false;
     }
-   /*
-    if(!detectInclinedPlaneAngle(m_robotControlHelper->getLeftFootImuData()))
+   
+    // PROCEDURE OF INCLINED PLANE ANGLE DETECTION
+    bool IMU = false;
+    if(IMU)
     {
-        yError() << "[WalkingModule::prepareRobot] Unable to get data from Left Right Foot Imu sensors.";
-        return false;
-    }
-    if(!m_trajectoryGenerator->setTrajectories(m_comHeight, m_comHeightDelta, m_inclPlaneAngle))
-    {
-        yError() << "[WalkingModule::prepareRobot] Unable to correctly set Trajectories for inclined plane.";
-        return false;
-    }
-    if(!m_stableDCMModel->setStableDCMModel(m_comHeight, m_inclPlaneAngle))
-    {
-        yError() << "[WalkingModule::prepareRobot] Unable to correctly set stable DCM Model for inclined plane.";
-        return false;
-    }
-    if(!m_walkingDCMReactiveController->setWalkingDCMReactiveController(m_comHeight, m_inclPlaneAngle))
-    {
-        yError() << "[WalkingModule::prepareRobot] Unable to correctly set DCM Reactive Controller for inclined plane.";
-        return false;
-    }
-    if(!m_FKSolver->setForwardKinematics(m_comHeight, m_inclPlaneAngle))
-    {
-        yError() << "[WalkingModule::prepareRobot] Unable to correctly set the Forward Kinematics for inclined plane.";
-        return false;
-    }
-    */
+        // detect the angle of the inclined plane via accelerometer
+        bool usingFilter = 0;
+        if(!detectInclinedPlaneAngle(m_robotControlHelper->getLeftFootThreeAxisLinearAccelerometersMeasureData(),usingFilter,m_leftFootImuFrameName,m_leftFootFrameName))
+        {
+            yError() << "[WalkingModule::prepareRobot] Unable to get data from Left Right Foot Imu sensors.";
+            return false;
+        }
+        // initialize all relative classes with an appropriate angle value for INCLINED PLANE WALKING
+        if(!m_trajectoryGenerator->setTrajectories(m_comHeight, m_comHeightDelta, m_inclPlaneAngle))
+        {
+            yError() << "[WalkingModule::prepareRobot] Unable to set correctly Trajectories for inclined plane.";
+            return false;
+        }
+        if(!m_stableDCMModel->setStableDCMModel(m_comHeight, m_inclPlaneAngle))
+        {
+            yError() << "[WalkingModule::prepareRobot] Unable to set correctly stable DCM Model for inclined plane.";
+            return false;
+        }
+        if(!m_walkingDCMReactiveController->setWalkingDCMReactiveController(m_comHeight, m_inclPlaneAngle))
+        {
+            yError() << "[WalkingModule::prepareRobot] Unable to correctly set DCM Reactive Controller for inclined plane.";
+            return false;
+        }
+        if(!m_FKSolver->setForwardKinematics(m_comHeight, m_inclPlaneAngle))
+        {
+            yError() << "[WalkingModule::prepareRobot] Unable to correctly set the Forward Kinematics for inclined plane.";
+            return false;
+        }
+    }   
 
     if(onTheFly)
     {
@@ -1015,14 +1251,17 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         return false;
     }
 
+    // INITIAL POSITION OF THE ROBOT 
     iDynTree::Position desiredCoMPosition;
     desiredCoMPosition(0) = m_DCMPositionDesired.front()(0) + (m_comHeight*(std::sin(iDynTree::deg2rad(m_inclPlaneAngle))));
     desiredCoMPosition(1) = m_DCMPositionDesired.front()(1);
     desiredCoMPosition(2) = m_comHeightTrajectory.front();
 
+    std::cout<< "-------------------------------------------" << std::endl;
     std::cout<<"inclPlaneAngle : "<<m_inclPlaneAngle<< std::endl;
     std::cout<<"corrTerm : "<<(m_comHeight*(std::sin(iDynTree::deg2rad(m_inclPlaneAngle))))<<std::endl;
     std::cout<<"desiredCoMPosition : "<<desiredCoMPosition(0)<< ' ' << desiredCoMPosition(1)<< ' ' << desiredCoMPosition(2)<< std::endl;
+    std::cout<< "-------------------------------------------" << std::endl;
 
     if(m_IKSolver->usingAdditionalRotationTarget())
     {
@@ -1041,12 +1280,19 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         yawRotation = yawRotation.inverse();
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
 
-        if(!m_IKSolver->updateIntertiaToWorldFrameRotation(modifiedInertial))
+        if(!m_IKSolver->updateInertiaToWorldFrameRotation(modifiedInertial))
         {
             yError() << "[WalkingModule::prepareRobot] Error updating the inertia to world frame rotation.";
             return false;
         }
     }
+    /*
+    if(!updateFKSolver())
+    {
+        yError() << "[WalkingModule::updateModule] Unable to update the FK solver.";
+        return false;
+    }
+    */
 
     if(!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
                               desiredCoMPosition, m_qDesired))
@@ -1056,12 +1302,59 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     }
 
     // std::cout<<"m_qDesired : "<< iDynTree::toEigen(m_qDesired) << std::endl;
+    
+    std::cout<< " left Transform : " << std::endl;
+    std::cout<<  m_leftTrajectory.front().getPosition().getVal(0)<< ' ' << m_leftTrajectory.front().getPosition().getVal(1)<< ' ' << m_leftTrajectory.front().getPosition().getVal(2) << std::endl;
+    std::cout<<  m_leftTrajectory.front().getRotation().asRPY()(0) << ' ' << m_leftTrajectory.front().getRotation().asRPY()(1) << ' ' << m_leftTrajectory.front().getRotation().asRPY()(2)  << std::endl;
+    std::cout<< " right Transform : " << std::endl;
+    std::cout<<  m_rightTrajectory.front().getPosition().getVal(0)<< ' ' << m_rightTrajectory.front().getPosition().getVal(1)<< ' ' << m_rightTrajectory.front().getPosition().getVal(2) << std::endl;
+    std::cout<<  m_rightTrajectory.front().getRotation().asRPY()(0) << ' ' << m_rightTrajectory.front().getRotation().asRPY()(1) << ' ' << m_rightTrajectory.front().getRotation().asRPY()(2)  << std::endl;
+    std::cout<< " desired COM position " << std::endl;
+    std::cout<< iDynTree::toEigen(desiredCoMPosition) << std::endl;
 
-    if(!m_robotControlHelper->setPositionReferences(m_qDesired, 5.0))
+    iDynTree::Transform wTb = m_FKSolver->getWorldToBaseTransform();
+
+    std::cout<< " wTb Transform : " << std::endl;
+    std::cout<<  wTb.getPosition().getVal(0)<< ' ' << wTb.getPosition().getVal(1)<< ' ' << wTb.getPosition().getVal(2) << std::endl;
+    std::cout<<  wTb.getRotation().asRPY()(0) << ' ' << wTb.getRotation().asRPY()(1) << ' ' << wTb.getRotation().asRPY()(2)  << std::endl;
+    /*
+    if(m_controlMode)
+    { */
+        std::cout << " PREPARE::ROBOT in POSITION CONTROL : " << std::endl;
+        std::cout << " ----------------------------------------------------- " << std::endl;
+
+        if(!m_robotControlHelper->setPositionReferences(m_qDesired, 5.0))
+        {
+            yError() << "[WalkingModule::prepareRobot] Error while setting the initial position.";
+            return false;
+        }
+    /*}
+    else
     {
-        yError() << "[WalkingModule::prepareRobot] Error while setting the initial position.";
-        return false;
-    }
+        std::cout << " PREPARE::ROBOT in TORQUE CONTROL : " << std::endl;
+        std::cout << " ----------------------------------------------------- " << std::endl;
+
+        iDynTree::VectorDynSize m_dqDesiredfake; m_dqDesiredfake.resize(m_qDesired.size()); m_dqDesiredfake.zero();
+
+        // set reference, desired signals and the gravitational term for Impedance Controller
+        m_walkingImpedanceController->setReferenceSignal(m_qDesired,m_dqDesiredfake);
+        m_walkingImpedanceController->setFeedback(m_robotControlHelper->getJointPosition(),m_robotControlHelper->getJointVelocity());
+        m_walkingImpedanceController->setGravityCompensationTerm(m_FKSolver->getGeneralizedGravityTorques().jointTorques());
+
+        // evaluate the impedance control law
+        if(!m_walkingImpedanceController->evaluateControl())
+        {
+            yError() << "[WalkingModule::updateModule] Error during evaluation the impedance control law.";
+            return false;
+        }
+
+        // send reference torque to the robot
+        if(!m_robotControlHelper->setTorqueReferences(m_walkingImpedanceController->getControllerOutput()))
+        {
+            yError() << "[WalkingModule::prepareRobot] Error while setting the reference torque to iCub.";
+            return false;
+        }
+    }*/
 
     {
         std::lock_guard<std::mutex> guard(m_mutex);
@@ -1231,27 +1524,114 @@ bool WalkingModule::updateFKSolver()
     return true;
 }
 
-bool WalkingModule::detectInclinedPlaneAngle(const iDynTree::VectorDynSize& FootImuData)
+bool WalkingModule::checkContact(iDynTree::MatrixDynSize &comToContactFeetJacobian, iDynTree::MatrixDynSize &comToContactFeetGraspMatrix)
 {
-    iDynTree::LinAcceleration linAcc; linAcc.zero();
-    iDynTree::GyroscopeMeasurements gyro; gyro.zero();
-    iDynTree::MagnetometerMeasurements mag; mag.zero();
+    if(m_leftInContact.front())
+    {    
+        if(m_rightInContact.front()) // double support
+        {
+            iDynTree::MatrixDynSize feetToCoMGraspMatrix;
+            m_FKSolver->getFeetToCoMGraspMatrix(m_contactModel, feetToCoMGraspMatrix);
 
-    linAcc(0) = FootImuData(3);
-    linAcc(1) = FootImuData(4);
-    linAcc(2) = FootImuData(5);
-    gyro(0) = FootImuData(6);
-    gyro(1) = FootImuData(7);
-    gyro(2) = FootImuData(8);
-    mag(0) = FootImuData(9);
-    mag(1) = FootImuData(10);
-    mag(2) = FootImuData(11);
+            iDynTree::MatrixDynSize comToFeetGraspMatrix;
+            m_FKSolver->getPseudoInverseOfGraspMatrix(feetToCoMGraspMatrix,comToFeetGraspMatrix);
 
-    m_qEKF->propagateStates();
-    m_qEKF->updateFilterWithMeasurements(linAcc, gyro, mag);
-    iDynTree::RPY rpy;
-    m_qEKF->getOrientationEstimateAsRPY(rpy);
-    m_inclPlaneAngle = rpy(2);
+            comToContactFeetGraspMatrix = comToFeetGraspMatrix;
+
+            m_FKSolver->getCoMToFeetJacobian(comToContactFeetJacobian);
+        }
+        else // left foot in single support
+        {
+            iDynTree::MatrixDynSize leftFootToCoMGraspMatrix;
+            m_FKSolver->getLeftFootToCoMGraspMatrix(m_contactModel,leftFootToCoMGraspMatrix);
+
+            iDynTree::MatrixDynSize comToLeftFootGraspMatrix;
+            m_FKSolver->getPseudoInverseOfGraspMatrix(leftFootToCoMGraspMatrix,comToLeftFootGraspMatrix);
+
+            comToContactFeetGraspMatrix = comToLeftFootGraspMatrix;
+
+            m_FKSolver->getCoMToLeftFootJacobian(comToContactFeetJacobian);
+        }
+    }
+    else 
+    {
+        if(m_rightInContact.front()) // right foot in single support
+        {
+            iDynTree::MatrixDynSize rightFootToCoMGraspMatrix;
+            m_FKSolver->getRightFootToCoMGraspMatrix(m_contactModel,rightFootToCoMGraspMatrix);
+
+            iDynTree::MatrixDynSize comToRightFootGraspMatrix;
+            m_FKSolver->getPseudoInverseOfGraspMatrix(rightFootToCoMGraspMatrix,comToRightFootGraspMatrix);
+
+            comToContactFeetGraspMatrix = comToRightFootGraspMatrix;
+
+            m_FKSolver->getCoMToRightFootJacobian(comToContactFeetJacobian);
+        }
+        else
+        {
+            yError() << "[WalkingModule::checkContact] No foot in contact.";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool WalkingModule::detectInclinedPlaneAngle(const iDynTree::VectorDynSize& SensorData, bool usingFilter, const std::string &sensorFrameName, const std::string &destinationFrameName)
+{
+    iDynTree::Transform root_T_sensor = m_loader.model().getFrameTransform(m_loader.model().getFrameIndex(sensorFrameName));
+    iDynTree::Transform root_T_destination = m_loader.model().getFrameTransform(m_loader.model().getFrameIndex(destinationFrameName)); 
+    iDynTree::Transform destination_T_sensor = root_T_destination.inverse() * root_T_sensor;
+    iDynTree::Rotation sole_R_imu = destination_T_sensor.getRotation();
+    iDynTree::VectorDynSize g_sole; g_sole.resize(3);
+    iDynTree::VectorDynSize g_i; g_i.resize(3);
+    g_i(0) = 0;
+    g_i(1) = 0;
+    g_i(2) = -9.81;
+
+    if(usingFilter)
+    {
+        iDynTree::LinAcceleration linAcc; linAcc.zero();
+        iDynTree::GyroscopeMeasurements gyro; gyro.zero();
+        iDynTree::MagnetometerMeasurements mag; mag.zero();
+
+        linAcc(0) = SensorData(0);
+        linAcc(1) = SensorData(1);
+        linAcc(2) = SensorData(2);
+        gyro(0) = SensorData(3);
+        gyro(1) = SensorData(4);
+        gyro(2) = SensorData(5);
+        mag(0) = SensorData(6);
+        mag(1) = SensorData(7);
+        mag(2) = SensorData(8);
+
+        m_MahonyFilter->updateFilterWithMeasurements(linAcc, gyro, mag);
+        m_MahonyFilter->propagateStates();
+        iDynTree::RPY rpy;
+        m_MahonyFilter->getOrientationEstimateAsRPY(rpy);
+        m_inclPlaneAngle = rpy(2);
+
+        iDynTree::Rotation imu_R_i; imu_R_i.RPY(rpy(0),rpy(1),rpy(2)); 
+        iDynTree::VectorDynSize g_imu; g_imu.resize(3);
+
+        iDynTree::toEigen(g_imu) = iDynTree::toEigen(imu_R_i) * iDynTree::toEigen(g_i) ;
+        iDynTree::toEigen(g_sole) = iDynTree::toEigen(sole_R_imu) * iDynTree::toEigen(g_imu);
+    }
+    else
+    {
+        iDynTree::VectorDynSize g_imu; g_imu.resize(3);
+
+        g_imu(0) = SensorData(0);
+        g_imu(1) = SensorData(1);
+        g_imu(2) = SensorData(2);
+
+        iDynTree::toEigen(g_sole) = iDynTree::toEigen(sole_R_imu) * iDynTree::toEigen(g_imu);     
+    }
+
+
+    m_inclPlaneAngle = std::acos(g_sole(2)/g_i(2)); // radians
+
+    return true;
 }
 
 bool WalkingModule::startWalking()
@@ -1285,7 +1665,20 @@ bool WalkingModule::startWalking()
                     "lf_err_x", "lf_err_y", "lf_err_z",
                     "lf_err_roll", "lf_err_pitch", "lf_err_yaw",
                     "rf_err_x", "rf_err_y", "rf_err_z",
-                    "rf_err_roll", "rf_err_pitch", "rf_err_yaw"});
+                    "rf_err_roll", "rf_err_pitch", "rf_err_yaw",
+                    "torso_pitch_des", "torso_roll_des", "torso_yaw_des",
+                    "l_shoulder_pitch_des", "l_shoulder_roll_des", "l_shoulder_yaw_des", "l_elbow_des",
+                    "r_shoulder_pitch_des", "r_shoulder_roll_des", "r_shoulder_yaw_des", "r_elbow_des",                        
+                    "l_hip_pitch_des", "l_hip_roll_des", "l_hip_yaw_des", "l_knee_des", "l_ankle_pitch_des", "l_ankle_roll_des",
+                    "r_hip_pitch_des", "r_hip_roll_des", "r_hip_yaw_des", "r_knee_des", "r_ankle_pitch_des", "r_ankle_roll_des",
+                    "torso_pitch", "torso_roll", "torso_yaw",
+                    "l_shoulder_pitch", "l_shoulder_roll", "l_shoulder_yaw", "l_elbow",
+                    "r_shoulder_pitch", "r_shoulder_roll", "r_shoulder_yaw", "r_elbow",
+                    "l_hip_pitch", "l_hip_roll", "l_hip_yaw", "l_knee", "l_ankle_pitch", "l_ankle_roll",
+                    "r_hip_pitch", "r_hip_roll", "r_hip_yaw", "r_knee", "r_ankle_pitch", "r_ankle_roll",
+                    "torso_pitch_torque", "torso_roll_torque", "torso_yaw_torque",
+                    "l_shoulder_pitch_torque", "l_shoulder_roll_torque", "l_shoulder_yaw_torque", "l_elbow_torque",
+                    "r_shoulder_pitch_torque", "r_shoulder_roll_torque", "r_shoulder_yaw_torque", "r_elbow_torque"});
     }
 
     // if the robot was only prepared the filters has to be reseted

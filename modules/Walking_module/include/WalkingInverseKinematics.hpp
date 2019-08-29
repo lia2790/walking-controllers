@@ -107,7 +107,7 @@ public:
     bool setFootFrame(const std::string& foot,
                       const std::string& footFrame);
 
-    bool updateIntertiaToWorldFrameRotation(const iDynTree::Rotation& inertial_R_worldFrame);
+    bool updateInertiaToWorldFrameRotation(const iDynTree::Rotation& inertial_R_worldFrame);
 
     bool updateAdditionalRotation(const iDynTree::Rotation& additionalRotation); //Defined in a inertial frame, with the z pointing upwards
 

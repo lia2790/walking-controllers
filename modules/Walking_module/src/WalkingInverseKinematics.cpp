@@ -214,7 +214,7 @@ bool WalkingIK::setFootFrame(const std::string& foot, const std::string& footFra
     return true;
 }
 
-bool WalkingIK::updateIntertiaToWorldFrameRotation(const iDynTree::Rotation &inertial_R_worldFrame)
+bool WalkingIK::updateInertiaToWorldFrameRotation(const iDynTree::Rotation &inertial_R_worldFrame)
 {
     if(m_additionalFrame.size() == 0)
     {
