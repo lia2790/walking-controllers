@@ -289,12 +289,18 @@ public:
     bool getFreeFloatingMassMatrix(iDynTree::MatrixDynSize &freeFloatingMassMatrix);
 
     /**
-     * Set a velocity transformation from a given jacobian.
+     * Get a base change transformation from a given jacobian matrix : a_T_b.
      * @param bToAJacobian is the Jacobian expresses from B to A.
      * @param bToAVelocityTransform is the velocity transformation from B to A.
      * @return true/false in case of success/failure.
      */
-    bool setChangeBaseTransformation(iDynTree::MatrixDynSize& bToAJacobian, iDynTree::MatrixDynSize& bToABaseTransform);
+    bool getChangeBaseTransformation(iDynTree::MatrixDynSize& bToAJacobian, iDynTree::MatrixDynSize& bToABaseTransform);
+
+    /**
+     *  
+     * @return true/false in case of success/failure.
+     */
+    bool getTransposeInverseOfChangeBaseTransformation(iDynTree::MatrixDynSize& bToABaseTransform, iDynTree::MatrixDynSize& bToATransposeInverseBaseTransform);
 
     /**
      *  
