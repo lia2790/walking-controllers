@@ -636,7 +636,7 @@ bool WalkingFK::getTotalMass(double& totalMass)
     iDynTree::toEigen(bTg) = iDynTree::toEigen(gTb).inverse(); std::cout<< " in 5 " << std::endl;
 
     iDynTree::MatrixDynSize Mg; Mg.resize(Mb.rows(),Mb.cols()); std::cout<< " in 6 " << std::endl;
-    iDynTree::toEigen(Mg) = iDynTree::toEigen(gTb) * iDynTree::toEigen(Mb) * iDynTree::toEigen(bTg); std::cout<< " in 6 " << std::endl;
+    iDynTree::toEigen(Mg) = iDynTree::toEigen(gTb_) * iDynTree::toEigen(Mb) * iDynTree::toEigen(bTg); std::cout<< " in 6 " << std::endl;
 
     totalMass = Mg(0,0); std::cout<< " in 7 " << std::endl;
 
