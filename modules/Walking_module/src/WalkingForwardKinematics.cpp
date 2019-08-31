@@ -555,7 +555,7 @@ bool WalkingFK::getFreeFloatingMassMatrix(iDynTree::MatrixDynSize &freeFloatingM
     return m_kinDyn.getFreeFloatingMassMatrix(freeFloatingMassMatrix);
 }
 
-bool WalkingFK::setVelocityTransformation(iDynTree::MatrixDynSize& bToAJacobian, iDynTree::MatrixDynSize& bToAVelocityTransform)
+bool WalkingFK::setChangeBaseTransformation(iDynTree::MatrixDynSize& bToAJacobian, iDynTree::MatrixDynSize& bToAVelocityTransform)
 {
     bToAVelocityTransform.resize(bToAJacobian.cols(),bToAJacobian.cols());
     bToAVelocityTransform.zero();
@@ -575,7 +575,7 @@ bool WalkingFK::setVelocityTransformation(iDynTree::MatrixDynSize& bToAJacobian,
     return true;
 }
 
-bool WalkingFK::setWorldToCoMVelocityTransformation(iDynTree::MatrixDynSize Rb, iDynTree::MatrixDynSize bRc, iDynTree::MatrixDynSize bJc, iDynTree::MatrixDynSize& AToCoMVelocityTransform)
+bool WalkingFK::setWorldToCoMChangeBaseTransformation(iDynTree::MatrixDynSize Rb, iDynTree::MatrixDynSize bRc, iDynTree::MatrixDynSize bJc, iDynTree::MatrixDynSize& AToCoMVelocityTransform)
 {
     AToCoMVelocityTransform.resize(Rb.cols() + bRc.cols() + bJc.cols(), Rb.cols() + bRc.cols() + bJc.cols());
     AToCoMVelocityTransform.zero();
@@ -630,7 +630,9 @@ bool WalkingFK::getTotalMass(double& totalMass)
 
     iDynTree::MatrixDynSize gTb_; gTb_.resize(gTb.rows(),gTb.cols()); gTb_.zero(); std::cout<< " in 4 " << std::endl;
     iDynTree::toEigen(gTb_) = iDynTree::toEigen(gTb).transpose(); std::cout<< " in 4 " << std::endl;
+    std::cout<< " gTb_ transpose : " << iDynTree::toEigen(gTb_) << std::endl;
     iDynTree::toEigen(gTb_) = iDynTree::toEigen(gTb_).inverse(); std::cout<< " in 4 " << std::endl;
+    std::cout<< " gTb_ inverse : " << iDynTree::toEigen(gTb_) << std::endl;
 
     iDynTree::MatrixDynSize bTg; bTg.resize(gTb.rows(),gTb.cols()); bTg.zero(); std::cout<< " in 5 " << std::endl;
     iDynTree::toEigen(bTg) = iDynTree::toEigen(gTb).inverse(); std::cout<< " in 5 " << std::endl;
@@ -643,7 +645,7 @@ bool WalkingFK::getTotalMass(double& totalMass)
     std::cout<< " totalMass : " << totalMass << std::endl;
     std::cout<< " Mg : " << iDynTree::toEigen(Mg) << std::endl;
     std::cout<< " bTg : " << iDynTree::toEigen(bTg) << std::endl;
-    std::cout<< " gTb : " << iDynTree::toEigen(gTb) << std::endl;
+    std::cout<< " gTb : " << iDynTree::toEigen(gTb_) << std::endl;
 
     return true;
 }

@@ -294,7 +294,7 @@ public:
      * @param bToAVelocityTransform is the velocity transformation from B to A.
      * @return true/false in case of success/failure.
      */
-    bool setVelocityTransformation(iDynTree::MatrixDynSize& bToAJacobian, iDynTree::MatrixDynSize& bToAVelocityTransform);
+    bool setChangeBaseTransformation(iDynTree::MatrixDynSize& bToAJacobian, iDynTree::MatrixDynSize& bToAVelocityTransform);
 
     /**
      * Set a velocity transformation from a frame (B) to the frame attached to the CoM (C) : ( B_T_C) 
@@ -304,7 +304,7 @@ public:
      * @param bJc is the jacobian matrix from the frame C to the frame B
      * @return true/false in case of success/failure.
      */
-    bool setWorldToCoMVelocityTransformation(iDynTree::MatrixDynSize Rb, iDynTree::MatrixDynSize bRc, iDynTree::MatrixDynSize bJc, iDynTree::MatrixDynSize& AToCoMVelocityTransform);
+    bool setWorldToCoMChangeBaseTransformation(iDynTree::MatrixDynSize Rb, iDynTree::MatrixDynSize bRc, iDynTree::MatrixDynSize bJc, iDynTree::MatrixDynSize& AToCoMVelocityTransform);
 
     /**
      *  
