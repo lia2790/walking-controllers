@@ -626,7 +626,7 @@ bool WalkingFK::getTotalMass(double& totalMass)
     m_kinDyn.getCenterOfMassJacobian(Jgb); std::cout<< " in 2 " << std::endl;
 
     iDynTree::MatrixDynSize gTb;
-    this->setVelocityTransformation(Jgb,gTb); std::cout<< " in 3 " << std::endl;
+    this->setChangeBaseTransformation(Jgb,gTb); std::cout<< " in 3 " << std::endl;
 
     iDynTree::MatrixDynSize gTb_; gTb_.resize(gTb.rows(),gTb.cols()); gTb_.zero(); std::cout<< " in 4 " << std::endl;
     iDynTree::toEigen(gTb_) = iDynTree::toEigen(gTb).transpose(); std::cout<< " in 4 " << std::endl;
@@ -659,7 +659,7 @@ bool WalkingFK::getCoMToLeftFootJacobian(iDynTree::MatrixDynSize &jacobian)
     this->getCoMJacobian(Jca);
 
     iDynTree::MatrixDynSize cTa;
-    this->setVelocityTransformation(Jca, cTa);
+    this->setChangeBaseTransformation(Jca, cTa);
 
     iDynTree::MatrixDynSize Jlc;
     iDynTree::toEigen(Jlc) = iDynTree::toEigen(Jla) * iDynTree::toEigen(cTa).inverse();
@@ -678,7 +678,7 @@ bool WalkingFK::getCoMToRightFootJacobian(iDynTree::MatrixDynSize &jacobian)
     this->getCoMJacobian(Jca);
 
     iDynTree::MatrixDynSize cTa;
-    this->setVelocityTransformation(Jca, cTa);
+    this->setChangeBaseTransformation(Jca, cTa);
 
     iDynTree::MatrixDynSize Jrc;
     iDynTree::toEigen(Jrc) = iDynTree::toEigen(Jra) * iDynTree::toEigen(cTa).inverse();
