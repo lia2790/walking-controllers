@@ -555,63 +555,21 @@ bool WalkingFK::getFreeFloatingMassMatrix(iDynTree::MatrixDynSize &freeFloatingM
     return m_kinDyn.getFreeFloatingMassMatrix(freeFloatingMassMatrix);
 }
 
-bool WalkingFK::setChangeBaseTransformation(iDynTree::MatrixDynSize& bToAJacobian, iDynTree::MatrixDynSize& bToAVelocityTransform)
+bool WalkingFK::setChangeBaseTransformation(iDynTree::MatrixDynSize& bToAJacobian, iDynTree::MatrixDynSize& bToABaseTransform)
 {
-    bToAVelocityTransform.resize(bToAJacobian.cols(),bToAJacobian.cols());
-    bToAVelocityTransform.zero();
+    bToABaseTransform.resize(bToAJacobian.cols(),bToAJacobian.cols());
+    bToABaseTransform.zero();
 
     for(int i = 0 ; i < bToAJacobian.rows() ; i++ )
     {
         for(int j = 0 ; j < bToAJacobian.cols() ; j++ )
         {
-            bToAVelocityTransform(i,j) = bToAJacobian(i,j);
+            bToABaseTransform(i,j) = bToAJacobian(i,j);
         }
     }
     for( int i = 6 ; i < bToAJacobian.cols() - 6 ; i++ )
     {
-        bToAVelocityTransform(i,i) = 1;
-    }
-
-    return true;
-}
-
-bool WalkingFK::setWorldToCoMChangeBaseTransformation(iDynTree::MatrixDynSize Rb, iDynTree::MatrixDynSize bRc, iDynTree::MatrixDynSize bJc, iDynTree::MatrixDynSize& AToCoMVelocityTransform)
-{
-    AToCoMVelocityTransform.resize(Rb.cols() + bRc.cols() + bJc.cols(), Rb.cols() + bRc.cols() + bJc.cols());
-    AToCoMVelocityTransform.zero();
-
-    for(int i = 0 ; i < Rb.rows() ; i++ )
-    {
-        for(int j = 0 ; j < Rb.cols() ; j++ )
-        {
-            AToCoMVelocityTransform(i,j) = Rb(i,j);
-        }   
-    }
-
-    for(int i = 0 ; i < bRc.rows() ; i++ )
-    {
-        for(int j = Rb.cols() ; j < bRc.cols() ; j++ )
-        {
-            AToCoMVelocityTransform(i,j) = bRc(i,j);
-        }   
-    }
-
-    for(int i = 0 ; i < bJc.rows() ; i++ )
-    {
-        for(int j = Rb.cols() + bRc.cols() ; j < bJc.cols() ; j++ )
-        {
-            AToCoMVelocityTransform(i,j) = bRc(i,j);
-        }   
-    }
-
-    for(int i = bRc.rows() ; i < bRc.rows() ; i++ )
-    {
-            AToCoMVelocityTransform(i,i) = 1;   
-    }
-
-    for(int i = bRc.rows() + bRc.rows() ; i < bJc.rows() ; i++ )
-    {
-            AToCoMVelocityTransform(i,i) = 1;
+        bToABaseTransform(i,i) = 1;
     }
 
     return true;
@@ -630,9 +588,13 @@ bool WalkingFK::getTotalMass(double& totalMass)
 
     iDynTree::MatrixDynSize gTb_; gTb_.resize(gTb.rows(),gTb.cols()); gTb_.zero(); std::cout<< " in 4 " << std::endl;
     iDynTree::toEigen(gTb_) = iDynTree::toEigen(gTb).transpose(); std::cout<< " in 4 " << std::endl;
+
+
     std::cout<< " gTb_ transpose : " << iDynTree::toEigen(gTb_) << std::endl;
     iDynTree::toEigen(gTb_) = iDynTree::toEigen(gTb_).inverse(); std::cout<< " in 4 " << std::endl;
     std::cout<< " gTb_ inverse : " << iDynTree::toEigen(gTb_) << std::endl;
+
+
 
     iDynTree::MatrixDynSize bTg; bTg.resize(gTb.rows(),gTb.cols()); bTg.zero(); std::cout<< " in 5 " << std::endl;
     iDynTree::toEigen(bTg) = iDynTree::toEigen(gTb).inverse(); std::cout<< " in 5 " << std::endl;
@@ -645,7 +607,8 @@ bool WalkingFK::getTotalMass(double& totalMass)
     std::cout<< " totalMass : " << totalMass << std::endl;
     std::cout<< " Mg : " << iDynTree::toEigen(Mg) << std::endl;
     std::cout<< " bTg : " << iDynTree::toEigen(bTg) << std::endl;
-    std::cout<< " gTb : " << iDynTree::toEigen(gTb_) << std::endl;
+    std::cout<< " gTb_ : " << iDynTree::toEigen(gTb_) << std::endl;
+    std::cout<< " dims gTb_ : " << gTb_.rows() << " " << gTb_.cols() << std::endl;
 
     return true;
 }
