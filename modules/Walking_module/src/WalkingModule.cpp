@@ -971,6 +971,7 @@ bool WalkingModule::updateModule()
                         yError() << "[WalkingModule::updateModule] Error while setting the feedback signal of pdfeedforward controller.";
                         return false;
                     }
+                    std::cout<< "-- pd feedForward feedback signal setted --" << std::endl;
 
                     iDynTree::VectorDynSize desiredCoMPosition_; desiredCoMPosition_.resize(desiredCoMPosition.size());
                     iDynTree::VectorDynSize desiredCoMVelocity_; desiredCoMVelocity_.resize(desiredCoMVelocity.size());
@@ -985,23 +986,31 @@ bool WalkingModule::updateModule()
                         yError() << "[WalkingModule::updateModule] Error while setting the feedback signal pdfeedforward controller.";
                         return false;
                     }
+                    std::cout<< "-- pd feedForward desired signal setted --" << std::endl;
+
                     iDynTree::VectorDynSize feedForward; feedForward.resize(desiredCoMPosition.size()); feedForward.zero();
                     if(!m_walkingPDFeedForwardController->setFeedForwardSignal(feedForward))
                     {
                         yError() << "[WalkingModule::updateModule] Error while setting the feedback signal pdfeedforward controller.";
                         return false;
                     }
+                    std::cout<< "-- feedForward signal setted --" << std::endl;
+
                     if(!m_walkingPDFeedForwardController->evaluateControl())
                     {
                         yError() << "[WalkingModule::updateModule] Error while evaluating the control law of pdfeedforward controller.";
                         return false;
                     }
+                    std::cout<< "-- pd feedForward control law computed --" << std::endl;
 
                     // compute gravity force
-                    iDynTree::VectorDynSize gravityForce; gravityForce.resize(3); gravityForce.zero();
-                    iDynTree::VectorDynSize gravity(1); gravity(0) = 9.81;
-                    double totalMass = 0; m_FKSolver->getTotalMass(totalMass);
-                    gravityForce(2) = - totalMass * gravity(0);
+                    iDynTree::VectorDynSize gravityForce; gravityForce.resize(3); gravityForce.zero(); std::cout<< " 1 " << std::endl;
+                    iDynTree::VectorDynSize gravity(1); gravity(0) = 9.81; std::cout<< " 2 " << std::endl;
+                    double totalMass = 0; m_FKSolver->getTotalMass(totalMass); std::cout<< " 3 " << std::endl;
+                    gravityForce(2) = - totalMass * gravity(0); std::cout<< " 4 " << std::endl;
+                    std::cout<< "-- gravity force computed --" << std::endl;
+                    std::cout<< "-- total mass : " << totalMass << std::endl;
+                    std::cout<< "-- gravity force : " << iDynTree::toEigen(gravityForce) << std::endl;
 
                     // compute input force pdfeedfowrad + gravity
                     iDynTree::VectorDynSize InputCoMForce; 
@@ -1010,11 +1019,13 @@ bool WalkingModule::updateModule()
                     iDynTree::VectorDynSize InputCoMWrench;
                     InputCoMWrench.resize(InputCoMForce.size() + InputCoMForce.size()); InputCoMWrench.zero();
                     iDynTree::toEigen(InputCoMWrench).segment(0,2) = iDynTree::toEigen(InputCoMForce);
+                    std::cout<< "-- input com wrench computed --" << std::endl;
 
                     // check contact
                     iDynTree::MatrixDynSize comToContactFeetJacobian;
                     iDynTree::MatrixDynSize comToContactFeetGraspMatrix;
                     checkContact(comToContactFeetJacobian,comToContactFeetGraspMatrix);
+                    std::cout<< "-- check contact --" << std::endl;
 
                     // compute the contact force
                     iDynTree::VectorDynSize InputContactFeetForces;
@@ -1026,12 +1037,14 @@ bool WalkingModule::updateModule()
                         yError() << "[WalkingModule::updateModule] Error while setting the feedback signal torque controller.";
                         return false;
                     }
+                    std::cout<< "-- torque control parameters setted --" << std::endl;
 
                     if(!m_walkingGTorqueController->evaluateControl())
                     {
                         yError() << "[WalkingModule::updateModule] Error while evaluating the control law of g torque controller.";
                         return false;
                     }
+                    std::cout<< "-- torque control law evaluated --" << std::endl;
 
                     // SEND SIGNAL TO THE ROBOT IN TORQUE CONTROL
                     if(!m_robotControlHelper->setTorqueReferences(m_walkingGTorqueController->getControllerOutput()))
@@ -1039,6 +1052,7 @@ bool WalkingModule::updateModule()
                         yError() << "[WalkingModule::updateModule] Error while setting the reference torque to iCub.";
                         return false;
                     }
+                    std::cout<< "-- torque control input sent --" << std::endl;
                 }
                 break;
             default:

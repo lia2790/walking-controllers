@@ -620,21 +620,30 @@ bool WalkingFK::setWorldToCoMVelocityTransformation(iDynTree::MatrixDynSize Rb, 
 bool WalkingFK::getTotalMass(double& totalMass)
 {
     iDynTree::MatrixDynSize Mb;
-    m_kinDyn.getFreeFloatingMassMatrix(Mb);
+    m_kinDyn.getFreeFloatingMassMatrix(Mb); std::cout<< " in 1 " << std::endl;
 
     iDynTree::MatrixDynSize Jgb;
-    m_kinDyn.getCenterOfMassJacobian(Jgb);
+    m_kinDyn.getCenterOfMassJacobian(Jgb); std::cout<< " in 2 " << std::endl;
 
     iDynTree::MatrixDynSize gTb;
-    this->setVelocityTransformation(Jgb,gTb);
+    this->setVelocityTransformation(Jgb,gTb); std::cout<< " in 3 " << std::endl;
 
-    iDynTree::MatrixDynSize bTg;
-    iDynTree::toEigen(bTg) = iDynTree::toEigen(gTb).inverse();
+    iDynTree::MatrixDynSize gTb_; gTb_.resize(gTb.rows(),gTb.cols()); gTb_.zero(); std::cout<< " in 4 " << std::endl;
+    iDynTree::toEigen(gTb_) = iDynTree::toEigen(gTb).transpose(); std::cout<< " in 4 " << std::endl;
+    iDynTree::toEigen(gTb_) = iDynTree::toEigen(gTb_).inverse(); std::cout<< " in 4 " << std::endl;
 
-    iDynTree::MatrixDynSize Mg;
-    iDynTree::toEigen(Mg) = iDynTree::toEigen(bTg).transpose() * iDynTree::toEigen(Mb) * iDynTree::toEigen(bTg);
+    iDynTree::MatrixDynSize bTg; bTg.resize(gTb.rows(),gTb.cols()); bTg.zero(); std::cout<< " in 5 " << std::endl;
+    iDynTree::toEigen(bTg) = iDynTree::toEigen(gTb).inverse(); std::cout<< " in 5 " << std::endl;
 
-    totalMass = Mg(0,0);
+    iDynTree::MatrixDynSize Mg; Mg.resize(Mb.rows(),Mb.cols()); std::cout<< " in 6 " << std::endl;
+    iDynTree::toEigen(Mg) = iDynTree::toEigen(gTb) * iDynTree::toEigen(Mb) * iDynTree::toEigen(bTg); std::cout<< " in 6 " << std::endl;
+
+    totalMass = Mg(0,0); std::cout<< " in 7 " << std::endl;
+
+    std::cout<< " totalMass : " << totalMass << std::endl;
+    std::cout<< " Mg : " << iDynTree::toEigen(Mg) << std::endl;
+    std::cout<< " bTg : " << iDynTree::toEigen(bTg) << std::endl;
+    std::cout<< " gTb : " << iDynTree::toEigen(gTb) << std::endl;
 
     return true;
 }
