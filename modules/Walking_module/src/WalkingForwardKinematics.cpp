@@ -581,12 +581,14 @@ bool WalkingFK::getTransposeInverseOfChangeBaseTransformation(iDynTree::MatrixDy
     bToAX.resize(6,6);
     bToAX.zero();
     iDynTree::toEigen(bToAX) = iDynTree::toEigen(bToABaseTransform).block(0,0,6,6);
+    iDynTree::toEigen(bToAX) = iDynTree::toEigen(bToAX).inverse();
 
     iDynTree::MatrixDynSize bToAS;
     bToAS.resize(6,bToABaseTransform.cols() - 6);
     bToAS.zero();
-    iDynTree::toEigen(bToAX) = iDynTree::toEigen(bToABaseTransform).block(0,6,6,bToABaseTransform.cols() - 6);
-    iDynTree::toEigen(bToAX) = iDynTree::toEigen(bToAX).inverse();
+    iDynTree::toEigen(bToAS) = iDynTree::toEigen(bToABaseTransform).block(0,6,6,bToABaseTransform.cols() - 6);
+
+    std::cout<< " bXa inverse : " << iDynTree::toEigen(bToAX) << std::endl;
 
     bToATransposeInverseBaseTransform.resize(bToABaseTransform.rows(),bToABaseTransform.cols());
     bToATransposeInverseBaseTransform.zero();
@@ -627,8 +629,8 @@ bool WalkingFK::getTotalMass(double& totalMass)
     totalMass = Mg(0,0); std::cout<< " in 7 " << std::endl;
 
     std::cout<< " totalMass : " << totalMass << std::endl;
-    std::cout<< " Mg : " << iDynTree::toEigen(Mg) << std::endl;
-    std::cout<< " bTg : " << iDynTree::toEigen(bTg) << std::endl;
+    // std::cout<< " Mg : " << iDynTree::toEigen(Mg) << std::endl;
+    // std::cout<< " bTg : " << iDynTree::toEigen(bTg) << std::endl;
     std::cout<< " gTb_ : " << iDynTree::toEigen(gTb_) << std::endl;
 
     return true;
