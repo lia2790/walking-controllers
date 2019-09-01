@@ -575,29 +575,29 @@ bool WalkingFK::getChangeBaseTransformation(iDynTree::MatrixDynSize& bToAJacobia
     return true;
 }
 
-bool WalkingFK::getTransposeInverseOfChangeBaseTransformation(iDynTree::MatrixDynSize& bToABaseTransform, iDynTree::MatrixDynSize& bToATransposeInverseBaseTransform)
+bool WalkingFK::getInverseVelocityTransformation(iDynTree::MatrixDynSize& bToAX, iDynTree::MatrixDynSize& bToAInverseX)
+{
+
+}
+
+bool WalkingFK::getInverseOfChangeBaseTransformation(iDynTree::MatrixDynSize& bToABaseTransform, iDynTree::MatrixDynSize& bToAInverseBaseTransform)
 {
     iDynTree::MatrixDynSize bToAX;
     bToAX.resize(6,6);
     bToAX.zero();
     iDynTree::toEigen(bToAX) = iDynTree::toEigen(bToABaseTransform).block(0,0,6,6);
-    iDynTree::toEigen(bToAX) = iDynTree::toEigen(bToAX).inverse();
 
-    iDynTree::MatrixDynSize bToAS;
+    iDynTree::MatrixDynSize bToAXinverse;
     bToAS.resize(6,bToABaseTransform.cols() - 6);
     bToAS.zero();
     iDynTree::toEigen(bToAS) = iDynTree::toEigen(bToABaseTransform).block(0,6,6,bToABaseTransform.cols() - 6);
 
-    std::cout<< " bXa inverse : " << iDynTree::toEigen(bToAX) << std::endl;
+    iDynTree::MatrixDynSize bToAXinverse;
+    this->getInverseVelocityTransformation(bToAX,bToAXinverse);
 
-    bToATransposeInverseBaseTransform.resize(bToABaseTransform.rows(),bToABaseTransform.cols());
-    bToATransposeInverseBaseTransform.zero();
-
-    iDynTree::toEigen(bToATransposeInverseBaseTransform).block(0,0,bToAX.rows(),bToAX.cols()) = iDynTree::toEigen(bToAX).transpose();
-    iDynTree::toEigen(bToATransposeInverseBaseTransform).block(6,0,bToAS.cols(),bToAS.rows()) = - iDynTree::toEigen(bToAS).transpose() * iDynTree::toEigen(bToAX).transpose();
-    
-    for( int i = 6 ; i < bToABaseTransform.cols() - 6 ; i++ )
-        bToATransposeInverseBaseTransform(i,i) = 1;
+    iDynTree::toEigen(bToAInverseBaseTransform).block(0,0,bToAX.rows(),bToAX.cols()) =   iDynTree::toEigen(bToAXinverse);
+    iDynTree::toEigen(bToAInverseBaseTransform).block(0,6,bToAS.rows(),bToAS.cols()) = - iDynTree::toEigen(bToAXinverse) * iDynTree::toEigen(bToAXinverse);
+    iDynTree::toEigen(bToAInverseBaseTransform).block(6,0,bToABaseTransform.rows()-6,bToABaseTransform.cols()) = iDynTree::toEigen(bToAInverseBaseTransform).block(6,0,bToABaseTransform.rows()-6,bToABaseTransform.cols());
 
     return true;
 }

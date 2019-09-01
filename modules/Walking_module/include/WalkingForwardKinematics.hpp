@@ -300,7 +300,13 @@ public:
      *  
      * @return true/false in case of success/failure.
      */
-    bool getTransposeInverseOfChangeBaseTransformation(iDynTree::MatrixDynSize& bToABaseTransform, iDynTree::MatrixDynSize& bToATransposeInverseBaseTransform);
+    bool getInverseVelocityTransformation(iDynTree::MatrixDynSize& bToAX, iDynTree::MatrixDynSize& bToAInverseX);
+
+    /**
+     *  
+     * @return true/false in case of success/failure.
+     */
+    bool getInverseOfChangeBaseTransformation(iDynTree::MatrixDynSize& bToABaseTransform, iDynTree::MatrixDynSize& bToAInverseBaseTransform);
 
     /**
      *  
