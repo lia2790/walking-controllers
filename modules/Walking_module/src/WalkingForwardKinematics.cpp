@@ -577,7 +577,14 @@ bool WalkingFK::getChangeBaseTransformation(iDynTree::MatrixDynSize& bToAJacobia
 
 bool WalkingFK::getInverseVelocityTransformation(iDynTree::MatrixDynSize& bToAX, iDynTree::MatrixDynSize& bToAInverseX)
 {
+    bToAInverseX.resize(bToAX.rows(),bToAX.cols());
+    bToAInverseX.zero();
 
+    iDynTree::toEigen(bToAInverseX).block(0,0,3,3) = iDynTree::toEigen(bToAX).block(0,0,3,3).transpose();
+    iDynTree::toEigen(bToAInverseX).block(0,3,3,3) = - iDynTree::toEigen(bToAX).block(0,0,3,3).transpose() * iDynTree::toEigen(bToAX).block(0,3,3,3) * iDynTree::toEigen(bToAX).block(0,0,3,3);
+    iDynTree::toEigen(bToAInverseX).block(3,3,3,3) = iDynTree::toEigen(bToAX).block(0,0,3,3);
+
+    return true;
 }
 
 bool WalkingFK::getInverseOfChangeBaseTransformation(iDynTree::MatrixDynSize& bToABaseTransform, iDynTree::MatrixDynSize& bToAInverseBaseTransform)
@@ -587,16 +594,16 @@ bool WalkingFK::getInverseOfChangeBaseTransformation(iDynTree::MatrixDynSize& bT
     bToAX.zero();
     iDynTree::toEigen(bToAX) = iDynTree::toEigen(bToABaseTransform).block(0,0,6,6);
 
-    iDynTree::MatrixDynSize bToAXinverse;
+    iDynTree::MatrixDynSize bToAS;
     bToAS.resize(6,bToABaseTransform.cols() - 6);
     bToAS.zero();
     iDynTree::toEigen(bToAS) = iDynTree::toEigen(bToABaseTransform).block(0,6,6,bToABaseTransform.cols() - 6);
 
-    iDynTree::MatrixDynSize bToAXinverse;
-    this->getInverseVelocityTransformation(bToAX,bToAXinverse);
+    iDynTree::MatrixDynSize bToAXinv;
+    this->getInverseVelocityTransformation(bToAX,bToAXinv);
 
-    iDynTree::toEigen(bToAInverseBaseTransform).block(0,0,bToAX.rows(),bToAX.cols()) =   iDynTree::toEigen(bToAXinverse);
-    iDynTree::toEigen(bToAInverseBaseTransform).block(0,6,bToAS.rows(),bToAS.cols()) = - iDynTree::toEigen(bToAXinverse) * iDynTree::toEigen(bToAXinverse);
+    iDynTree::toEigen(bToAInverseBaseTransform).block(0,0,bToAX.rows(),bToAX.cols()) =   iDynTree::toEigen(bToAXinv);
+    iDynTree::toEigen(bToAInverseBaseTransform).block(0,6,bToAS.rows(),bToAS.cols()) = - iDynTree::toEigen(bToAXinv) * iDynTree::toEigen(bToAS);
     iDynTree::toEigen(bToAInverseBaseTransform).block(6,0,bToABaseTransform.rows()-6,bToABaseTransform.cols()) = iDynTree::toEigen(bToAInverseBaseTransform).block(6,0,bToABaseTransform.rows()-6,bToABaseTransform.cols());
 
     return true;
@@ -614,7 +621,7 @@ bool WalkingFK::getTotalMass(double& totalMass)
     this->getChangeBaseTransformation(Jgb,gTb); std::cout<< " in 3 " << std::endl;
 
     iDynTree::MatrixDynSize gTb_;
-    this->getTransposeInverseOfChangeBaseTransformation(gTb,gTb_); std::cout<< " in 4 " << std::endl;
+    this->getInverseOfChangeBaseTransformation(gTb,gTb_); std::cout<< " in 4 " << std::endl;
 
     iDynTree::MatrixDynSize bTg;
     bTg.resize(gTb.rows(),gTb.cols());
@@ -624,7 +631,7 @@ bool WalkingFK::getTotalMass(double& totalMass)
     iDynTree::MatrixDynSize Mg; 
     Mg.resize(Mb.rows(),Mb.cols());
     Mg.zero();
-    iDynTree::toEigen(Mg) = iDynTree::toEigen(gTb_) * iDynTree::toEigen(Mb) * iDynTree::toEigen(bTg); std::cout<< " in 6 " << std::endl;
+    iDynTree::toEigen(Mg) = iDynTree::toEigen(gTb_).transpose() * iDynTree::toEigen(Mb) * iDynTree::toEigen(bTg); std::cout<< " in 6 " << std::endl;
 
     totalMass = Mg(0,0); std::cout<< " in 7 " << std::endl;
 
