@@ -300,7 +300,7 @@ public:
      *  
      * @return true/false in case of success/failure.
      */
-    bool getInverseVelocityTransformation(iDynTree::MatrixDynSize& bToAX, iDynTree::MatrixDynSize& bToAInverseX);
+    bool getInverseOfAdjointMatrix(iDynTree::MatrixDynSize& bToAX, iDynTree::MatrixDynSize& bToAInverseX);
 
     /**
      *  
