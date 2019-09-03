@@ -598,6 +598,8 @@ bool WalkingFK::getInverseOfChangeBaseTransformation(iDynTree::MatrixDynSize& bT
     iDynTree::MatrixDynSize bToAS; bToAS.resize(6,bToABaseTransform.cols() - 6); bToAS.zero();
     iDynTree::toEigen(bToAS) = iDynTree::toEigen(bToABaseTransform).block(0,6,6,bToABaseTransform.cols() - 6);
 
+    bToAInverseBaseTransform.resize(bToABaseTransform.rows(), bToABaseTransform.cols()); bToAInverseBaseTransform.zero();
+
     iDynTree::toEigen(bToAInverseBaseTransform).block(0,0,bToAX.rows(),bToAX.cols()) =   iDynTree::toEigen(bToAXinverse);
     iDynTree::toEigen(bToAInverseBaseTransform).block(0,6,bToAS.rows(),bToAS.cols()) = - iDynTree::toEigen(bToAXinverse) * iDynTree::toEigen(bToAS);
     iDynTree::toEigen(bToAInverseBaseTransform).block(6,0,bToABaseTransform.rows()-6,bToABaseTransform.cols()) = iDynTree::toEigen(bToAInverseBaseTransform).block(6,0,bToABaseTransform.rows()-6,bToABaseTransform.cols());
