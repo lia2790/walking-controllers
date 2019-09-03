@@ -1018,18 +1018,23 @@ bool WalkingModule::updateModule()
                     std::cout<< "-- input com wrench computed --" << std::endl;
                     std::cout<< "-- com wrench --" << iDynTree::toEigen(InputCoMWrench) << std::endl;
 
-                    // check contact
-                    iDynTree::MatrixDynSize comToContactFeetJacobian;
-                    iDynTree::MatrixDynSize comToContactFeetGraspMatrix;
-                    checkContact(comToContactFeetJacobian,comToContactFeetGraspMatrix);
+                    // check contact - intialize properly Jacobian and Grasp Matrix
+                    iDynTree::MatrixDynSize comToContactFeetJacobian; std::cout<< " 01 contact " << std::endl;
+                    iDynTree::MatrixDynSize comToContactFeetGraspMatrix; std::cout<< " 02 contact " << std::endl;
+                    checkContact(comToContactFeetJacobian,comToContactFeetGraspMatrix); std::cout<< " 03 contact " << std::endl;
                     std::cout<< "-- check contact computed --" << std::endl;
 
-                    // compute the contact force
+                    // compute contact force/s
                     iDynTree::VectorDynSize InputContactFeetForces;
                     iDynTree::toEigen(InputContactFeetForces) = iDynTree::toEigen(comToContactFeetGraspMatrix) * iDynTree::toEigen(InputCoMWrench);
 
+                    // to contact wrench/es
+                    iDynTree::VectorDynSize InputContactFeetWrenches(InputContactFeetForces.size()*2); InputContactFeetWrenches.zero();
+                    for(int i = 0; i < InputContactFeetWrenches.size(); i += 3 )
+                        iDynTree::toEigen(InputContactFeetWrenches).segment(i,3) = iDynTree::toEigen(InputContactFeetForces);
+
                     // TORQUE CONTROL
-                    if(!m_walkingGTorqueController->setParams(comToContactFeetJacobian,InputContactFeetForces,m_robotControlHelper->getJointVelocity()))
+                    if(!m_walkingGTorqueController->setParams(comToContactFeetJacobian,InputContactFeetWrenches,m_robotControlHelper->getJointVelocity()))
                     {
                         yError() << "[WalkingModule::updateModule] Error while setting the feedback signal torque controller.";
                         return false;
@@ -1537,50 +1542,54 @@ bool WalkingModule::updateFKSolver()
 
 bool WalkingModule::checkContact(iDynTree::MatrixDynSize &comToContactFeetJacobian, iDynTree::MatrixDynSize &comToContactFeetGraspMatrix)
 {
+    std::cout<< " checkContact 00 " << std::endl;
+
     if(m_leftInContact.front())
     {    
         if(m_rightInContact.front()) // double support
         {
-            iDynTree::MatrixDynSize feetToCoMGraspMatrix;
-            m_FKSolver->getFeetToCoMGraspMatrix(m_contactModel, feetToCoMGraspMatrix);
+            std::cout<< " checkContact 000 " << std::endl;
 
-            iDynTree::MatrixDynSize comToFeetGraspMatrix;
-            m_FKSolver->getPseudoInverseOfGraspMatrix(feetToCoMGraspMatrix,comToFeetGraspMatrix);
+            iDynTree::MatrixDynSize feetToCoMGraspMatrix; std::cout<< " checkContact 01 " << std::endl;
+            m_FKSolver->getFeetToCoMGraspMatrix(m_contactModel, feetToCoMGraspMatrix); std::cout<< " checkContact 02 " << std::endl;
 
-            comToContactFeetGraspMatrix = comToFeetGraspMatrix;
+            iDynTree::MatrixDynSize comToFeetGraspMatrix; std::cout<< " checkContact 03 " << std::endl;
+            m_FKSolver->getPseudoInverseOfGraspMatrix(feetToCoMGraspMatrix,comToFeetGraspMatrix); std::cout<< " checkContact 04 " << std::endl;
 
-            m_FKSolver->getCoMToFeetJacobian(comToContactFeetJacobian);
+            comToContactFeetGraspMatrix = comToFeetGraspMatrix; std::cout<< " checkContact 05 " << std::endl;
+
+            m_FKSolver->getCoMToFeetJacobian(comToContactFeetJacobian); std::cout<< " checkContact 06 " << std::endl;
         }
-        else // left foot in single support
+        else // in single support left foot
         {
-            iDynTree::MatrixDynSize leftFootToCoMGraspMatrix;
-            m_FKSolver->getLeftFootToCoMGraspMatrix(m_contactModel,leftFootToCoMGraspMatrix);
+            iDynTree::MatrixDynSize leftFootToCoMGraspMatrix; std::cout<< " checkContact 07 " << std::endl;
+            m_FKSolver->getLeftFootToCoMGraspMatrix(m_contactModel,leftFootToCoMGraspMatrix); std::cout<< " checkContact 08 " << std::endl;
 
-            iDynTree::MatrixDynSize comToLeftFootGraspMatrix;
-            m_FKSolver->getPseudoInverseOfGraspMatrix(leftFootToCoMGraspMatrix,comToLeftFootGraspMatrix);
+            iDynTree::MatrixDynSize comToLeftFootGraspMatrix; std::cout<< " checkContact 09 " << std::endl;
+            m_FKSolver->getPseudoInverseOfGraspMatrix(leftFootToCoMGraspMatrix,comToLeftFootGraspMatrix); std::cout<< " checkContact 010 " << std::endl;
 
-            comToContactFeetGraspMatrix = comToLeftFootGraspMatrix;
+            comToContactFeetGraspMatrix = comToLeftFootGraspMatrix; std::cout<< " checkContact 011 " << std::endl;
 
-            m_FKSolver->getCoMToLeftFootJacobian(comToContactFeetJacobian);
+            m_FKSolver->getCoMToLeftFootJacobian(comToContactFeetJacobian); std::cout<< " checkContact 012 " << std::endl;
         }
     }
     else 
     {
-        if(m_rightInContact.front()) // right foot in single support
+        if(m_rightInContact.front()) // in single support right foot
         {
-            iDynTree::MatrixDynSize rightFootToCoMGraspMatrix;
-            m_FKSolver->getRightFootToCoMGraspMatrix(m_contactModel,rightFootToCoMGraspMatrix);
+            iDynTree::MatrixDynSize rightFootToCoMGraspMatrix; std::cout<< " checkContact 013 " << std::endl;
+            m_FKSolver->getRightFootToCoMGraspMatrix(m_contactModel,rightFootToCoMGraspMatrix); std::cout<< " checkContact 014 " << std::endl;
 
-            iDynTree::MatrixDynSize comToRightFootGraspMatrix;
-            m_FKSolver->getPseudoInverseOfGraspMatrix(rightFootToCoMGraspMatrix,comToRightFootGraspMatrix);
+            iDynTree::MatrixDynSize comToRightFootGraspMatrix; std::cout<< " checkContact 015 " << std::endl;
+            m_FKSolver->getPseudoInverseOfGraspMatrix(rightFootToCoMGraspMatrix,comToRightFootGraspMatrix); std::cout<< " checkContact 016 " << std::endl;
 
-            comToContactFeetGraspMatrix = comToRightFootGraspMatrix;
+            comToContactFeetGraspMatrix = comToRightFootGraspMatrix; std::cout<< " checkContact 017 " << std::endl;
 
-            m_FKSolver->getCoMToRightFootJacobian(comToContactFeetJacobian);
+            m_FKSolver->getCoMToRightFootJacobian(comToContactFeetJacobian); std::cout<< " checkContact 018 " << std::endl;
         }
         else
         {
-            yError() << "[WalkingModule::checkContact] No foot in contact.";
+            yError() << "[WalkingModule::checkContact] Any foot is in contact.";
             return false;
         }
     }
