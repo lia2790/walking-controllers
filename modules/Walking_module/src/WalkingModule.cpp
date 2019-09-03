@@ -1009,23 +1009,20 @@ bool WalkingModule::updateModule()
                     double totalMass = 0; m_FKSolver->getTotalMass(totalMass); std::cout<< " 3 " << std::endl;
                     gravityForce(2) = - totalMass * gravity(0); std::cout<< " 4 " << std::endl;
                     std::cout<< "-- gravity force computed --" << std::endl;
-                    std::cout<< "-- total mass : " << totalMass << std::endl;
+                    std::cout<< "-- total mass : "    << totalMass << std::endl;
                     std::cout<< "-- gravity force : " << iDynTree::toEigen(gravityForce) << std::endl;
 
                     // compute input force pdfeedfowrad + gravity
-                    iDynTree::VectorDynSize InputCoMForce; 
-                    InputCoMForce.resize(m_walkingPDFeedForwardController->getControllerOutput().size()); InputCoMForce.zero();
-                    iDynTree::toEigen(InputCoMForce) = iDynTree::toEigen(m_walkingPDFeedForwardController->getControllerOutput()) + iDynTree::toEigen(gravityForce);
-                    iDynTree::VectorDynSize InputCoMWrench;
-                    InputCoMWrench.resize(InputCoMForce.size() + InputCoMForce.size()); InputCoMWrench.zero();
-                    iDynTree::toEigen(InputCoMWrench).segment(0,2) = iDynTree::toEigen(InputCoMForce);
+                    iDynTree::VectorDynSize InputCoMWrench(6); InputCoMWrench.zero(); std::cout<< " 01 " << std::endl;
+                    iDynTree::toEigen(InputCoMWrench).segment(0,3) = iDynTree::toEigen(m_walkingPDFeedForwardController->getControllerOutput()) + iDynTree::toEigen(gravityForce); std::cout<< " 02 " << std::endl;
                     std::cout<< "-- input com wrench computed --" << std::endl;
+                    std::cout<< "-- com wrench --" << iDynTree::toEigen(InputCoMWrench) << std::endl;
 
                     // check contact
                     iDynTree::MatrixDynSize comToContactFeetJacobian;
                     iDynTree::MatrixDynSize comToContactFeetGraspMatrix;
                     checkContact(comToContactFeetJacobian,comToContactFeetGraspMatrix);
-                    std::cout<< "-- check contact --" << std::endl;
+                    std::cout<< "-- check contact computed --" << std::endl;
 
                     // compute the contact force
                     iDynTree::VectorDynSize InputContactFeetForces;
@@ -1046,7 +1043,7 @@ bool WalkingModule::updateModule()
                     }
                     std::cout<< "-- torque control law evaluated --" << std::endl;
 
-                    // SEND SIGNAL TO THE ROBOT IN TORQUE CONTROL
+                    // SEND TORQUE CONTROL SIGNAL TO THE ROBOT
                     if(!m_robotControlHelper->setTorqueReferences(m_walkingGTorqueController->getControllerOutput()))
                     {
                         yError() << "[WalkingModule::updateModule] Error while setting the reference torque to iCub.";

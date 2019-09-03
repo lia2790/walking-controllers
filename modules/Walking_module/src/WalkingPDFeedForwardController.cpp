@@ -144,9 +144,9 @@ bool WalkingPDFeedForwardController::evaluateControl()
     std::cout << iDynTree::toEigen(m_Kp) << std::endl;
     std::cout << " ----------------- Kd gain ------------------------------- : " << std::endl;
     std::cout << iDynTree::toEigen(m_Kd) << std::endl;
-    std::cout << " ----------------- Kff gain ------------------------------- : " << std::endl;
+    std::cout << " ----------------- Kff gain ------------------------------ : " << std::endl;
     std::cout << iDynTree::toEigen(m_Kff) << std::endl;
-    std::cout << " ------- Size vectors ------------------------------------- : " << std::endl;
+    std::cout << " ------- Size vectors ------------------------------------ : " << std::endl;
     std::cout << " 1 ------------------------------------ : " << std::endl; 
     std::cout << m_controllerOutput.size() << std::endl;
     std::cout << " 2 ------------------------------------ : " << std::endl; 
@@ -163,7 +163,7 @@ bool WalkingPDFeedForwardController::evaluateControl()
     std::cout << m_Kp.size() << std::endl;
     std::cout << " Kd ----------------------------------- : " << std::endl;
     std::cout << m_Kd.size() << std::endl;
-    std::cout << " Kff ----------------------------------- : " << std::endl;
+    std::cout << " Kff ---------------------------------- : " << std::endl;
     std::cout << m_Kff.size() << std::endl;
     std::cout << " -------------------------------------- : " << std::endl;
 
