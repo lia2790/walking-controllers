@@ -27,16 +27,20 @@ bool WalkingGTorqueController::initialize(const yarp::os::Searchable& config)
         return false;
     }
 
-    // take stiffness and damping gains from conf file
+    // damping gain from conf file
     yarp::os::Value KD = config.find("D");
     yarp::os::Bottle *KDValue = KD.asList();
     m_KD.resize(KDValue->size());
     m_KD.zero();
 
+    for(int i = 0; i < KDValue->size(); i++ )
+        m_KD(i) = KDValue->get(i).asDouble();
+
+    m_controllerOutput.resize(m_KD.size());
+    m_controllerOutput.zero();
+
     m_isInitialized = true;
     m_isSetParams = false;
-
-    // std::cout<< "---------- Torque Controller Initialization ------------------ "<< std::endl;
 
     return true;
 }
@@ -75,9 +79,10 @@ bool WalkingGTorqueController::evaluateControl()
         for( int j = 0; j < m_comToContactJacobian.rows(); j++)
         {
             Jf_i += m_comToContactJacobian(j,i) * m_inputForce(j);
+            std::cout << " ------- j -------- : " << j << std::endl;
         }
-
         m_controllerOutput(i) = Jf_i - m_KD(i) * m_jointVelocity(i);
+        std::cout << " ------- i -------- : " << i << std::endl;
     }
 
     printOutput();

@@ -1004,37 +1004,45 @@ bool WalkingModule::updateModule()
                     std::cout<< "-- pd feedForward control law computed --" << std::endl;
 
                     // compute gravity force
-                    iDynTree::VectorDynSize gravityForce; gravityForce.resize(3); gravityForce.zero(); std::cout<< " 1 " << std::endl;
-                    iDynTree::VectorDynSize gravity(1); gravity(0) = 9.81; std::cout<< " 2 " << std::endl;
-                    double totalMass = 0; m_FKSolver->getTotalMass(totalMass); std::cout<< " 3 " << std::endl;
-                    gravityForce(2) = - totalMass * gravity(0); std::cout<< " 4 " << std::endl;
+                    iDynTree::VectorDynSize gravityForce; gravityForce.resize(3); gravityForce.zero();
+                    iDynTree::VectorDynSize gravity(1); gravity(0) = 9.81;
+                    double totalMass = 0; m_FKSolver->getTotalMass(totalMass);
+                    gravityForce(2) = - totalMass * gravity(0);
                     std::cout<< "-- gravity force computed --" << std::endl;
                     std::cout<< "-- total mass : "    << totalMass << std::endl;
                     std::cout<< "-- gravity force : " << iDynTree::toEigen(gravityForce) << std::endl;
 
                     // compute input force pdfeedfowrad + gravity
-                    iDynTree::VectorDynSize InputCoMWrench(6); InputCoMWrench.zero(); std::cout<< " 01 " << std::endl;
-                    iDynTree::toEigen(InputCoMWrench).segment(0,3) = iDynTree::toEigen(m_walkingPDFeedForwardController->getControllerOutput()) + iDynTree::toEigen(gravityForce); std::cout<< " 02 " << std::endl;
+                    iDynTree::VectorDynSize InputCoMWrench(6); InputCoMWrench.zero();
+                    iDynTree::toEigen(InputCoMWrench).segment(0,3) = iDynTree::toEigen(m_walkingPDFeedForwardController->getControllerOutput()) + iDynTree::toEigen(gravityForce);
                     std::cout<< "-- input com wrench computed --" << std::endl;
                     std::cout<< "-- com wrench --" << iDynTree::toEigen(InputCoMWrench) << std::endl;
 
-                    // check contact - intialize properly Jacobian and Grasp Matrix
-                    iDynTree::MatrixDynSize comToContactFeetJacobian; std::cout<< " 01 contact " << std::endl;
-                    iDynTree::MatrixDynSize comToContactFeetGraspMatrix; std::cout<< " 02 contact " << std::endl;
-                    checkContact(comToContactFeetJacobian,comToContactFeetGraspMatrix); std::cout<< " 03 contact " << std::endl;
+                    // check contact - intialize Jacobian and Grasp Matrix
+                    iDynTree::MatrixDynSize comToContactFeetJacobian;
+                    iDynTree::MatrixDynSize comToContactFeetGraspMatrix;
+                    checkContact(comToContactFeetJacobian,comToContactFeetGraspMatrix);
                     std::cout<< "-- check contact computed --" << std::endl;
 
-                    // compute contact force/s
-                    iDynTree::VectorDynSize InputContactFeetForces;
-                    iDynTree::toEigen(InputContactFeetForces) = iDynTree::toEigen(comToContactFeetGraspMatrix) * iDynTree::toEigen(InputCoMWrench);
+                    // get the torques part of the jacobian
+                    iDynTree::MatrixDynSize comToContactFeetJacobianTorques(comToContactFeetJacobian.rows(),comToContactFeetJacobian.cols()-6);
+                    for(int i = 0; i < comToContactFeetJacobianTorques.rows() ; i+=6 )
+                        iDynTree::toEigen(comToContactFeetJacobianTorques).block(i,0,6,comToContactFeetJacobianTorques.cols()) = iDynTree::toEigen(comToContactFeetJacobian).block(i,6,6,comToContactFeetJacobianTorques.cols());
+                    std::cout<< "-- comToContactFeetJacobianTorques computed --" << std::endl;
 
-                    // to contact wrench/es
+                    // compute contact force/s
+                    iDynTree::VectorDynSize InputContactFeetForces(comToContactFeetGraspMatrix.rows());
+                    iDynTree::toEigen(InputContactFeetForces) = iDynTree::toEigen(comToContactFeetGraspMatrix) * iDynTree::toEigen(InputCoMWrench);
+                    std::cout<< "-- InputContactFeetForces computed --" << std::endl;
+
+                    // mapped into contact wrench/es
                     iDynTree::VectorDynSize InputContactFeetWrenches(InputContactFeetForces.size()*2); InputContactFeetWrenches.zero();
-                    for(int i = 0; i < InputContactFeetWrenches.size(); i += 3 )
-                        iDynTree::toEigen(InputContactFeetWrenches).segment(i,3) = iDynTree::toEigen(InputContactFeetForces);
+                    for(int i = 0; i < InputContactFeetWrenches.size(); i += 6 )
+                        iDynTree::toEigen(InputContactFeetWrenches).segment(i,3) = iDynTree::toEigen(InputContactFeetForces).segment(i/2,3);
+                    std::cout<< "-- InputContactFeetWrenches computed --" << std::endl;
 
                     // TORQUE CONTROL
-                    if(!m_walkingGTorqueController->setParams(comToContactFeetJacobian,InputContactFeetWrenches,m_robotControlHelper->getJointVelocity()))
+                    if(!m_walkingGTorqueController->setParams(comToContactFeetJacobianTorques,InputContactFeetWrenches,m_robotControlHelper->getJointVelocity()))
                     {
                         yError() << "[WalkingModule::updateModule] Error while setting the feedback signal torque controller.";
                         return false;
@@ -1548,8 +1556,6 @@ bool WalkingModule::checkContact(iDynTree::MatrixDynSize &comToContactFeetJacobi
     {    
         if(m_rightInContact.front()) // double support
         {
-            std::cout<< " checkContact 000 " << std::endl;
-
             iDynTree::MatrixDynSize feetToCoMGraspMatrix; std::cout<< " checkContact 01 " << std::endl;
             m_FKSolver->getFeetToCoMGraspMatrix(m_contactModel, feetToCoMGraspMatrix); std::cout<< " checkContact 02 " << std::endl;
 

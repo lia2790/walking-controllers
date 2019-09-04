@@ -619,10 +619,10 @@ bool WalkingFK::getTotalMass(double& totalMass)
 
     totalMass = Mg(0,0); std::cout<< " in 6 " << std::endl;
 
-    std::cout<< " totalMass  : " << totalMass              << std::endl;
+    std::cout<< " totalMass  : " << totalMass              << std::endl;/*
     std::cout<< " Mg         : " << iDynTree::toEigen(Mg)  << std::endl;
     std::cout<< " gTb        : " << iDynTree::toEigen(gTb) << std::endl;
-    std::cout<< " gTbinverse : " << iDynTree::toEigen(gTbinverse) << std::endl;
+    std::cout<< " gTbinverse : " << iDynTree::toEigen(gTbinverse) << std::endl;*/
 
     return true;
 }

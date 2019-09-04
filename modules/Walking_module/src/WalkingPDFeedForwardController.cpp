@@ -20,7 +20,6 @@
 
 bool WalkingPDFeedForwardController::initialize(const yarp::os::Searchable& config)
 {
-
     // check if the configuration file is empty
     if(config.isNull())
     {
@@ -28,7 +27,7 @@ bool WalkingPDFeedForwardController::initialize(const yarp::os::Searchable& conf
         return false;
     }
 
-    // take stiffness and damping gains from conf file
+    // stiffness and damping gains from conf file
     yarp::os::Value Kp = config.find("Kp");
     yarp::os::Value Kd = config.find("Kd");
     yarp::os::Value Kff = config.find("Kff");
@@ -43,19 +42,17 @@ bool WalkingPDFeedForwardController::initialize(const yarp::os::Searchable& conf
     m_Kd.zero();
     m_Kff.zero();
 
-    m_isInitialized = true;
-    m_isSetFeedbackSignal = false;
-    m_isSetDesiredSignal = false;
-    m_isSetFeedForward = false;
-
-    // std::cout<< "-- PDFeedforward Controller Initialization --------------------- "<< std::endl;
-
     for(int i = 0; i < KpValue->size(); i++ )
     {
         m_Kp(i) = KpValue->get(i).asDouble();
         m_Kd(i) = KdValue->get(i).asDouble();
         m_Kff(i) = KffValue->get(i).asDouble();
     }
+
+    m_isInitialized = true;
+    m_isSetFeedbackSignal = false;
+    m_isSetDesiredSignal = false;
+    m_isSetFeedForward = false;
 
     return true;
 }
