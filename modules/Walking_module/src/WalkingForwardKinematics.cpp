@@ -343,8 +343,6 @@ bool WalkingFK::setInternalRobotState(const iDynTree::VectorDynSize& positionFee
     gravity.zero();
     gravity(2) = -9.81;
 
-    // m_worldToBaseTransform 
-
     if(!m_kinDyn.setRobotState(m_worldToBaseTransform, positionFeedbackInRadians,
                                iDynTree::Twist::Zero(), velocityFeedbackInRadians,
                                gravity))
@@ -629,20 +627,20 @@ bool WalkingFK::getTotalMass(double& totalMass)
 
 bool WalkingFK::getCoMToLeftFootJacobian(iDynTree::MatrixDynSize &jacobian)
 {
-    iDynTree::MatrixDynSize Jla(6,29);
-    this->getLeftFootJacobian(Jla);
+    iDynTree::MatrixDynSize Jlw(6,29);
+    this->getLeftFootJacobian(Jlw);
 
-    iDynTree::MatrixDynSize Jca;
-    this->getCoMJacobian(Jca);
+    iDynTree::MatrixDynSize Jcw;
+    this->getCoMJacobian(Jcw);
 
-    iDynTree::MatrixDynSize cTa;
-    this->getChangeBaseTransformation(Jca, cTa);
+    iDynTree::MatrixDynSize cTw;
+    this->getChangeBaseTransformation(Jcw, cTw);
 
-    iDynTree::MatrixDynSize cTainverse;
-    this->getInverseOfChangeBaseTransformation(cTa,cTainverse);
+    iDynTree::MatrixDynSize cTwinverse;
+    this->getInverseOfChangeBaseTransformation(cTw,cTwinverse);
 
     iDynTree::MatrixDynSize Jlc(6,29);
-    iDynTree::toEigen(Jlc) = iDynTree::toEigen(Jla) * iDynTree::toEigen(cTainverse);
+    iDynTree::toEigen(Jlc) = iDynTree::toEigen(Jlw) * iDynTree::toEigen(cTwinverse);
 
     jacobian = Jlc;
 
@@ -651,20 +649,20 @@ bool WalkingFK::getCoMToLeftFootJacobian(iDynTree::MatrixDynSize &jacobian)
 
 bool WalkingFK::getCoMToRightFootJacobian(iDynTree::MatrixDynSize &jacobian)
 {
-    iDynTree::MatrixDynSize Jra(6,29);
-    this->getRightFootJacobian(Jra);
+    iDynTree::MatrixDynSize Jrw(6,29);
+    this->getRightFootJacobian(Jrw);
 
-    iDynTree::MatrixDynSize Jca;
-    this->getCoMJacobian(Jca);
+    iDynTree::MatrixDynSize Jcw;
+    this->getCoMJacobian(Jcw);
 
-    iDynTree::MatrixDynSize cTa;
-    this->getChangeBaseTransformation(Jca, cTa);
+    iDynTree::MatrixDynSize cTw;
+    this->getChangeBaseTransformation(Jcw, cTw);
 
-    iDynTree::MatrixDynSize cTainverse;
-    this->getInverseOfChangeBaseTransformation(cTa,cTainverse);
+    iDynTree::MatrixDynSize cTwinverse;
+    this->getInverseOfChangeBaseTransformation(cTw,cTwinverse);
 
     iDynTree::MatrixDynSize Jrc(6,29);
-    iDynTree::toEigen(Jrc) = iDynTree::toEigen(Jra) * iDynTree::toEigen(cTainverse);
+    iDynTree::toEigen(Jrc) = iDynTree::toEigen(Jrw) * iDynTree::toEigen(cTwinverse);
 
     jacobian = Jrc;
 
@@ -770,7 +768,7 @@ bool WalkingFK::getLeftFootToCoMGraspMatrix(iDynTree::MatrixDynSize &contactMode
     wTl = this->getLeftFootToWorldTransform();
 
     iDynTree::Transform cTl;
-    cTl = wTc.inverse() * wTl;
+    cTl = wTc.inverse() * wTl * m_frameHlinkLeft ;
 
     iDynTree::Rotation Rcl_; Rcl_ = cTl.getRotation();
     iDynTree::Position Pcl_; Pcl_ = cTl.getPosition();
@@ -792,7 +790,7 @@ bool WalkingFK::getRightFootToCoMGraspMatrix(iDynTree::MatrixDynSize &contactMod
     wTr = this->getRightFootToWorldTransform();
 
     iDynTree::Transform cTr;
-    cTr = wTc.inverse() * wTr;
+    cTr = wTc.inverse() * wTr * m_frameHlinkRight;
 
     iDynTree::Rotation Rcr_; Rcr_ = cTr.getRotation();
     iDynTree::Position Pcr_; Pcr_ = cTr.getPosition();

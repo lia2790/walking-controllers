@@ -965,7 +965,7 @@ bool WalkingModule::updateModule()
                     comVelocity(1) = m_FKSolver->getCoMVelocity().getVal(1);
                     comVelocity(2) = m_FKSolver->getCoMVelocity().getVal(2); 
 
-                    // FEEDFORWARD CONTROL
+                    // PDFEEDFORWARD CONTROL
                     if(!m_walkingPDFeedForwardController->setFeedbackSignals(comPosition,comVelocity))
                     {
                         yError() << "[WalkingModule::updateModule] Error while setting the feedback signal of pdfeedforward controller.";
@@ -973,14 +973,25 @@ bool WalkingModule::updateModule()
                     }
                     std::cout<< "-- pd feedForward feedback signal setted --" << std::endl;
 
-                    iDynTree::VectorDynSize desiredCoMPosition_; desiredCoMPosition_.resize(desiredCoMPosition.size());
+
+                    iDynTree::VectorDynSize desiredCoMPosition_(3); 
+                    desiredCoMPosition_(0) = m_stableDCMModel->getCoMPosition()(0);
+                    desiredCoMPosition_(1) = m_stableDCMModel->getCoMPosition()(1);
+                    desiredCoMPosition_(2) = m_comHeightTrajectory.front();
+
+                    iDynTree::VectorDynSize desiredCoMVelocity_(3); 
+                    desiredCoMVelocity_(0) = m_stableDCMModel->getCoMVelocity()(0);
+                    desiredCoMVelocity_(1) = m_stableDCMModel->getCoMVelocity()(1);
+                    desiredCoMVelocity_(2) = m_comHeightVelocity.front();
+
+                  /*iDynTree::VectorDynSize desiredCoMPosition_; desiredCoMPosition_.resize(desiredCoMPosition.size());
                     iDynTree::VectorDynSize desiredCoMVelocity_; desiredCoMVelocity_.resize(desiredCoMVelocity.size());
                     desiredCoMPosition_(0) = desiredCoMPosition.getVal(0);
                     desiredCoMPosition_(1) = desiredCoMPosition.getVal(1);
                     desiredCoMPosition_(2) = desiredCoMPosition.getVal(2);             
                     desiredCoMVelocity_(0) = desiredCoMVelocity.getVal(0);
                     desiredCoMVelocity_(1) = desiredCoMVelocity.getVal(1);
-                    desiredCoMVelocity_(2) = desiredCoMVelocity.getVal(2);
+                    desiredCoMVelocity_(2) = desiredCoMVelocity.getVal(2);*/
                     if(!m_walkingPDFeedForwardController->setDesiredSignals(desiredCoMPosition_,desiredCoMVelocity_))
                     {
                         yError() << "[WalkingModule::updateModule] Error while setting the feedback signal pdfeedforward controller.";
