@@ -1105,7 +1105,7 @@ bool WalkingModule::updateModule()
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
                                       errorL, errorR,
-                                      m_qDesired, m_robotControlHelper->getJointPosition());
+                                      m_qDesired, m_robotControlHelper->getJointPosition(), m_walkingGTorqueController->getControllerOutput(), m_robotControlHelper->getJointTorque());
         }
 
         propagateTime();
@@ -1702,9 +1702,16 @@ bool WalkingModule::startWalking()
                     "r_shoulder_pitch", "r_shoulder_roll", "r_shoulder_yaw", "r_elbow",
                     "l_hip_pitch", "l_hip_roll", "l_hip_yaw", "l_knee", "l_ankle_pitch", "l_ankle_roll",
                     "r_hip_pitch", "r_hip_roll", "r_hip_yaw", "r_knee", "r_ankle_pitch", "r_ankle_roll",
+                    "torso_pitch_torque_des", "torso_roll_torque_des", "torso_yaw_torque_des",
+                    "l_shoulder_pitch_torque_des", "l_shoulder_roll_torque_des", "l_shoulder_yaw_torque_des", "l_elbow_torque_des",
+                    "r_shoulder_pitch_torque_des", "r_shoulder_roll_torque_des", "r_shoulder_yaw_torque_des", "r_elbow_torque_des",
+                    "l_hip_pitch_torque_des", "l_hip_roll_torque_des", "l_hip_yaw_torque_des", "l_knee_torque_des", "l_ankle_pitch_torque_des", "l_ankle_roll_torque_des",
+                    "r_hip_pitch_torque_des", "r_hip_roll_torque_des", "r_hip_yaw_torque_des", "r_knee_torque_des", "r_ankle_pitch_torque_des", "r_ankle_roll_torque_des"
                     "torso_pitch_torque", "torso_roll_torque", "torso_yaw_torque",
                     "l_shoulder_pitch_torque", "l_shoulder_roll_torque", "l_shoulder_yaw_torque", "l_elbow_torque",
-                    "r_shoulder_pitch_torque", "r_shoulder_roll_torque", "r_shoulder_yaw_torque", "r_elbow_torque"});
+                    "r_shoulder_pitch_torque", "r_shoulder_roll_torque", "r_shoulder_yaw_torque", "r_elbow_torque",
+                    "l_hip_pitch_torque", "l_hip_roll_torque", "l_hip_yaw_torque", "l_knee_torque", "l_ankle_pitch_torque", "l_ankle_roll_torque",
+                    "r_hip_pitch_torque", "r_hip_roll_torque", "r_hip_yaw_torque", "r_knee_torque", "r_ankle_pitch_torque", "r_ankle_roll_torque"});
     }
 
     // if the robot was only prepared the filters has to be reseted
