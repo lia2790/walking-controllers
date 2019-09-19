@@ -161,7 +161,6 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
      */
     bool advanceReferenceSignals();
 
-
     /**
      * Update the FK solver.
      * @return true in case of success and false otherwise.
@@ -175,6 +174,12 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
      * @return true in case of success and false otherwise.
      */
     bool checkContact(iDynTree::MatrixDynSize &comToContactFeetJacobian, iDynTree::MatrixDynSize &comToContactFeetGraspMatrix);
+
+    /**
+     *
+     *
+     */
+    bool checkContactBase(iDynTree::MatrixDynSize &baseToContactFeetJacobian, iDynTree::MatrixDynSize &baseToContactFeetGraspMatrix);
 
     /**
      * Set the QP-IK problem.

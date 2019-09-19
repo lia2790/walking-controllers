@@ -36,17 +36,23 @@ class WalkingFK
     iDynTree::FrameIndex m_frameLeftHandIndex; /**< Index of the frame attached to the left hand. */
     iDynTree::FrameIndex m_frameRightHandIndex; /**< Index of the frame attached to the right hand. */
     iDynTree::FrameIndex m_frameHeadIndex; /**< Index of the frame attached to the head. */
+    iDynTree::FrameIndex m_frameBaseIndex; /**< Index of the base frame. */
 
     std::string m_baseFrameLeft; /**< Name of the left base frame. */
     std::string m_baseFrameRight;  /**< Name of the right base frame. */
+    std::string m_baseFrameCoM; /**< Name of the com base frame. */
+    std::string m_baseFrameName; /**< Name of the base frame. */
+    std::string m_baseFrameLink; /**< Name of the base link. */
 
     iDynTree::Transform m_frameHlinkLeft; /**< Transformation between the l_sole and the l_foot frame (l_ankle_2?!). */
-    iDynTree::Transform m_frameHlinkRight; /**< Transformation between the l_sole and the l_foot frame (l_ankle_2?!). */
+    iDynTree::Transform m_frameHlinkRight; /**< Transformation between the r_sole and the r_foot frame (r_ankle_2?!). */
+    iDynTree::Transform m_frameBaseHlinkBase; /**< Transformation between the link base and the frame base. */
+
     iDynTree::Transform m_worldToBaseTransform; /**< World to base transformation. */
 
     iDynTree::Position m_comPosition; /**< Position of the CoM. */
-    iDynTree::Vector3 m_comVelocity; /**< Velocity of the CoM. */
-    iDynTree::Vector2 m_dcm; /**< DCM position. */
+    iDynTree::Vector3  m_comVelocity; /**< Velocity of the CoM. */
+    iDynTree::Vector2  m_dcm; /**< DCM position. */
     double m_corrTerm; /**< Correction Term relative to Inclined Plane dcm position*/
     double m_omega; /**< Inverted time constant of the 3D-LIPM. */
 
@@ -77,6 +83,12 @@ class WalkingFK
      * @return true/false in case of success/failure.
      */
     bool setBaseFrames(const std::string& lFootFrame, const std::string& rFootFrame);
+
+    /*
+     *
+     * @return true/false in case of success/failure.
+     */
+    bool addCoMLink(const std::string& linkName, const std::string& comFrameName);
 
     /**
      * Evaluate the Divergent component of motion.
@@ -130,6 +142,12 @@ public:
     bool evaluateWorldToBaseTransformation(const iDynTree::Transform& leftFootTransform,
                                            const iDynTree::Transform& rightFootTransform,
                                            const bool& isLeftFixedFrame);
+
+    /**
+     * 
+     * @return true/false in case of success/failure.
+     */
+    bool updateWorldToBaseTransformation(const bool& isLeftFixedFrame);
 
     /**
      * Set the base for the onTheFly feature
@@ -211,14 +229,14 @@ public:
      * Return the transformation from base frame to world.
      * @return world_H_base_frame.
      */
-    iDynTree::Transform getWorldToBaseTransform();
+    iDynTree::Transform getBaseToWorldTransform();
 
     /**
      * Return the transformation from com frame to world frame 
-     * ( the rotation part is assumed to be equal to the world rotation,
+     * (the rotation part is assumed to be equal to the world rotation)
      * @return world_H_com_frame.
      */
-    iDynTree::Transform getCoMTransform();
+    iDynTree::Transform getCoMToWorldTransform();
 
     /**
      * Return the root link velocity.
@@ -297,6 +315,12 @@ public:
     bool getChangeBaseTransformation(iDynTree::MatrixDynSize& bToAJacobian, iDynTree::MatrixDynSize& bToABaseTransform);
 
     /**
+     *
+     * @return true/false in case of success/failure.
+     */
+    bool getChangeBaseTransformation(iDynTree::MatrixDynSize& bToAX, iDynTree::MatrixDynSize& bToAS, iDynTree::MatrixDynSize& bToABaseTransform);
+
+    /**
      *  
      * @return true/false in case of success/failure.
      */
@@ -309,6 +333,30 @@ public:
     bool getInverseOfChangeBaseTransformation(iDynTree::MatrixDynSize& bToABaseTransform, iDynTree::MatrixDynSize& bToAInverseBaseTransform);
 
     /**
+     *
+     * @return true/false in case of success/failure.
+     */
+    bool getBaseToCoMChangeBaseTransformation(iDynTree::MatrixDynSize &cTb);
+
+     /**
+     *
+     * @return true/false in case of success/failure.
+     */
+    bool getCoMToBaseChangeBaseTransformation(iDynTree::MatrixDynSize &bTc);
+
+    /**
+     *
+     * @return true/false in case of success/failure.
+     */
+    bool getCentroidalbTcBaseTransformation(iDynTree::MatrixDynSize &bTc); // Ott Roa
+
+    /**
+     *
+     * @return true/false in case of success/failure.
+     */
+    bool getCentroidalbTcBaseBaseTransformation(iDynTree::MatrixDynSize &bTc); // nava
+
+    /**
      *  
      * @return true/false in case of success/failure.
      */
@@ -319,6 +367,12 @@ public:
      * @return true/false in case of success/failure.
      */
     bool toVectorDynSize(iDynTree::Position &pos, iDynTree::VectorDynSize &vec);
+
+    /**
+     *
+     * @return a square identity matrix.
+     */
+    iDynTree::MatrixDynSize getIdentity(int n);
 
     /**
      * Get the total mass of the robot.
@@ -379,6 +433,27 @@ public:
      * @return true/false in case of success/failure.
      */
     bool getFeetToCoMGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &feetToCoMGraspMatrix);
+
+    /**
+     *
+     */
+    bool getLeftFootTobaseGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &leftFootTobaseGraspMatrix);
+
+    /**
+     *
+     */
+    bool getRightFootTobaseGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &rightFootTobaseGraspMatrix);
+
+    /**
+     *
+     */
+    bool getFeetTobaseGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &feetTobaseGraspMatrix);
+
+    /**
+     *
+     *
+     */
+    bool getCoMToBaseGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &CoMToBaseGraspMatrix);
 
     /**
      *

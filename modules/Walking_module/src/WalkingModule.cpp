@@ -715,6 +715,26 @@ bool WalkingModule::updateModule()
 
         m_retargetingClient->getFeedback();
 
+        /* with com approach for torque control
+        if(m_controlMode == 0 || m_controlMode == 1) // POSITION CONTROL 0 or IMPEDANCE TORQUE CONTROL 1
+        {
+            if(!updateFKSolver())
+            {
+                yError() << "[WalkingModule::updateModule] Unable to update the FK solver.";
+                return false;
+            }
+        }
+            
+        if(m_controlMode == 2) // PDFEEDFORWARD + FORCE TORQUE CONTROL 2
+        {
+            if(!updateFKSolverCoMApproach())
+            {
+                yError() << "[WalkingModule::updateModule] Unable to update the FK solver.";
+                return false;
+            }
+        }
+        */
+
         if(!updateFKSolver())
         {
             yError() << "[WalkingModule::updateModule] Unable to update the FK solver.";
@@ -984,14 +1004,6 @@ bool WalkingModule::updateModule()
                     desiredCoMVelocity_(1) = m_stableDCMModel->getCoMVelocity()(1);
                     desiredCoMVelocity_(2) = m_comHeightVelocity.front();
 
-                  /*iDynTree::VectorDynSize desiredCoMPosition_; desiredCoMPosition_.resize(desiredCoMPosition.size());
-                    iDynTree::VectorDynSize desiredCoMVelocity_; desiredCoMVelocity_.resize(desiredCoMVelocity.size());
-                    desiredCoMPosition_(0) = desiredCoMPosition.getVal(0);
-                    desiredCoMPosition_(1) = desiredCoMPosition.getVal(1);
-                    desiredCoMPosition_(2) = desiredCoMPosition.getVal(2);             
-                    desiredCoMVelocity_(0) = desiredCoMVelocity.getVal(0);
-                    desiredCoMVelocity_(1) = desiredCoMVelocity.getVal(1);
-                    desiredCoMVelocity_(2) = desiredCoMVelocity.getVal(2);*/
                     if(!m_walkingPDFeedForwardController->setDesiredSignals(desiredCoMPosition_,desiredCoMVelocity_))
                     {
                         yError() << "[WalkingModule::updateModule] Error while setting the feedback signal pdfeedforward controller.";
@@ -1021,7 +1033,7 @@ bool WalkingModule::updateModule()
                     gravityForce(2) = - totalMass * gravity(0);
                     std::cout<< "-- gravity force computed --" << std::endl;
                     std::cout<< "-- total mass : "    << totalMass << std::endl;
-                    std::cout<< "-- gravity force : " << iDynTree::toEigen(gravityForce) << std::endl;
+                    std::cout<< "-- gravity force : " << std::endl << iDynTree::toEigen(gravityForce) << std::endl;
 
                     // compute input force pdfeedfowrad + gravity
                     iDynTree::VectorDynSize InputCoMWrench(6); InputCoMWrench.zero();
@@ -1029,11 +1041,44 @@ bool WalkingModule::updateModule()
                     std::cout<< "-- input com wrench computed --" << std::endl;
                     std::cout<< "-- com wrench --" << iDynTree::toEigen(InputCoMWrench) << std::endl;
 
-                    // check contact - intialize Jacobian and Grasp Matrix
+                    // check contact/s - intialize Jacobian and Grasp Matrix
                     iDynTree::MatrixDynSize comToContactFeetJacobian;
                     iDynTree::MatrixDynSize comToContactFeetGraspMatrix;
                     checkContact(comToContactFeetJacobian,comToContactFeetGraspMatrix);
                     std::cout<< "-- check contact computed --" << std::endl;
+
+
+                    // --------------------------------------------------------------------------------------------------------------------------------------- 
+                              // maps the wrench in the base frame
+                    /*
+                    iDynTree::MatrixDynSize bcGraspMatrix;
+                    m_FKSolver->getCoMToBaseGraspMatrix(m_contactModel,bcGraspMatrix);
+                    iDynTree::VectorDynSize InputWrenchBase(6); InputWrenchBase.zero();
+                    iDynTree::toEigen(InputWrenchBase) = iDynTree::toEigen(bcGraspMatrix) * iDynTree::toEigen(InputCoMWrench).segment(0,3);
+                    std::cout<< "-- InputWrenchBase computed --" << std::endl;
+
+                    iDynTree::MatrixDynSize baseToContactFeetJacobian;
+                    iDynTree::MatrixDynSize baseToContactFeetGraspMatrix;
+                    checkContactBase(baseToContactFeetJacobian,baseToContactFeetGraspMatrix);
+                    std::cout<< "-- checkContactBase computed --" << std::endl;
+
+                    iDynTree::MatrixDynSize baseToContactFeetJacobianTorques(baseToContactFeetJacobian.rows(),baseToContactFeetJacobian.cols()-6);
+                    for(int i = 0; i < baseToContactFeetJacobianTorques.rows() ; i+=6 )
+                        iDynTree::toEigen(baseToContactFeetJacobianTorques).block(i,0,6,baseToContactFeetJacobianTorques.cols()) = iDynTree::toEigen(baseToContactFeetJacobian).block(i,6,6,baseToContactFeetJacobianTorques.cols());
+                    std::cout<< "-- baseToContactFeetJacobianTorques computed --" << std::endl;      
+
+                    iDynTree::VectorDynSize InputContactFeetForcesBase; InputContactFeetForcesBase.resize(comToContactFeetGraspMatrix.rows());
+                    iDynTree::toEigen(InputContactFeetForcesBase) = iDynTree::toEigen(baseToContactFeetGraspMatrix) * iDynTree::toEigen(InputWrenchBase);
+                    std::cout<< "-- InputContactFeetForcesBase computed --" << std::endl;
+
+                    iDynTree::VectorDynSize InputContactFeetWrenchesBase(InputContactFeetForcesBase.size()*2); InputContactFeetWrenchesBase.zero();
+                    for(int i = 0; i < InputContactFeetWrenchesBase.size(); i += 6 )
+                        iDynTree::toEigen(InputContactFeetWrenchesBase).segment(i,3) = iDynTree::toEigen(InputContactFeetForcesBase).segment(i/2,3);
+                    std::cout<< "-- InputContactFeetWrenchesBase computed --" << std::endl;
+                    */
+                    
+                    // --------------------------------------------------------------------------------------------------------------------------------------
+
 
                     // get the torques part of the jacobian
                     iDynTree::MatrixDynSize comToContactFeetJacobianTorques(comToContactFeetJacobian.rows(),comToContactFeetJacobian.cols()-6);
@@ -1046,14 +1091,14 @@ bool WalkingModule::updateModule()
                     iDynTree::toEigen(InputContactFeetForces) = iDynTree::toEigen(comToContactFeetGraspMatrix) * iDynTree::toEigen(InputCoMWrench);
                     std::cout<< "-- InputContactFeetForces computed --" << std::endl;
 
-                    // mapped into contact wrench/es
+                    // map contact force/s into contact wrench/es
                     iDynTree::VectorDynSize InputContactFeetWrenches(InputContactFeetForces.size()*2); InputContactFeetWrenches.zero();
                     for(int i = 0; i < InputContactFeetWrenches.size(); i += 6 )
                         iDynTree::toEigen(InputContactFeetWrenches).segment(i,3) = iDynTree::toEigen(InputContactFeetForces).segment(i/2,3);
                     std::cout<< "-- InputContactFeetWrenches computed --" << std::endl;
 
                     // TORQUE CONTROL
-                    if(!m_walkingGTorqueController->setParams(comToContactFeetJacobianTorques,InputContactFeetWrenches,m_robotControlHelper->getJointVelocity()))
+                    if(!m_walkingGTorqueController->setParams(comToContactFeetJacobianTorques, InputContactFeetWrenches, m_robotControlHelper->getJointVelocity()))
                     {
                         yError() << "[WalkingModule::updateModule] Error while setting the feedback signal torque controller.";
                         return false;
@@ -1118,6 +1163,8 @@ bool WalkingModule::updateModule()
                                       errorL, errorR,
                                       m_qDesired, m_robotControlHelper->getJointPosition(), m_walkingGTorqueController->getControllerOutput(), m_robotControlHelper->getJointTorque());
         }
+
+        std::cout << " JointTorque measure " << std::endl << iDynTree::toEigen(m_robotControlHelper->getJointTorque()) << std::endl;
 
         propagateTime();
 
@@ -1208,7 +1255,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     bool IMU = false;
     if(IMU)
     {
-        // detect the angle of the inclined plane via accelerometer
+        // detect inclined plane angle via accelerometer
         bool usingFilter = 0;
         if(!detectInclinedPlaneAngle(m_robotControlHelper->getLeftFootThreeAxisLinearAccelerometersMeasureData(),usingFilter,m_leftFootImuFrameName,m_leftFootFrameName))
         {
@@ -1337,21 +1384,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     }
 
     // std::cout<<"m_qDesired : "<< iDynTree::toEigen(m_qDesired) << std::endl;
-    
-    std::cout<< " left Transform : " << std::endl;
-    std::cout<<  m_leftTrajectory.front().getPosition().getVal(0)<< ' ' << m_leftTrajectory.front().getPosition().getVal(1)<< ' ' << m_leftTrajectory.front().getPosition().getVal(2) << std::endl;
-    std::cout<<  m_leftTrajectory.front().getRotation().asRPY()(0) << ' ' << m_leftTrajectory.front().getRotation().asRPY()(1) << ' ' << m_leftTrajectory.front().getRotation().asRPY()(2)  << std::endl;
-    std::cout<< " right Transform : " << std::endl;
-    std::cout<<  m_rightTrajectory.front().getPosition().getVal(0)<< ' ' << m_rightTrajectory.front().getPosition().getVal(1)<< ' ' << m_rightTrajectory.front().getPosition().getVal(2) << std::endl;
-    std::cout<<  m_rightTrajectory.front().getRotation().asRPY()(0) << ' ' << m_rightTrajectory.front().getRotation().asRPY()(1) << ' ' << m_rightTrajectory.front().getRotation().asRPY()(2)  << std::endl;
-    std::cout<< " desired COM position " << std::endl;
-    std::cout<< iDynTree::toEigen(desiredCoMPosition) << std::endl;
 
-    iDynTree::Transform wTb = m_FKSolver->getWorldToBaseTransform();
-
-    std::cout<< " wTb Transform : " << std::endl;
-    std::cout<<  wTb.getPosition().getVal(0)<< ' ' << wTb.getPosition().getVal(1)<< ' ' << wTb.getPosition().getVal(2) << std::endl;
-    std::cout<<  wTb.getRotation().asRPY()(0) << ' ' << wTb.getRotation().asRPY()(1) << ' ' << wTb.getRotation().asRPY()(2)  << std::endl;
     /*
     if(m_controlMode)
     { */
@@ -1541,13 +1574,27 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
 
 bool WalkingModule::updateFKSolver()
 {
-    if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
-                                                      m_rightTrajectory.front(),
-                                                      m_isLeftFixedFrame.front()))
-    {
-        yError() << "[WalkingModule::updateFKSolver] Unable to evaluate the world to base transformation.";
-        return false;
+    bool baseFoot = true;
+
+    if(baseFoot)
+    {    
+        if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
+                                                          m_rightTrajectory.front(),
+                                                          m_isLeftFixedFrame.front()))
+        {
+            yError() << "[WalkingModule::updateFKSolver] Unable to evaluate the world to base transformation.";
+            return false;
+        }
     }
+    else
+    {
+        if(!m_FKSolver->updateWorldToBaseTransformation(m_isLeftFixedFrame.front()))
+        {
+            yError() << "[WalkingModule::updateFKSolver] Unable to evaluate the world to base transformation.";
+            return false;
+        }
+    }
+   
 
     if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
                                           m_robotControlHelper->getJointVelocity()))
@@ -1612,6 +1659,69 @@ bool WalkingModule::checkContact(iDynTree::MatrixDynSize &comToContactFeetJacobi
     }
 
     return true;
+}
+
+bool WalkingModule::checkContactBase(iDynTree::MatrixDynSize &baseToContactFeetJacobian, iDynTree::MatrixDynSize &baseToContactFeetGraspMatrix)
+{
+    if(m_leftInContact.front())
+    {    
+        if(m_rightInContact.front()) // double support
+        {
+            iDynTree::MatrixDynSize feetTobaseGraspMatrix; std::cout<< " checkContact 01 " << std::endl;
+            m_FKSolver->getFeetTobaseGraspMatrix(m_contactModel, feetTobaseGraspMatrix); std::cout<< " checkContact 02 " << std::endl;
+
+            iDynTree::MatrixDynSize baseToFeetGraspMatrix; std::cout<< " checkContact 03 " << std::endl;
+            m_FKSolver->getPseudoInverseOfGraspMatrix(feetTobaseGraspMatrix,baseToFeetGraspMatrix); std::cout<< " checkContact 04 " << std::endl;
+
+            baseToContactFeetGraspMatrix = baseToFeetGraspMatrix; std::cout<< " checkContact 05 " << std::endl;
+
+            iDynTree::MatrixDynSize baseTorFootJacobian(6,29); std::cout<< " checkContact 05 " << std::endl;
+            iDynTree::MatrixDynSize baseTolFootJacobian(6,29); std::cout<< " checkContact 05 " << std::endl;
+            m_FKSolver->getLeftFootJacobian(baseTolFootJacobian); std::cout<< " checkContact 06 a " << std::endl;
+            m_FKSolver->getRightFootJacobian(baseTorFootJacobian); std::cout<< " checkContact 06 b " << std::endl;
+
+            baseToContactFeetJacobian.resize(baseTorFootJacobian.rows() + baseTolFootJacobian.rows(),baseTorFootJacobian.cols()); std::cout<< " checkContact 06 c " << std::endl;
+            baseToContactFeetJacobian.zero(); std::cout<< " checkContact 06 c " << std::endl;
+            iDynTree::toEigen(baseToContactFeetJacobian).block(0,0,baseTolFootJacobian.rows(),baseTolFootJacobian.cols()) = iDynTree::toEigen(baseTolFootJacobian); std::cout<< " checkContact 06 d " << std::endl;
+            iDynTree::toEigen(baseToContactFeetJacobian).block(6,0,baseTorFootJacobian.rows(),baseTorFootJacobian.cols()) = iDynTree::toEigen(baseTorFootJacobian); std::cout<< " checkContact 06 e " << std::endl;
+
+        }
+        else // in single support left foot
+        {
+            iDynTree::MatrixDynSize leftFootTobaseGraspMatrix; std::cout<< " checkContact 07 " << std::endl;
+            m_FKSolver->getLeftFootTobaseGraspMatrix(m_contactModel,leftFootTobaseGraspMatrix); std::cout<< " checkContact 08 " << std::endl;
+
+            iDynTree::MatrixDynSize baseToLeftFootGraspMatrix; std::cout<< " checkContact 09 " << std::endl;
+            m_FKSolver->getPseudoInverseOfGraspMatrix(leftFootTobaseGraspMatrix,baseToLeftFootGraspMatrix); std::cout<< " checkContact 010 " << std::endl;
+
+            baseToContactFeetGraspMatrix = baseToLeftFootGraspMatrix; std::cout<< " checkContact 011 " << std::endl;
+
+            m_FKSolver->getLeftFootJacobian(baseToContactFeetJacobian); std::cout<< " checkContact 012 " << std::endl;
+        }
+    }
+    else 
+    {
+        if(m_rightInContact.front()) // in single support right foot
+        {
+            iDynTree::MatrixDynSize rightFootTobaseGraspMatrix; std::cout<< " checkContact 013 " << std::endl;
+            m_FKSolver->getRightFootTobaseGraspMatrix(m_contactModel,rightFootTobaseGraspMatrix); std::cout<< " checkContact 014 " << std::endl;
+
+            iDynTree::MatrixDynSize baseToRightFootGraspMatrix; std::cout<< " checkContact 015 " << std::endl;
+            m_FKSolver->getPseudoInverseOfGraspMatrix(rightFootTobaseGraspMatrix,baseToRightFootGraspMatrix); std::cout<< " checkContact 016 " << std::endl;
+
+            baseToContactFeetGraspMatrix = baseToRightFootGraspMatrix; std::cout<< " checkContact 017 " << std::endl;
+
+            m_FKSolver->getRightFootJacobian(baseToContactFeetJacobian); std::cout<< " checkContact 018 " << std::endl;
+        }
+        else
+        {
+            yError() << "[WalkingModule::checkContact] Any foot is in contact.";
+            return false;
+        }
+    }
+
+    return true;
+
 }
 
 bool WalkingModule::detectInclinedPlaneAngle(const iDynTree::VectorDynSize& SensorData, bool usingFilter, const std::string &sensorFrameName, const std::string &destinationFrameName)
@@ -1717,7 +1827,7 @@ bool WalkingModule::startWalking()
                     "l_shoulder_pitch_torque_des", "l_shoulder_roll_torque_des", "l_shoulder_yaw_torque_des", "l_elbow_torque_des",
                     "r_shoulder_pitch_torque_des", "r_shoulder_roll_torque_des", "r_shoulder_yaw_torque_des", "r_elbow_torque_des",
                     "l_hip_pitch_torque_des", "l_hip_roll_torque_des", "l_hip_yaw_torque_des", "l_knee_torque_des", "l_ankle_pitch_torque_des", "l_ankle_roll_torque_des",
-                    "r_hip_pitch_torque_des", "r_hip_roll_torque_des", "r_hip_yaw_torque_des", "r_knee_torque_des", "r_ankle_pitch_torque_des", "r_ankle_roll_torque_des"
+                    "r_hip_pitch_torque_des", "r_hip_roll_torque_des", "r_hip_yaw_torque_des", "r_knee_torque_des", "r_ankle_pitch_torque_des", "r_ankle_roll_torque_des",
                     "torso_pitch_torque", "torso_roll_torque", "torso_yaw_torque",
                     "l_shoulder_pitch_torque", "l_shoulder_roll_torque", "l_shoulder_yaw_torque", "l_elbow_torque",
                     "r_shoulder_pitch_torque", "r_shoulder_roll_torque", "r_shoulder_yaw_torque", "r_elbow_torque",

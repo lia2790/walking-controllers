@@ -203,7 +203,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
     std::cout<<"inclined plane angle : " << inclPlaneAngle << std::endl;
     std::cout<<"com Height : "<< comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle)) << std::endl;
     std::cout<<"m_corrTerm : "<< m_corrTerm << std::endl;
-    std::cout<< "--------------------------------------------------------------" << std::endl;
+    std::cout<< "--------------------------------------------------" << std::endl;
 
     // init filters
     double samplingTime;
@@ -224,7 +224,6 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
     m_comVelocityFiltered.zero();
     m_comPositionFiltered(2) = (comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle)));
 
-
     m_comPositionFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency, samplingTime);
     m_comVelocityFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency, samplingTime);
 
@@ -242,6 +241,80 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
     //initialized generalized gravity force vector.
     m_generalizedGravityTorques.resize(m_kinDyn.model());
 
+    // check if the config is empty
+    if(!addCoMLink("torso_frame", "com_frame"))
+    {
+        yError() << "[WalkingFK::initialize] Unable to add CoM link to the robot model.";
+        return false;
+    }
+
+    // set base frame
+    m_baseFrameName = torsoFrame;
+
+    return true;
+}
+
+bool WalkingFK::addCoMLink(const std::string& frameName, const std::string& comFrameName)
+{
+    /*
+    iDynTree::Transform wTc;
+    wTc = this->getCoMToWorldTransform();
+
+    iDynTree::Transform wTframe;
+    wTframe = m_kinDyn.getWorldTransform(frameName);
+
+    iDynTree::Transform linkTframe;
+    linkTframe = m_kinDyn.model().getFrameTransform(m_kinDyn.model().getFrameIndex(frameName));
+
+    iDynTree::Transform linkTc;
+    linkTc = linkTframe * wTframe.inverse() * wTc;
+
+    std::string linkName;
+    linkName = m_kinDyn.model().getLinkName(m_kinDyn.model().getFrameLink(m_kinDyn.model().getFrameIndex(frameName)));
+
+    m_kinDyn.model().addAdditionalFrameToLink(linkName,comFrameName,linkTc);
+
+    m_baseFrameCoM = comFrameName;
+    */
+    return true;
+}
+
+bool WalkingFK::updateWorldToBaseTransformation(const bool& isLeftFixedFrame)
+{
+    if(isLeftFixedFrame)
+    {
+        // evaluate the new world to base transformation only if the previous fixed frame was
+        // the right foot
+        if(!m_prevContactLeft || m_firstStep)
+        {
+            m_prevContactLeft = true; // m_frameHlinkLeft
+        }
+    }
+    else
+    {
+        // evaluate the new world to base transformation only if the previous fixed frame was
+        // the left foot
+        if(m_prevContactLeft || m_firstStep)
+        {
+            m_prevContactLeft = false;
+        } 
+    }
+
+    m_frameBaseIndex = m_kinDyn.model().getFrameIndex(m_baseFrameName);
+    iDynTree::LinkIndex linkBaseIndex = m_kinDyn.model().getFrameLink(m_frameBaseIndex);
+    m_frameBaseHlinkBase = m_kinDyn.getRelativeTransform(m_frameBaseIndex, linkBaseIndex);
+
+    m_baseFrameLink = m_kinDyn.model().getLinkName(linkBaseIndex);
+
+    m_worldToBaseTransform = m_kinDyn.getWorldTransform(m_frameBaseIndex) * m_frameBaseHlinkBase;
+    if(!m_kinDyn.setFloatingBase(m_baseFrameLink))
+    {
+        yError() << "[WalkingFK::evaluateWorldToBaseTransformation] Error while setting the floating com approach "
+                 << "base on link " << m_baseFrameLink;
+        return false;
+    }
+
+    m_firstStep = false;
     return true;
 }
 
@@ -321,7 +394,7 @@ bool WalkingFK::evaluateWorldToBaseTransformation(const iDynTree::Transform& lef
         // the left foot
         if(m_prevContactLeft || m_firstStep)
         {
-            m_worldToBaseTransform = rightFootTransform * m_frameHlinkRight;
+           m_worldToBaseTransform = rightFootTransform * m_frameHlinkRight;
             if(!m_kinDyn.setFloatingBase(m_baseFrameRight))
             {
                 yError() << "[WalkingFK::evaluateWorldToBaseTransformation] Error while setting the floating "
@@ -491,9 +564,18 @@ iDynTree::Transform WalkingFK::getRootLinkToWorldTransform()
     return m_kinDyn.getWorldTransform(m_frameRootIndex);
 }
 
-iDynTree::Transform WalkingFK::getWorldToBaseTransform()
+iDynTree::Transform WalkingFK::getBaseToWorldTransform()
 {
     return m_worldToBaseTransform;
+}
+
+iDynTree::Transform WalkingFK::getCoMToWorldTransform()
+{
+    iDynTree::Transform wTc;
+    wTc = iDynTree::Transform::Identity();
+    wTc.setPosition(this->getCoMPosition());
+
+    return wTc;
 }
 
 iDynTree::Twist WalkingFK::getRootLinkVelocity()
@@ -546,146 +628,6 @@ bool WalkingFK::getFreeFloatingMassMatrix(iDynTree::MatrixDynSize &freeFloatingM
     return m_kinDyn.getFreeFloatingMassMatrix(freeFloatingMassMatrix);
 }
 
-bool WalkingFK::getChangeBaseTransformation(iDynTree::MatrixDynSize& bToAJacobian, iDynTree::MatrixDynSize& bToABaseTransform)
-{
-    bToABaseTransform.resize(bToAJacobian.cols(),bToAJacobian.cols());
-    bToABaseTransform.zero();
-
-    for(int i = 0 ; i < bToAJacobian.rows() ; i++ )
-    {
-        for(int j = 0 ; j < bToAJacobian.cols() ; j++ )
-        {
-            bToABaseTransform(i,j) = bToAJacobian(i,j);
-        }
-    }
-    for( int i = 6 ; i < bToAJacobian.cols() - 6 ; i++ )
-    {
-        bToABaseTransform(i,i) = 1;
-    }
-
-    return true;
-}
-
-bool WalkingFK::getInverseOfAdjointMatrix(iDynTree::MatrixDynSize& bToAX, iDynTree::MatrixDynSize& bToAInverseX)
-{
-    bToAInverseX.resize(bToAX.rows(),bToAX.cols());
-    bToAInverseX.zero();
-
-    iDynTree::toEigen(bToAInverseX).block(0,0,3,3) =   iDynTree::toEigen(bToAX).block(0,0,3,3).transpose();
-    iDynTree::toEigen(bToAInverseX).block(0,3,3,3) = - iDynTree::toEigen(bToAX).block(0,0,3,3).transpose() * iDynTree::toEigen(bToAX).block(0,3,3,3) * iDynTree::toEigen(bToAX).block(0,0,3,3);
-    iDynTree::toEigen(bToAInverseX).block(3,3,3,3) =   iDynTree::toEigen(bToAX).block(0,0,3,3);
-
-    return true;
-}
-
-bool WalkingFK::getInverseOfChangeBaseTransformation(iDynTree::MatrixDynSize& bToABaseTransform, iDynTree::MatrixDynSize& bToAInverseBaseTransform)
-{
-    iDynTree::MatrixDynSize bToAX; bToAX.resize(6,6); bToAX.zero();
-    iDynTree::toEigen(bToAX) = iDynTree::toEigen(bToABaseTransform).block(0,0,6,6);
-
-    iDynTree::MatrixDynSize bToAXinverse;
-    this->getInverseOfAdjointMatrix(bToAX,bToAXinverse);
-
-    iDynTree::MatrixDynSize bToAS; bToAS.resize(6,bToABaseTransform.cols() - 6); bToAS.zero();
-    iDynTree::toEigen(bToAS) = iDynTree::toEigen(bToABaseTransform).block(0,6,6,bToABaseTransform.cols() - 6);
-
-    bToAInverseBaseTransform.resize(bToABaseTransform.rows(), bToABaseTransform.cols()); bToAInverseBaseTransform.zero();
-
-    iDynTree::toEigen(bToAInverseBaseTransform).block(0,0,bToAX.rows(),bToAX.cols()) =   iDynTree::toEigen(bToAXinverse);
-    iDynTree::toEigen(bToAInverseBaseTransform).block(0,6,bToAS.rows(),bToAS.cols()) = - iDynTree::toEigen(bToAXinverse) * iDynTree::toEigen(bToAS);
-    iDynTree::toEigen(bToAInverseBaseTransform).block(6,0,bToABaseTransform.rows()-6,bToABaseTransform.cols()) = iDynTree::toEigen(bToAInverseBaseTransform).block(6,0,bToABaseTransform.rows()-6,bToABaseTransform.cols());
-
-    return true;
-}
-
-bool WalkingFK::getTotalMass(double& totalMass)
-{
-    iDynTree::MatrixDynSize Mb;
-    m_kinDyn.getFreeFloatingMassMatrix(Mb); std::cout<< " in 1 " << std::endl;
-
-    iDynTree::MatrixDynSize Jgb;
-    m_kinDyn.getCenterOfMassJacobian(Jgb); std::cout<< " in 2 " << std::endl;
-
-    iDynTree::MatrixDynSize gTb;
-    this->getChangeBaseTransformation(Jgb,gTb); std::cout<< " in 3 " << std::endl;
-
-    iDynTree::MatrixDynSize gTbinverse;
-    this->getInverseOfChangeBaseTransformation(gTb,gTbinverse); std::cout<< " in 4 " << std::endl;
-
-    iDynTree::MatrixDynSize Mg; Mg.resize(Mb.rows(),Mb.cols()); Mg.zero();
-    iDynTree::toEigen(Mg) = iDynTree::toEigen(gTbinverse).transpose() * iDynTree::toEigen(Mb) * iDynTree::toEigen(gTbinverse); std::cout<< " in 5 " << std::endl;
-
-    totalMass = Mg(0,0); std::cout<< " in 6 " << std::endl;
-
-    std::cout<< " totalMass  : " << totalMass              << std::endl;/*
-    std::cout<< " Mg         : " << iDynTree::toEigen(Mg)  << std::endl;
-    std::cout<< " gTb        : " << iDynTree::toEigen(gTb) << std::endl;
-    std::cout<< " gTbinverse : " << iDynTree::toEigen(gTbinverse) << std::endl;*/
-
-    return true;
-}
-
-bool WalkingFK::getCoMToLeftFootJacobian(iDynTree::MatrixDynSize &jacobian)
-{
-    iDynTree::MatrixDynSize Jlw(6,29);
-    this->getLeftFootJacobian(Jlw);
-
-    iDynTree::MatrixDynSize Jcw;
-    this->getCoMJacobian(Jcw);
-
-    iDynTree::MatrixDynSize cTw;
-    this->getChangeBaseTransformation(Jcw, cTw);
-
-    iDynTree::MatrixDynSize cTwinverse;
-    this->getInverseOfChangeBaseTransformation(cTw,cTwinverse);
-
-    iDynTree::MatrixDynSize Jlc(6,29);
-    iDynTree::toEigen(Jlc) = iDynTree::toEigen(Jlw) * iDynTree::toEigen(cTwinverse);
-
-    jacobian = Jlc;
-
-    return true;
-}
-
-bool WalkingFK::getCoMToRightFootJacobian(iDynTree::MatrixDynSize &jacobian)
-{
-    iDynTree::MatrixDynSize Jrw(6,29);
-    this->getRightFootJacobian(Jrw);
-
-    iDynTree::MatrixDynSize Jcw;
-    this->getCoMJacobian(Jcw);
-
-    iDynTree::MatrixDynSize cTw;
-    this->getChangeBaseTransformation(Jcw, cTw);
-
-    iDynTree::MatrixDynSize cTwinverse;
-    this->getInverseOfChangeBaseTransformation(cTw,cTwinverse);
-
-    iDynTree::MatrixDynSize Jrc(6,29);
-    iDynTree::toEigen(Jrc) = iDynTree::toEigen(Jrw) * iDynTree::toEigen(cTwinverse);
-
-    jacobian = Jrc;
-
-    return true;
-}
-
-bool WalkingFK::getCoMToFeetJacobian(iDynTree::MatrixDynSize &jacobian)
-{
-    iDynTree::MatrixDynSize Jlc;
-    this->getCoMToLeftFootJacobian(Jlc);
-
-    iDynTree::MatrixDynSize Jrc;
-    this->getCoMToRightFootJacobian(Jrc);
-
-    jacobian.resize(Jlc.rows() + Jrc.rows(), Jrc.cols());
-    jacobian.zero();
-
-    iDynTree::toEigen(jacobian).block(0,0,Jlc.rows(),Jlc.cols()) = iDynTree::toEigen(Jlc); // Jacobian from com to left foot
-    iDynTree::toEigen(jacobian).block(Jlc.rows(),0,Jrc.rows(),Jrc.cols()) = iDynTree::toEigen(Jrc); // Jacobian from right foot
-
-    return true;
-}
-
 bool WalkingFK::getSkewMatrix(iDynTree::VectorDynSize &vec, iDynTree::MatrixDynSize &skewMatrix)
 {
     skewMatrix.resize(3,3); skewMatrix.zero();
@@ -714,6 +656,273 @@ bool WalkingFK::getAdjointMatrix(iDynTree::MatrixDynSize &Rotation, iDynTree::Ve
     return true;
 }
 
+bool WalkingFK::getInverseOfAdjointMatrix(iDynTree::MatrixDynSize& bToAX, iDynTree::MatrixDynSize& bToAInverseX)
+{
+    bToAInverseX.resize(bToAX.rows(),bToAX.cols());
+    bToAInverseX.zero();
+
+    iDynTree::toEigen(bToAInverseX).block(0,0,3,3) =   iDynTree::toEigen(bToAX).block(0,0,3,3).transpose();
+    iDynTree::toEigen(bToAInverseX).block(0,3,3,3) = - iDynTree::toEigen(bToAX).block(0,0,3,3).transpose() * iDynTree::toEigen(bToAX).block(0,3,3,3) * iDynTree::toEigen(bToAX).block(0,0,3,3);
+    iDynTree::toEigen(bToAInverseX).block(3,3,3,3) =   iDynTree::toEigen(bToAX).block(0,0,3,3);
+
+    return true;
+}
+
+bool WalkingFK::getTotalMass(double& totalMass)
+{
+    iDynTree::MatrixDynSize Mb;
+    m_kinDyn.getFreeFloatingMassMatrix(Mb);
+
+    iDynTree::MatrixDynSize gTb;
+    this->getBaseToCoMChangeBaseTransformation(gTb);
+
+    iDynTree::MatrixDynSize gTbinverse;
+    this->getInverseOfChangeBaseTransformation(gTb,gTbinverse);
+
+    iDynTree::MatrixDynSize Mg; Mg.resize(Mb.rows(),Mb.cols()); Mg.zero();
+    iDynTree::toEigen(Mg) = iDynTree::toEigen(gTbinverse).transpose() * iDynTree::toEigen(Mb) * iDynTree::toEigen(gTbinverse);
+
+    totalMass = Mg(0,0);
+
+    std::cout<< " totalMass  : " << totalMass              << std::endl;
+    std::cout<< " Mg         : " << iDynTree::toEigen(Mg)  << std::endl;/*
+    std::cout<< " gTb        : " << iDynTree::toEigen(gTb) << std::endl;
+    std::cout<< " gTbinverse : " << iDynTree::toEigen(gTbinverse) << std::endl;*/
+
+    return true;
+}
+
+bool WalkingFK::getChangeBaseTransformation(iDynTree::MatrixDynSize& bToAJacobian, iDynTree::MatrixDynSize& bToABaseTransform)
+{
+    bToABaseTransform.resize(bToAJacobian.cols(),bToAJacobian.cols());
+    bToABaseTransform.zero();
+
+    for(int i = 0 ; i < bToAJacobian.rows() ; i++ )
+    {
+        for(int j = 0 ; j < bToAJacobian.cols() ; j++ )
+        {
+            bToABaseTransform(i,j) = bToAJacobian(i,j);
+        }
+    }
+    for( int i = 6 ; i < bToAJacobian.cols() - 6 ; i++ )
+    {
+        bToABaseTransform(i,i) = 1;
+    }
+
+    return true;
+}
+
+bool WalkingFK::getChangeBaseTransformation(iDynTree::MatrixDynSize& bToAX, iDynTree::MatrixDynSize& bToAS, iDynTree::MatrixDynSize& bToABaseTransform)
+{
+    bToABaseTransform.resize(bToAX.rows()+bToAS.cols(),bToAX.cols()+bToAS.cols());
+    bToABaseTransform.zero();
+
+    iDynTree::toEigen(bToABaseTransform).block(0,0,bToAX.rows(),bToAX.cols()) = iDynTree::toEigen(bToAX);
+    iDynTree::toEigen(bToABaseTransform).block(0,bToAX.cols(),bToAS.rows(),bToAS.cols()) = iDynTree::toEigen(bToAS);
+    iDynTree::toEigen(bToABaseTransform).block(bToAX.rows(),bToAX.cols(),bToAS.cols(),bToAS.cols()) = iDynTree::toEigen(this->getIdentity(bToAS.cols()));
+
+    return true;
+}
+
+bool WalkingFK::getInverseOfChangeBaseTransformation(iDynTree::MatrixDynSize& bToABaseTransform, iDynTree::MatrixDynSize& bToAInverseBaseTransform)
+{
+    iDynTree::MatrixDynSize bToAX; bToAX.resize(6,6); bToAX.zero();
+    iDynTree::toEigen(bToAX) = iDynTree::toEigen(bToABaseTransform).block(0,0,6,6);
+
+    iDynTree::MatrixDynSize bToAXinverse;
+    this->getInverseOfAdjointMatrix(bToAX,bToAXinverse);
+
+    iDynTree::MatrixDynSize bToAS; bToAS.resize(6,bToABaseTransform.cols() - 6); bToAS.zero();
+    iDynTree::toEigen(bToAS) = iDynTree::toEigen(bToABaseTransform).block(0,6,6,bToABaseTransform.cols() - 6);
+
+    bToAInverseBaseTransform.resize(bToABaseTransform.rows(), bToABaseTransform.cols()); bToAInverseBaseTransform.zero();
+
+    iDynTree::toEigen(bToAInverseBaseTransform).block(0,0,bToAX.rows(),bToAX.cols()) =   iDynTree::toEigen(bToAXinverse);
+    iDynTree::toEigen(bToAInverseBaseTransform).block(0,6,bToAS.rows(),bToAS.cols()) = - iDynTree::toEigen(bToAXinverse) * iDynTree::toEigen(bToAS);
+    iDynTree::toEigen(bToAInverseBaseTransform).block(6,0,bToABaseTransform.rows()-6,bToABaseTransform.cols()) = iDynTree::toEigen(bToAInverseBaseTransform).block(6,0,bToABaseTransform.rows()-6,bToABaseTransform.cols());
+
+    return true;
+}
+
+bool WalkingFK::getBaseToCoMChangeBaseTransformation(iDynTree::MatrixDynSize &cTb)
+{
+    iDynTree::MatrixDynSize Jcb;
+    this->getCoMJacobian(Jcb);
+
+    this->getChangeBaseTransformation(Jcb,cTb);
+}
+
+bool WalkingFK::getCoMToBaseChangeBaseTransformation(iDynTree::MatrixDynSize &bTc)
+{
+    iDynTree::MatrixDynSize cTb;
+    this->getBaseToCoMChangeBaseTransformation(cTb);
+
+    this->getInverseOfChangeBaseTransformation(cTb,bTc);
+}
+
+bool WalkingFK::getCentroidalbTcBaseTransformation(iDynTree::MatrixDynSize &bTc) // Ott Roa paper
+{
+    iDynTree::MatrixDynSize Jcb;
+    this->getCoMJacobian(Jcb);
+
+    iDynTree::Transform wTb;
+    wTb = this->getBaseToWorldTransform();
+
+    iDynTree::Transform wTc;
+    wTc = this->getCoMToWorldTransform();
+
+    iDynTree::Position P = wTc.getPosition();
+    iDynTree::Rotation R = wTc.getRotation();
+    
+    iDynTree::VectorDynSize pos;
+    iDynTree::MatrixDynSize Rot;
+
+    this->toVectorDynSize(P,pos);
+    this->toMatrixDynSize(R,Rot);
+
+    iDynTree::MatrixDynSize skewMatrix;
+    this->getSkewMatrix(pos,skewMatrix);
+
+    bTc.resize(Jcb.cols(),Jcb.cols());
+    bTc.zero();
+
+    iDynTree::toEigen(bTc).block(0,0,Rot.rows(),Rot.cols()) = iDynTree::toEigen(Rot).transpose();
+    iDynTree::toEigen(bTc).block(0,Rot.cols(),skewMatrix.rows(),skewMatrix.cols()) = iDynTree::toEigen(skewMatrix);
+    iDynTree::toEigen(bTc).block(0,Rot.cols() + skewMatrix.cols(),3,Jcb.cols()-6) = - iDynTree::toEigen(Jcb).block(0,6,3,Jcb.cols()-6);
+    iDynTree::toEigen(bTc).block(skewMatrix.rows(), Rot.cols(),3,3) = iDynTree::toEigen(this->getIdentity(3));
+    iDynTree::toEigen(bTc).block(6,Rot.cols() + skewMatrix.cols(),Jcb.cols()-6,Jcb.cols()-6) = iDynTree::toEigen(this->getIdentity(Jcb.cols()-6));
+}
+
+bool WalkingFK::getCentroidalbTcBaseBaseTransformation(iDynTree::MatrixDynSize &bTc) // Nava
+{
+    iDynTree::Transform wTc;
+    wTc = this->getCoMToWorldTransform();
+
+    iDynTree::Transform wTb;
+    wTb = this->getBaseToWorldTransform();
+
+    iDynTree::Position Pc = wTc.getPosition();
+    iDynTree::Position Pb = wTb.getPosition();
+
+    std::cout << "hereee 1" << std::endl;
+
+    iDynTree::VectorDynSize posc;
+    iDynTree::VectorDynSize posb;
+    iDynTree::VectorDynSize poscb(3);
+
+    this->toVectorDynSize(Pc,posc);
+    this->toVectorDynSize(Pb,posb);
+
+    std::cout << "hereee 2" << std::endl;
+
+    iDynTree::toEigen(poscb) = iDynTree::toEigen(posc) - iDynTree::toEigen(posb);
+
+    std::cout << "hereee 21" << std::endl;
+
+    iDynTree::MatrixDynSize skewMatrix;
+    this->getSkewMatrix(poscb,skewMatrix);
+
+    std::cout << "hereee 22" << std::endl;
+
+    iDynTree::MatrixDynSize adjointMatrix(6,6); adjointMatrix.zero();
+    iDynTree::toEigen(adjointMatrix).block(0,0,3,3) = iDynTree::toEigen(this->getIdentity(3));
+    iDynTree::toEigen(adjointMatrix).block(0,3,3,3) = - iDynTree::toEigen(skewMatrix);
+    iDynTree::toEigen(adjointMatrix).block(3,3,3,3) = iDynTree::toEigen(this->getIdentity(3));
+
+    std::cout << "hereee 23" << std::endl;
+
+    iDynTree::MatrixDynSize M;
+    this->getFreeFloatingMassMatrix(M);
+
+    std::cout << "hereee 31 " << std::endl;
+
+    iDynTree::MatrixDynSize Jcb;
+    this->getCoMJacobian(Jcb);
+
+    iDynTree::MatrixDynSize Mb(6,6);
+    iDynTree::MatrixDynSize Mbj(6,Jcb.cols()-6);
+
+    iDynTree::toEigen(Mb)  = iDynTree::toEigen(M).block(0,0,6,6);
+    iDynTree::toEigen(Mbj) = iDynTree::toEigen(M).block(0,6,6,M.cols()-6);
+
+    std::cout << "hereee 32" << std::endl;
+
+    iDynTree::MatrixDynSize S(6,Jcb.cols()-6); S.zero();
+    iDynTree::toEigen(S) = iDynTree::toEigen(adjointMatrix) * iDynTree::toEigen(Mb).inverse() * iDynTree::toEigen(Mbj);
+
+    iDynTree::MatrixDynSize cTb;
+    this->getChangeBaseTransformation(adjointMatrix, S, cTb);
+
+    this->getInverseOfChangeBaseTransformation(cTb,bTc);
+}
+
+bool WalkingFK::getCoMToLeftFootJacobian(iDynTree::MatrixDynSize &jacobian)
+{
+    iDynTree::MatrixDynSize Jlw(6,29);
+    this->getLeftFootJacobian(Jlw);
+
+    iDynTree::MatrixDynSize Jcw;
+    this->getCoMJacobian(Jcw);
+
+    iDynTree::MatrixDynSize cTw;
+    this->getChangeBaseTransformation(Jcw, cTw);
+
+    iDynTree::MatrixDynSize cTwinverse;
+    this->getInverseOfChangeBaseTransformation(cTw,cTwinverse);
+
+    iDynTree::MatrixDynSize bTc;
+    this->getCentroidalbTcBaseTransformation(bTc);
+
+    iDynTree::MatrixDynSize Jlc(6,29);
+    iDynTree::toEigen(Jlc) = iDynTree::toEigen(Jlw) * iDynTree::toEigen(bTc); //* iDynTree::toEigen(cTwinverse);
+
+    jacobian = Jlc;
+
+    return true;
+}
+
+bool WalkingFK::getCoMToRightFootJacobian(iDynTree::MatrixDynSize &jacobian)
+{
+    iDynTree::MatrixDynSize Jrw(6,29);
+    this->getRightFootJacobian(Jrw);
+
+    iDynTree::MatrixDynSize Jcw;
+    this->getCoMJacobian(Jcw);
+
+    iDynTree::MatrixDynSize cTw;
+    this->getChangeBaseTransformation(Jcw, cTw);
+
+    iDynTree::MatrixDynSize cTwinverse;
+    this->getInverseOfChangeBaseTransformation(cTw,cTwinverse);
+
+    iDynTree::MatrixDynSize bTc;
+    this->getCentroidalbTcBaseTransformation(bTc);
+
+    iDynTree::MatrixDynSize Jrc(6,29);
+    iDynTree::toEigen(Jrc) = iDynTree::toEigen(Jrw) * iDynTree::toEigen(bTc); //* iDynTree::toEigen(cTwinverse);
+
+    jacobian = Jrc;
+
+    return true;
+}
+
+bool WalkingFK::getCoMToFeetJacobian(iDynTree::MatrixDynSize &jacobian)
+{
+    iDynTree::MatrixDynSize Jlc;
+    this->getCoMToLeftFootJacobian(Jlc);
+
+    iDynTree::MatrixDynSize Jrc;
+    this->getCoMToRightFootJacobian(Jrc);
+
+    jacobian.resize(Jlc.rows() + Jrc.rows(), Jrc.cols());
+    jacobian.zero();
+
+    iDynTree::toEigen(jacobian).block(0,0,Jlc.rows(),Jlc.cols()) = iDynTree::toEigen(Jlc); // Jacobian from com to left foot
+    iDynTree::toEigen(jacobian).block(Jlc.rows(),0,Jrc.rows(),Jrc.cols()) = iDynTree::toEigen(Jrc); // Jacobian from right foot
+
+    return true;
+}
+
 bool WalkingFK::getGraspMatrix(iDynTree::MatrixDynSize &Rotation, iDynTree::VectorDynSize &position, iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &graspMatrix)
 {
     iDynTree::MatrixDynSize adjointMatrix;
@@ -723,15 +932,6 @@ bool WalkingFK::getGraspMatrix(iDynTree::MatrixDynSize &Rotation, iDynTree::Vect
     iDynTree::toEigen(graspMatrix) = iDynTree::toEigen(adjointMatrix).transpose() * iDynTree::toEigen(contactModelMatrix);
 
     return true;
-}
-
-iDynTree::Transform WalkingFK::getCoMTransform()
-{
-    iDynTree::Transform wTc;
-    wTc = iDynTree::Transform::Identity();
-    wTc.setPosition(m_comPosition);
-
-    return wTc;
 }
 
 bool WalkingFK::toMatrixDynSize(iDynTree::Rotation &Rot, iDynTree::MatrixDynSize &Mat)
@@ -759,19 +959,30 @@ bool WalkingFK::toVectorDynSize(iDynTree::Position &pos, iDynTree::VectorDynSize
     return true;
 }
 
+iDynTree::MatrixDynSize  WalkingFK::getIdentity(int n)
+{
+    iDynTree::MatrixDynSize Id(n,n);
+    Id.zero();
+
+    for(int i = 0 ; i < n ; i++)
+        Id(i,i) = 1;
+
+    return Id;
+}
+
 bool WalkingFK::getLeftFootToCoMGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &leftFootToCoMGraspMatrix)
 { 
     iDynTree::Transform wTc;
-    wTc = this->getCoMTransform();
+    wTc = this->getCoMToWorldTransform();
 
     iDynTree::Transform wTl;
     wTl = this->getLeftFootToWorldTransform();
 
     iDynTree::Transform cTl;
-    cTl = wTc.inverse() * wTl * m_frameHlinkLeft ;
+    cTl = wTc.inverse() * wTl * m_frameHlinkLeft;
 
-    iDynTree::Rotation Rcl_; Rcl_ = cTl.getRotation();
-    iDynTree::Position Pcl_; Pcl_ = cTl.getPosition();
+    iDynTree::Rotation Rcl_ = cTl.getRotation();
+    iDynTree::Position Pcl_ = cTl.getPosition();
 
     iDynTree::MatrixDynSize Rcl; this->toMatrixDynSize(Rcl_,Rcl);
     iDynTree::VectorDynSize Pcl; this->toVectorDynSize(Pcl_,Pcl);
@@ -784,7 +995,7 @@ bool WalkingFK::getLeftFootToCoMGraspMatrix(iDynTree::MatrixDynSize &contactMode
 bool WalkingFK::getRightFootToCoMGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &rightFootToCoMGraspMatrix)
 {
     iDynTree::Transform wTc;
-    wTc = this->getCoMTransform();
+    wTc = this->getCoMToWorldTransform();
 
     iDynTree::Transform wTr;
     wTr = this->getRightFootToWorldTransform();
@@ -792,13 +1003,79 @@ bool WalkingFK::getRightFootToCoMGraspMatrix(iDynTree::MatrixDynSize &contactMod
     iDynTree::Transform cTr;
     cTr = wTc.inverse() * wTr * m_frameHlinkRight;
 
-    iDynTree::Rotation Rcr_; Rcr_ = cTr.getRotation();
-    iDynTree::Position Pcr_; Pcr_ = cTr.getPosition();
+    iDynTree::Rotation Rcr_ = cTr.getRotation();
+    iDynTree::Position Pcr_ = cTr.getPosition();
 
     iDynTree::MatrixDynSize Rcr; this->toMatrixDynSize(Rcr_,Rcr);
     iDynTree::VectorDynSize Pcr; this->toVectorDynSize(Pcr_,Pcr);
 
     this->getGraspMatrix(Rcr,Pcr,contactModelMatrix,rightFootToCoMGraspMatrix);
+
+    return true;
+}
+
+bool WalkingFK::getLeftFootTobaseGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &leftFootTobaseGraspMatrix)
+{ 
+    iDynTree::Transform wTb;
+    wTb = this->getBaseToWorldTransform();
+
+    iDynTree::Transform wTl;
+    wTl = this->getLeftFootToWorldTransform();
+
+    iDynTree::Transform bTl;
+    bTl = wTb.inverse() * wTl * m_frameHlinkLeft ;
+
+    iDynTree::Rotation Rbl_ = bTl.getRotation();
+    iDynTree::Position Pbl_ = bTl.getPosition();
+
+    iDynTree::MatrixDynSize Rbl; this->toMatrixDynSize(Rbl_,Rbl);
+    iDynTree::VectorDynSize Pbl; this->toVectorDynSize(Pbl_,Pbl);
+
+    this->getGraspMatrix(Rbl,Pbl,contactModelMatrix,leftFootTobaseGraspMatrix);
+
+    return true;
+}
+
+bool WalkingFK::getRightFootTobaseGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &rightFootTobaseGraspMatrix)
+{
+    iDynTree::Transform wTb;
+    wTb = this->getBaseToWorldTransform();
+
+    iDynTree::Transform wTr;
+    wTr = this->getRightFootToWorldTransform();
+
+    iDynTree::Transform bTr;
+    bTr = wTb.inverse() * wTr * m_frameHlinkRight;
+
+    iDynTree::Rotation Rbr_ = bTr.getRotation();
+    iDynTree::Position Pbr_ = bTr.getPosition();
+
+    iDynTree::MatrixDynSize Rbr; this->toMatrixDynSize(Rbr_,Rbr);
+    iDynTree::VectorDynSize Pbr; this->toVectorDynSize(Pbr_,Pbr);
+
+    this->getGraspMatrix(Rbr,Pbr,contactModelMatrix,rightFootTobaseGraspMatrix);
+
+    return true;
+}
+
+bool WalkingFK::getCoMToBaseGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &CoMToBaseGraspMatrix)
+{
+    iDynTree::Transform wTc;
+    wTc = this->getCoMToWorldTransform();
+
+    iDynTree::Transform wTb;
+    wTb = this->getBaseToWorldTransform();
+
+    iDynTree::Transform bTc;
+    bTc = wTb.inverse() * wTc;
+
+    iDynTree::Rotation Rbc_ = bTc.getRotation();
+    iDynTree::Position Pbc_ = bTc.getPosition();
+
+    iDynTree::MatrixDynSize Rbc; this->toMatrixDynSize(Rbc_,Rbc);
+    iDynTree::VectorDynSize Pbc; this->toVectorDynSize(Pbc_,Pbc);
+
+    this->getGraspMatrix(Rbc,Pbc,contactModelMatrix,CoMToBaseGraspMatrix);
 
     return true;
 }
@@ -819,6 +1096,24 @@ bool WalkingFK::getFeetToCoMGraspMatrix(iDynTree::MatrixDynSize &contactModelMat
 
     return true;
 }
+
+bool WalkingFK::getFeetTobaseGraspMatrix(iDynTree::MatrixDynSize &contactModelMatrix, iDynTree::MatrixDynSize &feetTobaseGraspMatrix)
+{
+    iDynTree::MatrixDynSize rightFootTobaseGraspMatrix;
+    this->getRightFootTobaseGraspMatrix(contactModelMatrix, rightFootTobaseGraspMatrix);
+
+    iDynTree::MatrixDynSize leftFootTobaseGraspMatrix;
+    this->getLeftFootTobaseGraspMatrix(contactModelMatrix, leftFootTobaseGraspMatrix);
+
+    feetTobaseGraspMatrix.resize(rightFootTobaseGraspMatrix.rows(), rightFootTobaseGraspMatrix.cols() + leftFootTobaseGraspMatrix.cols());
+    feetTobaseGraspMatrix.zero();
+
+    iDynTree::toEigen(feetTobaseGraspMatrix).block(0,0,leftFootTobaseGraspMatrix.rows(),leftFootTobaseGraspMatrix.cols()) = iDynTree::toEigen(leftFootTobaseGraspMatrix);
+    iDynTree::toEigen(feetTobaseGraspMatrix).block(0,leftFootTobaseGraspMatrix.cols(),rightFootTobaseGraspMatrix.rows(),rightFootTobaseGraspMatrix.cols()) = iDynTree::toEigen(rightFootTobaseGraspMatrix);
+
+    return true;
+}
+
 
 bool WalkingFK::getPseudoInverseOfGraspMatrix(iDynTree::MatrixDynSize &graspMatrix, iDynTree::MatrixDynSize &pseudoInverseGraspMatrix)
 {   

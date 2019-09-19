@@ -79,10 +79,8 @@ bool WalkingGTorqueController::evaluateControl()
         for( int j = 0; j < m_comToContactJacobian.rows(); j++)
         {
             Jf_i += m_comToContactJacobian(j,i) * m_inputForce(j);
-            std::cout << " ------- j -------- : " << j << std::endl;
         }
         m_controllerOutput(i) = Jf_i - m_KD(i) * m_jointVelocity(i);
-        std::cout << " ------- i -------- : " << i << std::endl;
     }
 
     printOutput();
