@@ -617,6 +617,48 @@ void TaskBasedTorqueSolver::instantiateJointsPositionLimit(const yarp::os::Searc
 
 }
 
+bool TaskBasedTorqueSolver::initializeSolver(const yarp::os::Searchable& config)
+{
+
+    bool verbosity = config.check("verbosity", yarp::os::Value(false)).asBool();
+    int linearSystemSolver = config.check("linearSystemSolver", yarp::os::Value(0)).asInt();
+    double maxIteraction = config.check("maxIteraction", yarp::os::Value(100000)).asDouble();
+    double sigma = config.check("sigma", yarp::os::Value(0.0000001)).asDouble();
+    double alpha = config.check("alpha", yarp::os::Value(1.6)).asDouble();
+    double absoluteTolerance = config.check("absoluteTolerance", yarp::os::Value(0.0001)).asDouble();
+    double relativeTolerance = config.check("relativeTolerance", yarp::os::Value(0.0001)).asDouble();
+    double primalInfeasibilityTolerance = config.check("primalInfeasibilityTolerance", yarp::os::Value(0.00001)).asDouble();
+
+    std::cout << " absoluteTolerance " << absoluteTolerance << std::endl;
+    std::cout << " relativeTolerance " << relativeTolerance << std::endl;
+
+    // resize
+    // sparse matrix
+    m_hessianEigen.resize(m_numberOfVariables, m_numberOfVariables);
+    m_constraintMatrix.resize(m_numberOfConstraints, m_numberOfVariables);
+
+    // dense vectors
+    m_gradient = Eigen::VectorXd::Zero(m_numberOfVariables);
+    m_lowerBound = Eigen::VectorXd::Zero(m_numberOfConstraints);
+    m_upperBound = Eigen::VectorXd::Zero(m_numberOfConstraints);
+
+    // initialize the optimization problem
+    m_optimizer = std::make_unique<OsqpEigen::Solver>();
+    m_optimizer->data()->setNumberOfVariables(m_numberOfVariables);
+    m_optimizer->data()->setNumberOfConstraints(m_numberOfConstraints);
+
+    m_optimizer->settings()->setVerbosity(verbosity);
+    m_optimizer->settings()->setLinearSystemSolver(linearSystemSolver);
+    m_optimizer->settings()->setMaxIteraction(maxIteraction);
+    m_optimizer->settings()->setSigma(sigma);
+    m_optimizer->settings()->setAlpha(alpha);
+    m_optimizer->settings()->setAbsoluteTolerance(absoluteTolerance);
+    m_optimizer->settings()->setRelativeTolerance(relativeTolerance);
+    m_optimizer->settings()->setPrimalInfeasibilityTollerance(primalInfeasibilityTolerance);
+
+
+}
+
 bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
                                        const int& actuatedDOFs,
                                        const iDynTree::VectorDynSize& minJointTorque,
@@ -769,24 +811,8 @@ bool TaskBasedTorqueSolver::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
-    // resize
-    // sparse matrix
-    m_hessianEigen.resize(m_numberOfVariables, m_numberOfVariables);
-    m_constraintMatrix.resize(m_numberOfConstraints, m_numberOfVariables);
 
-    // dense vectors
-    m_gradient = Eigen::VectorXd::Zero(m_numberOfVariables);
-    m_lowerBound = Eigen::VectorXd::Zero(m_numberOfConstraints);
-    m_upperBound = Eigen::VectorXd::Zero(m_numberOfConstraints);
-
-    // initialize the optimization problem
-    m_optimizer = std::make_unique<OsqpEigen::Solver>();
-    m_optimizer->data()->setNumberOfVariables(m_numberOfVariables);
-    m_optimizer->data()->setNumberOfConstraints(m_numberOfConstraints);
-
-    m_optimizer->settings()->setVerbosity(false);
-    m_optimizer->settings()->setLinearSystemSolver(0);
-    m_optimizer->settings()->setMaxIteraction(100000);
+    this->initializeSolver(config);
 
     // set constant element of the cost function
     for(const auto& element: m_costFunctions)
@@ -1814,7 +1840,7 @@ bool TaskBasedTorqueSolverDoubleSupport::instantiateContactForcesConstraint(cons
 {
     if(config.isNull())
     {
-        yError() << "[instantiateFeetConstraint] Empty configuration file.";
+        yError() << "[instantiateContactForcesConstraint] Empty configuration file.";
         return false;
     }
 

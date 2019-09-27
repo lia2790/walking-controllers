@@ -159,6 +159,8 @@ public:
                     const iDynTree::VectorDynSize& jointPositionUpperLimit,
                     const iDynTree::VectorDynSize& jointPositionLowerLimit);
 
+    bool initializeSolver(const yarp::os::Searchable& config);
+
     bool setCoMGains(const iDynTree::Vector3& kp, const iDynTree::Vector3& kd);
 
     void setInitialValue(const iDynTree::VectorDynSize initialValue);
@@ -248,6 +250,7 @@ private:
     iDynTree::VectorDynSize m_rightFootBiasAcceleration;
 
     bool instantiateFeetConstraint(const yarp::os::Searchable& config) override;
+
     bool instantiateZMPConstraint(const yarp::os::Searchable& config) override;
 
     void instantiateSystemDynamicsConstraint() override;
@@ -313,6 +316,7 @@ class TaskBasedTorqueSolverSingleSupport : public TaskBasedTorqueSolver
     iDynTree::VectorDynSize m_swingFootBiasAcceleration;
 
     bool instantiateFeetConstraint(const yarp::os::Searchable& config) override;
+    
     bool instantiateZMPConstraint(const yarp::os::Searchable& config) override;
 
     void instantiateSystemDynamicsConstraint() override;

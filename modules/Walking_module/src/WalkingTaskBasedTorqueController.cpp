@@ -175,7 +175,7 @@ void WalkingTaskBasedTorqueController::setFeetState(const bool &leftInContact, c
         }
 
         m_isDoubleSupportPhase = true;
-        yInfo() << "[setFeetState] Double support phase";
+        yInfo() << "[WalkingTaskBasedTorqueController][setFeetState] Double support phase";
     }
     else
     {
@@ -209,7 +209,7 @@ void WalkingTaskBasedTorqueController::setFeetState(const bool &leftInContact, c
         }
 
         m_isDoubleSupportPhase = false;
-        yInfo() << "[setFeetState] Single support phase";
+        yInfo() << "[WalkingTaskBasedTorqueController][setFeetState] Single support phase";
     }
 
     if(m_firstStep)
