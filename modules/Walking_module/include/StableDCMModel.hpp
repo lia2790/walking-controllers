@@ -28,6 +28,11 @@
 class StableDCMModel
 {
     double m_omega; /**< Inverted time constant of the 3D-LIPM. */
+    double m_comHeight; /**< CoM height ( z component ). */
+    double m_inclPlaneAngle; /**< inclined plane angle. */
+
+    iDynTree::Vector2 m_dcmCorrTerm; /**< Correction Term vector for CoM velocity. */
+    iDynTree::Vector2 m_lipCorrTerm; /**< Correction Term vector for CoM acceleration. */
 
     std::unique_ptr<iCub::ctrl::Integrator> m_comIntegrator{nullptr}; /**< CoM integrator object. */
 
@@ -54,11 +59,17 @@ public:
      */
     void setDCMPosition(const iDynTree::Vector2& input);
 
-/**
+    /**
      * Set the controlled input.
      * @param controlledInput of the 3D-LIPM (i.e. Position of the ZMP).
      */
     void setZMPPosition(const iDynTree::Vector2& input);
+
+    /**
+     * Update trajectory-dependent quantities.
+     * @return true on success, false otherwise.
+     **/
+    bool setStableDCMModel(double inclPlaneAngle, double yawAngle);
 
     /**
      * Integrate the model.

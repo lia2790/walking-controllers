@@ -817,13 +817,8 @@ bool WalkingModule::updateModule()
             m_accelerationIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, bufferZero);
 
             // reset the models
-            // m_walkingZMPController->reset(m_DCMPositionDesired.front());
-
-            iDynTree::Vector2 CoMinitialPosition;
-            CoMinitialPosition(0) = m_DCMPositionDesired.front()(0) + m_comHeight * std::sin(iDynTree::deg2rad(7.0));
-            CoMinitialPosition(1) = m_DCMPositionDesired.front()(1);
-            m_stableDCMModel->reset(CoMinitialPosition);
-            m_walkingZMPController->reset(CoMinitialPosition);
+            m_walkingZMPController->reset(m_DCMPositionDesired.front());
+            m_stableDCMModel->reset(m_DCMPositionDesired.front());
 
             // TODO
             if(m_useTorque)
@@ -859,14 +854,13 @@ bool WalkingModule::updateModule()
             yError() << "[updateModule] Unable to detect the angle of the inclined plane";
             return false;
         }
-        std::cout << "[updateModule] Angle detected " << std::endl;
         // update quantities related to the angle of the inclined plane
-    /*  if(!updateOmegaDCM())
+        if(!updateOmegaDCM());
         {
             yError() << "[updateModule] Unable to update quantities related to the angle of the inclined plane";
             return false;
         }
-*/
+
         // check desired planner input
         yarp::sig::Vector* desiredUnicyclePosition = nullptr;
         desiredUnicyclePosition = m_desiredUnyciclePositionPort.read(false);
@@ -991,8 +985,6 @@ bool WalkingModule::updateModule()
             yError() << "[updateModule] Unable to get the desired CoM position.";
             return false;
         }
-
-        // std::cout << "m_stableDCMModel desiredCoMPositionXY " << desiredCoMPositionXY << std::endl;
 
         // DCM controller
         iDynTree::Vector2 desiredZMP;
@@ -1484,22 +1476,6 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         return false;
     }
 
-    // detect the angle of the inclined plane
-    if(!detectGround())
-    {
-        yError() << "[updateModule] Unable to detect the angle of the inclined plane";
-        return false;
-    }
-    std::cout << "[updateModule] Angle detected " << std::endl;
-    // update quantities related to the angle of the inclined plane
-    if(!updateOmegaDCM())
-    {
-        yError() << "[updateModule] Unable to update quantities related to the angle of the inclined plane";
-        return false;
-    }
-
-    m_inclPlaneAngle = 7.0;
-
     // TODO
     // if(!updateFKSolver())
     //     return false;
@@ -1611,7 +1587,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION))
     // {
     //     yError() << "[prepareRobot] Error while setting the position control.";
-    //     return false;m_comHeight
+    //     return false;
     // }
 
     if(!m_robotControlHelper->setPositionReferences(m_qDesired, 5.0))
@@ -1625,44 +1601,45 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         m_robotState = WalkingFSM::Preparing;
     }
 
-
-    std::cout << " DCM x  " << m_DCMPositionDesired.front()(0) << std::endl;
-    std::cout << " CoM x  " << desiredCoMPosition(0) << std::endl;
-    std::cout << " CoM z  " << desiredCoMPosition(2) << std::endl;
-    std::cout << " Com z flat " << m_comHeight << std::endl;
-    std::cout << " inclined plane angle " << m_inclPlaneAngle << std::endl;
-
     return true;
 }
 
 
-bool  WalkingModule::readIMUData(iDynTree::Position gIMU)
+bool  WalkingModule::readIMUData()
 {
+
+
     return true;
 }
 
-bool WalkingModule::imuDetect()
+bool  WalkingModule::touchFoot()
 {
-    iDynTree::Position g, gIP, gIMU;
-    g.zero();   g.setVal(2, -9.81);
-    gIP.zero();
-    gIMU.zero();
 
-    readIMUData(gIMU);
+}
+
+
+bool WalkingModule::detectGround()
+{    
+    iDynTree::VectorDynSize g, gIP, gIMU;
+    g.resize(3);    g.zero();   g(2) = -9.81;
+    gIP.resize(3);  gIP.zero();
+    gIMU.resize(3); gIMU.zero();
+
+    readIMUData();
 
     iDynTree::Transform ftTimu;
     iDynTree::Transform soleTft;
 
 
-    if( !m_robotControlHelper->getContactFoot() ) // 0 left - 1 right
+    if( touchFoot() )
     {
         iDynTree::Transform ftTimu = m_FKSolver->getIMUsensorLeftFootToFTsensorLeftFoot();
-        iDynTree::Transform soleTft = m_FKSolver->getFTsensorLeftFootToSoleLeftFoot();
+        iDynTree::Transform soleTft = m_FKSolver->getLeftFootToSoleLeftFoot();
     }
     else
     {
         iDynTree::Transform ftTimu = m_FKSolver->getIMUsensorRightFootToFTsensorRightFoot();
-        iDynTree::Transform soleTft = m_FKSolver->getFTsensorRightFootToSoleRightFoot();
+        iDynTree::Transform soleTft = m_FKSolver->getRightFootToSoleRightFoot();
     }
 
 
@@ -1671,88 +1648,38 @@ bool WalkingModule::imuDetect()
     m_inclPlaneAngle = std::acos(gIP(2)/g(2)); // radians
 
     return true;
-
 }
 
-bool WalkingModule::kinDetect()
+bool WalkingModule::computeYaw(double actualCoMPosX, double desiredCoMPosX)
 {
-    iDynTree::Transform wTcontactFoot;
 
-    if(!m_robotControlHelper->getContactFoot()) // left foot touch
-        wTcontactFoot = m_FKSolver->getLeftFootToWorldTransform();
-    else
-        wTcontactFoot = m_FKSolver->getRightFootToWorldTransform();
-
-    double r = 0;
-    double p = 0;
-    double y = 0;
-
-    wTcontactFoot.getRotation().getRPY(r,p,y);
-
-    m_inclPlaneAngle = -p;
-    m_yawCoMAngle = y;
-
-    std::cout<< "[WalkingModule][kinDetect] m_inclPlaneAngle : " << m_inclPlaneAngle * (180.0/3.141592653589793238463) << std::endl;
-    std::cout<< "[WalkingModule][kinDetect] m_yawCoMAngle : " << m_yawCoMAngle * (180.0/3.141592653589793238463) << std::endl;
-
-    m_inclPlaneAngle = 7.0;
-
-    return true;
-}
-
-bool WalkingModule::detectGround()
-{    
-    bool method = true;
-
-    if(method)
-        kinDetect();
-    else
-        imuDetect();
-
-    return true;
-}
-
-/*bool WalkingModule::computeYaw()
-{
     if( desiredCoMPosX == 0 )
     {
         yError() << "[WalkingModule][computeYaw] I can not divide by zero.";
         return false;
     }
 
+
     m_yawCoMAngle = std::acos( actualCoMPosX / desiredCoMPosX );
 
     return true;
-}*/
+}
+
+bool WalkingModule::updateYawDCM()
+{
+    m_stableDCMModel->updateStableDCMModel(m_inclPlaneAngle,m_yawCoMAngle);
+    m_FKSolver->updateOmegaDCM(m_inclPlaneAngle,m_yawCoMAngle);
+
+    return true;
+}
+
 
 bool WalkingModule::updateOmegaDCM()
 {
-    // computeYaw();
-    if(!m_walkingDCMReactiveController->setOmega(7.0))
-    {
-        yError() << "[WalkingModule][updateOmegaDCM] Error coming from m_walkingDCMReactiveController->setOmega(m_inclPlaneAngle) ";
-        return false;
-    }
-
-    if(!m_trajectoryGenerator->updateOmegaTrajectories(7.0))
-    {
-        yError() << "[WalkingModule][updateOmegaDCM] Error coming from m_trajectoryGenerator->updateOmegaTrajectories(m_inclPlaneAngle)";
-        return false;
-    }
-
-    if(!m_stableDCMModel->setStableDCMModel(7.0,0.0))
-    {
-        yError() << "[WalkingModule][updateOmegaDCM] Error coming from m_stableDCMModel->setStableDCMModel(m_inclPlaneAngle,m_yawCoMAngle)";
-        return false;
-    }
-
-    if(!m_FKSolver->updateOmegaDCM(7.0,0.0))
-    {
-        yError() << "[WalkingModule][updateOmegaDCM] Error coming from m_FKSolver->updateOmegaDCM(m_inclPlaneAngle,m_yawCoMAngle";
-        return false;
-    }
-
-    std::cout << "[WalkingModule][updateOmegaDCM] Passing functions" << std::endl;
+    m_walkingDCMReactiveController->updateOmega(m_inclPlaneAngle);
+    m_trajectoryGenerator->updateOmegaTrajectories(m_inclPlaneAngle);
+    m_stableDCMModel->updateStableDCMModel(m_inclPlaneAngle,m_yawCoMAngle);
+    m_FKSolver->updateOmegaDCM(m_inclPlaneAngle,m_yawCoMAngle);
 
     return true;
 }

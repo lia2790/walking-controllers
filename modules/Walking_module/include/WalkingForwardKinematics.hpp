@@ -35,11 +35,12 @@ class WalkingFK
 
     iDynTree::FreeFloatingGeneralizedTorques m_generalizedBiasForces;
 
-    iDynTree::FrameIndex m_frameLeftIndex; /**< Index of the frame attached to the left foot in which all the left foot transformations are expressed. */
-    iDynTree::FrameIndex m_frameRightIndex; /**< Index of the frame attached to the right foot in which all the right foot transformations are expressed. */
+    iDynTree::FrameIndex m_frameLeftIndex; /**< Index of the frame attached to the left foot in which all the left foot transformations are expressed (l_sole). */
+    iDynTree::FrameIndex m_frameRightIndex; /**< Index of the frame attached to the right foot in which all the right foot transformations are expressed (r_sole). */
     iDynTree::FrameIndex m_frameRootIndex; /**< Index of the frame attached to the root_link. */
     iDynTree::FrameIndex m_frameNeckIndex; /**< Index of the frame attached to the neck_2. */
-
+    iDynTree::FrameIndex m_frameFTsensorRightFootIndex; /**< FT sensor frame on the right foot (r_foot). */
+    iDynTree::FrameIndex m_frameFTsensorLeftFootIndex; /**< FT sensor frame on the left foot (l_foot). */
 
     std::unordered_map<std::string, std::pair<const std::string, const iDynTree::Transform>> m_baseFrames;
     iDynTree::Transform m_worldToBaseTransform; /**< World to base transformation. */
@@ -49,7 +50,12 @@ class WalkingFK
     iDynTree::Vector3 m_comVelocity; /**< Velocity of the CoM. */
     iDynTree::Vector3 m_dcm; /**< DCM position. */
     iDynTree::Vector2 m_zmp; /**< ZMP position. */
-    double m_gravityAcceleration; /**< Gravity acceleration magnitude. */
+
+    // walking on inclined plane
+    double m_comHeight; /**< CoM height (z component). */
+    double m_omega; /**< constant LIPM. */
+    double m_inclPlaneAngle; /**< .... . */
+    iDynTree::Vector3 m_dcmCorrTerm; /**< correction term vector for DCM. */
 
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_comPositionFilter; /**< CoM position low pass filter. */
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_comVelocityFilter; /**< CoM velocity low pass filter. */
@@ -111,6 +117,14 @@ public:
     bool evaluateWorldToBaseTransformation(const iDynTree::Transform& leftFootTransform,
                                            const iDynTree::Transform& rightFootTransform,
                                            const bool& isLeftFixedFrame);
+
+    /**
+     * Update Omega and DCM correction term.
+     * @param inclPlaneAngle is the inclined plane angle
+     * @param yawAngle is the yaw angle during walking w.r.t. world frame.
+     * @return true/false in case of success/failure.
+     */
+    bool updateOmegaDCM(double inclPlaneAngle, double yawAngle);
 
     /**
      * Set the base for the onTheFly feature
@@ -176,16 +190,46 @@ public:
     iDynTree::Transform getLeftFootToWorldTransform();
 
     /**
-     * Return the velocity of the left foot frame (l_sole) (mixed representation)
-     * @return left foot velocity
-     */
-    iDynTree::Twist getLeftFootVelocity();
-
-    /**
      * Return the transformation between the right foot frame (r_sole) and the world reference frame.
      * @return world_H_right_frame.
      */
     iDynTree::Transform getRightFootToWorldTransform();
+
+    /**
+     * Return the transformation between the left foot frame (l_sole) and the right foot frame (r_sole).
+     * @return right_frame_H_left_frame.
+     */
+    iDynTree::Transform getLeftFootToRightFoot();
+
+    /**
+     *
+     * @return l_sole_frame_H_left_foot_ft_sensor_frame.
+     */
+    iDynTree::Transform getFTsensorLeftFootToSoleLeftFoot();
+
+    /**
+     *
+     * @return r_sole_frame_H_right_foot_ft_sensor_frame.
+     */
+    iDynTree::Transform getFTsensorRightFootToSoleRightFoot();
+
+    /**
+     *
+     *
+     */
+    iDynTree::Transform getIMUsensorLeftFootToFTsensorLeftFoot();
+
+    /**
+     *
+     *
+     */
+    iDynTree::Transform getIMUsensorRightFootToFTsensorRightFoot();
+
+    /**
+     * Return the velocity of the left foot frame (l_sole) (mixed representation)
+     * @return left foot velocity
+     */
+    iDynTree::Twist getLeftFootVelocity();
 
     /**
      * Return the velocity of the right foot frame (r_sole) (mixed representation)
@@ -294,8 +338,6 @@ public:
      * @return right foot bias acceleration.
      */
     iDynTree::Vector6 getRightFootBiasAcceleration();
-
-    iDynTree::Transform getLeftFootToRightFoot();
 
     /**
      * Get the neck bias acceleration.

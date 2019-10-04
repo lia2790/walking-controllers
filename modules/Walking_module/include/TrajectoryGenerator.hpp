@@ -39,6 +39,8 @@ class TrajectoryGenerator
     bool m_useMinimumJerk;
 
     bool m_swingLeft; /**< True if the first swing foot is the left. */
+    double m_comHeight; /**< Center of Mass. */
+    double m_comHeightDelta; /**< Center of Mass delta. */
 
     double m_dT; /**< Sampling time of the planner. */
     double m_plannerHorizon; /**< Horizon of the planner. */
@@ -123,6 +125,13 @@ public:
     bool updateTrajectories(double initTime, const iDynTree::Vector2& DCMBoundaryConditionAtMergePointPosition,
                             const iDynTree::Vector2& DCMBoundaryConditionAtMergePointVelocity, bool correctLeft,
                             const iDynTree::Transform& measured, const iDynTree::Vector2& desiredPosition);
+
+    /**
+     * Update the trajectory related to omega.
+     * @param inclined plane angle.
+     * @return true/false in case of success/failure.
+     */
+    bool updateOmegaTrajectories(double inclPlaneAngle);
 
     /**
      * Return if the trajectory was computed

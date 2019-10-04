@@ -40,14 +40,15 @@ bool WalkingDCMReactiveController::initialize(const yarp::os::Searchable& config
         return false;
     }
 
-    double comHeight;
-    if(!YarpHelper::getNumberFromSearchable(config, "com_height", comHeight))
+    if(!YarpHelper::getNumberFromSearchable(config, "com_height", m_comHeight))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
     }
-    double gravityAcceleration = config.check("gravity_acceleration", yarp::os::Value(9.81)).asDouble();
-    m_omega = sqrt(gravityAcceleration / comHeight);
+
+    double inclPlaneAngle = 7.0;
+
+    m_omega = sqrt(9.81 * std::cos(iDynTree::deg2rad(inclPlaneAngle)) / m_comHeight * std::cos(iDynTree::deg2rad(inclPlaneAngle)));
 
     yarp::sig::Vector buffer(3, 0.0);
     m_dcmErrorIntegral = std::make_unique<iCub::ctrl::Integrator>(0.01, buffer);
@@ -65,6 +66,13 @@ void WalkingDCMReactiveController::setReferenceSignal(const iDynTree::Vector3& d
 {
     m_dcmPositionDesired = dcmPositionDesired;
     m_dcmVelocityDesired = dcmVelocityDesired;
+}
+
+bool WalkingDCMReactiveController::setOmega(double inclPlaneAngle)
+{
+    m_omega = sqrt((9.81 * std::cos(iDynTree::deg2rad(inclPlaneAngle))) / (m_comHeight*std::cos(iDynTree::deg2rad(inclPlaneAngle))));
+
+    return true;
 }
 
 bool WalkingDCMReactiveController::evaluateControl()

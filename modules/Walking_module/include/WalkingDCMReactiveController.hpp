@@ -37,6 +37,8 @@ class WalkingDCMReactiveController
     double m_kDCM; /**< Controller gain. */
     double m_kIDCM; /**< Controller gain. */
     double m_omega; /**< LIPM time constant. */
+    double m_comHeight; /**< Center of Mass. */
+
     bool m_controlEvaluated{false}; /**< True if the control output was correctly evaluated. */
 
     iDynTree::Vector3 m_dcmFeedback; /**< Feedback signal containing the position of the CoM. */
@@ -69,6 +71,13 @@ public:
      */
     void setReferenceSignal(const iDynTree::Vector3& dcmPositionDesired,
                             const iDynTree::Vector3& dcmVelocityDesired);
+
+    /**
+     * Update omega variable, lipm time constant.
+     * @param angle of the inclined plane;
+     * @return true/false in case of success/failure
+     */
+    bool setOmega(double inclPlaneAngle);
 
     /**
      * Evaluate the control output.

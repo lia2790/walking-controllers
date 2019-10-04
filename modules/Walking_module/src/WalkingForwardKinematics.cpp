@@ -203,6 +203,20 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
+    m_frameFTsensorRightFootIndex = m_kinDyn.model().getFrameIndex("r_foot");
+    if(m_frameFTsensorRightFootIndex == iDynTree::FRAME_INVALID_INDEX)
+    {
+        yError() << "[initialize] Unable to find the frame named: r_sole";
+        return false;
+    }
+
+    m_frameFTsensorLeftFootIndex = m_kinDyn.model().getFrameIndex("l_foot");
+    if(m_frameFTsensorLeftFootIndex == iDynTree::FRAME_INVALID_INDEX)
+    {
+        yError() << "[initialize] Unable to find the frame named: r_sole";
+        return false;
+    }
+
     m_frameNeckIndex = m_kinDyn.model().getFrameIndex("neck_2");
     if(m_frameNeckIndex == iDynTree::FRAME_INVALID_INDEX)
     {
@@ -210,13 +224,17 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
-    double comHeight;
-    if(!YarpHelper::getNumberFromSearchable(config, "com_height", comHeight))
+    if(!YarpHelper::getNumberFromSearchable(config, "com_height", m_comHeight))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
     }
-    m_gravityAcceleration = config.check("gravity_acceleration", yarp::os::Value(9.81)).asDouble();
+    // walking on inclined plane
+    m_inclPlaneAngle = 7.0;
+    m_omega = sqrt((9.81 * std::cos(iDynTree::deg2rad(m_inclPlaneAngle))) / (m_comHeight*std::cos(iDynTree::deg2rad(m_inclPlaneAngle))));
+
+    m_dcmCorrTerm(0) = - m_comHeight * std::tan(iDynTree::deg2rad(m_inclPlaneAngle));
+    m_dcmCorrTerm(1) = 0;
 
     m_useFilters = config.check("use_filters", yarp::os::Value(false)).asBool();
     if (m_useFilters)
@@ -239,7 +257,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         m_comPositionFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency, samplingTime);
         m_comVelocityFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency, samplingTime);
         yarp::sig::Vector comPosition(3, 0.0);
-        comPosition(2) = comHeight;
+        comPosition(2) = m_comHeight * std::cos(iDynTree::deg2rad(m_inclPlaneAngle));
         m_comPositionFilter->init(comPosition);
 
         yarp::sig::Vector comVelocity(3, 0.0);
@@ -317,12 +335,25 @@ bool WalkingFK::evaluateWorldToBaseTransformation(const iDynTree::Transform& lef
     return true;
 }
 
+bool WalkingFK::updateOmegaDCM(double inclPlaneAngle, double yawAngle)
+{
+    m_inclPlaneAngle = inclPlaneAngle;
+
+    m_dcmCorrTerm(0) = - m_comHeight * std::tan(iDynTree::deg2rad(m_inclPlaneAngle));
+    m_dcmCorrTerm(1) = 0;
+
+    m_omega = sqrt((9.81 * std::cos(iDynTree::deg2rad(m_inclPlaneAngle))) / (m_comHeight*std::cos(iDynTree::deg2rad(m_inclPlaneAngle))));
+
+    return true;
+}
+
 bool WalkingFK::setInternalRobotState(const iDynTree::VectorDynSize& positionFeedbackInRadians,
                                       const iDynTree::VectorDynSize& velocityFeedbackInRadians)
 {
     iDynTree::Vector3 gravity;
     gravity.zero();
-    gravity(2) = -9.81;
+    gravity(0) = -9.81 * std::sin(iDynTree::deg2rad(m_inclPlaneAngle));
+    gravity(2) = -9.81 * std::cos(iDynTree::deg2rad(m_inclPlaneAngle));
 
     if(!m_kinDyn.setRobotState(m_worldToBaseTransform, positionFeedbackInRadians,
                                m_baseTwist, velocityFeedbackInRadians,
@@ -369,11 +400,8 @@ bool WalkingFK::evaluateCoM()
 
 void WalkingFK::evaluateDCM()
 {
-    double omega = sqrt(m_gravityAcceleration / m_comPosition(2));
-
     // evaluate the 3D-DCM
-    iDynTree::toEigen(m_dcm) = iDynTree::toEigen(m_comPosition) +
-        iDynTree::toEigen(m_comVelocity) / omega;
+    iDynTree::toEigen(m_dcm) = iDynTree::toEigen(m_comPosition) + iDynTree::toEigen(m_comVelocity) / m_omega + iDynTree::toEigen(m_dcmCorrTerm) ;
 
     return;
 }
@@ -471,19 +499,53 @@ iDynTree::Transform WalkingFK::getLeftFootToWorldTransform()
     return m_kinDyn.getWorldTransform(m_frameLeftIndex);
 }
 
+iDynTree::Transform WalkingFK::getRightFootToWorldTransform()
+{
+    return m_kinDyn.getWorldTransform(m_frameRightIndex);
+}
+
 iDynTree::Transform WalkingFK::getLeftFootToRightFoot()
 {
     return m_kinDyn.getRelativeTransform(m_frameLeftIndex, m_frameRightIndex);
 }
 
+iDynTree::Transform WalkingFK::getFTsensorLeftFootToSoleLeftFoot()
+{
+    return m_kinDyn.getRelativeTransform(m_frameFTsensorLeftFootIndex, m_frameLeftIndex);
+}
+
+iDynTree::Transform WalkingFK::getFTsensorRightFootToSoleRightFoot()
+{
+    return m_kinDyn.getRelativeTransform(m_frameFTsensorRightFootIndex, m_frameRightIndex);
+}
+
+iDynTree::Transform WalkingFK::getIMUsensorLeftFootToFTsensorLeftFoot()
+{
+    // return m_kinDyn.getRelativeTransform(m_frameImuSensorLeftFootIndex, m_frameLeftIndex);
+
+    iDynTree::Transform imuSensorLeftFootTftSensorLeftFoot;
+
+    // imuSensorLeftFootTftSensorLeftFoot.setPosition();
+    // imuSensorLeftFootTftSensorLeftFoot.setRotation();
+
+    return imuSensorLeftFootTftSensorLeftFoot;
+}
+
+iDynTree::Transform WalkingFK::getIMUsensorRightFootToFTsensorRightFoot()
+{
+    // return m_kinDyn.getRelativeTransform(m_frameImuSensorRightFootIndex, m_frameRightIndex);
+
+    iDynTree::Transform imuSensorRightFootTftSensorRightFoot;
+
+    // imuSensorRightFootTftSensorRightFoot.setPosition();
+    // imuSensorRightFootTftSensorRightFoot.setRotation();
+
+    return imuSensorRightFootTftSensorRightFoot;
+}
+
 iDynTree::Twist WalkingFK::getLeftFootVelocity()
 {
     return m_kinDyn.getFrameVel(m_frameLeftIndex);
-}
-
-iDynTree::Transform WalkingFK::getRightFootToWorldTransform()
-{
-    return m_kinDyn.getWorldTransform(m_frameRightIndex);
 }
 
 iDynTree::Twist WalkingFK::getRightFootVelocity()

@@ -62,6 +62,7 @@ bool RobotHelper::getFeedbacksRaw(bool getBaseEst, unsigned int maxAttempts)
 
     bool okLeftWrench = false;
     bool okRightWrench = false;
+    bool okContactFoot = false;
 
     bool okBaseEstimation = true;
     if(getBaseEst)
@@ -124,8 +125,39 @@ bool RobotHelper::getFeedbacksRaw(bool getBaseEst, unsigned int maxAttempts)
             }
         }
 
+        if(!okContactFoot)
+        {
+            yarp::sig::Vector *contact = NULL;
+            contact = m_robotContactFootPort.read(false);
 
-        if(okPosition && okVelocity && okLeftWrench && okRightWrench && okBaseEstimation && okTorque)
+            if(contact != NULL)
+            {
+                if((*contact)(2) && m_contactFoot == 1 ) // true if it is in contact and it was not in contact before
+                {
+                   m_contactFoot = 0; // left foot is in contact
+                }
+                else
+                {
+                    if((*contact)(3) && m_contactFoot == 0 ) // true if it is in contact and it was not in contact before
+                    {
+                       m_contactFoot = 1; // right foot is in contact
+                    }
+                    else
+                    {
+                        yError() << "[getFeedbacks][ContactFoot] No foot in contact.";
+                        return false;
+                    }
+
+                }
+            }
+
+            std::cout << "[RobotHelper][FootinContact] foot in contact : " << m_contactFoot << std::endl;
+
+            okContactFoot = true;
+        }
+
+
+        if(okPosition && okVelocity && okLeftWrench && okRightWrench && okBaseEstimation && okTorque && okContactFoot)
         {
             for(unsigned j = 0 ; j < m_actuatedDOFs; j++)
             {
@@ -167,6 +199,9 @@ bool RobotHelper::getFeedbacksRaw(bool getBaseEst, unsigned int maxAttempts)
 
     if(!okBaseEstimation)
         yError() << "\t - Base estimation";
+
+    if(!okContactFoot)
+        yError() << "\t - Contact Foot";
 
     return false;
 }
@@ -375,7 +410,7 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
         std::string floatingBasePortName;
         if(!YarpHelper::getStringFromSearchable(config, "floatingBasePortName", floatingBasePortName))
         {
-            yError() << "[RobotHelper::configureForceTorqueSensors] Unable to get the string from searchable.";
+            yError() << "[RobotHelper::useExternalRobotBase] Unable to get the string from searchable.";
             return false;
         }
 
@@ -387,6 +422,24 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
 
         m_heightOffset = 0;
     }
+
+    // open foot contact port
+    m_robotContactFootPort.open("/" + name + "/robotContact:i");
+    std::string contactFootPortName;
+    if(!YarpHelper::getStringFromSearchable(config, "contactFootPortName", contactFootPortName))
+    {
+        yError() << "[RobotHelper::contactFootPortName] Unable to get the string from searchable.";
+        return false;
+    }
+
+    if(!yarp::os::Network::connect(contactFootPortName, "/" + name + "/robotContact:i"))
+    {
+        yError() << "Unable to connect to port " << "/base-estimator/feet_contact/state:o";
+        return false;
+    }
+    m_contactFoot = 1; // right foot
+
+
     return true;
 }
 
@@ -864,6 +917,11 @@ WalkingPIDHandler& RobotHelper::getPIDHandler()
 const iDynTree::Transform& RobotHelper::getBaseTransform() const
 {
     return m_robotBaseTransform;
+}
+
+bool RobotHelper::getContactFoot()
+{
+    return m_contactFoot;
 }
 
 const iDynTree::Twist& RobotHelper::getBaseTwist() const

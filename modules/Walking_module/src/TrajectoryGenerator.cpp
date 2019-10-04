@@ -85,29 +85,23 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double maxStepLength = config.check("maxStepLength", yarp::os::Value(0.05)).asDouble();
     double minStepLength = config.check("minStepLength", yarp::os::Value(0.005)).asDouble();
     double minWidth = config.check("minWidth", yarp::os::Value(0.03)).asDouble();
-    double maxAngleVariation = iDynTree::deg2rad(config.check("maxAngleVariation",
-                                                              yarp::os::Value(40.0)).asDouble());
-    double minAngleVariation = iDynTree::deg2rad(config.check("minAngleVariation",
-                                                              yarp::os::Value(5.0)).asDouble());
+    double maxAngleVariation = iDynTree::deg2rad(config.check("maxAngleVariation", yarp::os::Value(40.0)).asDouble());
+    double minAngleVariation = iDynTree::deg2rad(config.check("minAngleVariation", yarp::os::Value(5.0)).asDouble());
     double maxStepDuration = config.check("maxStepDuration", yarp::os::Value(8.0)).asDouble();
     double minStepDuration = config.check("minStepDuration", yarp::os::Value(2.9)).asDouble();
     double stepHeight = config.check("stepHeight", yarp::os::Value(0.005)).asDouble();
     double landingVelocity = config.check("stepLandingVelocity", yarp::os::Value(0.0)).asDouble();
     double apexTime = config.check("footApexTime", yarp::os::Value(0.5)).asDouble();
-    double comHeight = config.check("com_height", yarp::os::Value(0.49)).asDouble();
-    double comHeightDelta = config.check("comHeightDelta", yarp::os::Value(0.01)).asDouble();
+    m_comHeight = config.check("com_height", yarp::os::Value(0.49)).asDouble();
+    m_comHeightDelta = config.check("comHeightDelta", yarp::os::Value(0.01)).asDouble();
     double nominalDuration = config.check("nominalDuration", yarp::os::Value(4.0)).asDouble();
     double lastStepSwitchTime = config.check("lastStepSwitchTime", yarp::os::Value(0.5)).asDouble();
-    double switchOverSwingRatio = config.check("switchOverSwingRatio",
-                                               yarp::os::Value(0.4)).asDouble();
+    double switchOverSwingRatio = config.check("switchOverSwingRatio", yarp::os::Value(0.4)).asDouble();
     double mergePointRatio = config.check("mergePointRatio", yarp::os::Value(0.5)).asDouble();
-
     m_nominalWidth = config.check("nominalWidth", yarp::os::Value(0.04)).asDouble();
-
     m_swingLeft = config.check("swingLeft", yarp::os::Value(true)).asBool();
     bool startWithSameFoot = config.check("startAlwaysSameFoot", yarp::os::Value(false)).asBool();
-    m_useMinimumJerk = config.check("useMinimumJerkFootTrajectory",
-                                    yarp::os::Value(false)).asBool();
+    m_useMinimumJerk = config.check("useMinimumJerkFootTrajectory", yarp::os::Value(false)).asBool();
     double pitchDelta = config.check("pitchDelta", yarp::os::Value(0.0)).asDouble();
 
     // try to configure the planner
@@ -146,12 +140,12 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && m_feetGenerator->setPitchDelta(pitchDelta);
 
     m_heightGenerator = m_trajectoryGenerator.addCoMHeightTrajectoryGenerator();
-    ok = ok && m_heightGenerator->setCoMHeightSettings(comHeight, comHeightDelta);
+    ok = ok && m_heightGenerator->setCoMHeightSettings(m_comHeight, m_comHeightDelta);
     ok = ok && m_trajectoryGenerator.setMergePointRatio(mergePointRatio);
 
     m_dcmGenerator = m_trajectoryGenerator.addDCMTrajectoryGenerator();
     m_dcmGenerator->setFootOriginOffset(leftZMPDelta, rightZMPDelta);
-    m_dcmGenerator->setOmega(sqrt(9.81/comHeight));
+    m_dcmGenerator->setOmega(sqrt(9.81/m_comHeight));
 
     m_correctLeft = true;
 
@@ -415,6 +409,14 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     }
 
     m_generatorState = GeneratorState::Returned;
+    return true;
+}
+
+bool TrajectoryGenerator::updateOmegaTrajectories(double inclPlaneAngle)
+{
+    m_heightGenerator->setCoMHeightSettings(m_comHeight*(std::cos(iDynTree::deg2rad(inclPlaneAngle))), m_comHeightDelta);
+    m_dcmGenerator->setOmega(sqrt(9.81*(std::cos(iDynTree::deg2rad(inclPlaneAngle)))/ (m_comHeight*(std::cos(iDynTree::deg2rad(inclPlaneAngle))))));
+
     return true;
 }
 

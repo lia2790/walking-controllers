@@ -98,6 +98,10 @@ class RobotHelper
     yarp::os::BufferedPort<yarp::sig::Vector> m_robotBasePort; /**< Right foot wrench port. */
     double m_heightOffset;
 
+    // contact
+    yarp::os::BufferedPort<yarp::sig::Vector> m_robotContactFootPort; /**< contact Foot port. */
+    bool m_contactFoot; /**< booalean to identify which foot is in contact : 0 left foot - 1 right foot. */
+
     /**
      * Get the higher position error among all joints.
      * @param desiredJointPositionsRad desired joint position in radiants;
@@ -201,6 +205,7 @@ public:
     const iDynTree::Twist&getBaseTwist() const;
 
     bool isExternalRobotBaseUsed();
+    bool getContactFoot();
 
     WalkingPIDHandler& getPIDHandler();
 };

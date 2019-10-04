@@ -140,6 +140,11 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     double m_footHeight;
     double m_footVelocityLanding;
 
+    // walking on inclined plane
+    double m_inclPlaneAngle; /**< angle of the inclined plane. */
+    double m_comHeight; /**< height of the centre of the mass. */
+    double m_yawCoMAngle; /**< yaw angle relative to COM position. */
+
     /**
      * Get the robot model from the resource finder and set it.
      * @param rf is the reference to a resource finder object.
@@ -200,6 +205,43 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
                         const iDynTree::Vector3& desiredVRPPosition,
                         iDynTree::VectorDynSize &outputTorque,
                         iDynTree::VectorDynSize &outputAcceleration);
+
+    /**
+     *
+     * @return true in case of success and false otherwise.
+     */
+    bool readIMUData(iDynTree::Position gIMU);
+
+    /**
+     *
+     * @return true in case of success and false otherwise.
+     */
+    bool imuDetect();
+
+    /**
+     *
+     * @return true in case of success and false otherwise.
+     */
+    bool kinDetect();
+
+    /**
+     *
+     * @return true in case of success and false otherwise.
+     */
+    bool detectGround();
+
+    /**
+     *
+     * @return true in case of success and false otherwise.
+     */
+    // bool computeYaw();
+
+    /**
+     *
+     * @return true in case of success and false otherwise.
+     */
+    bool updateOmegaDCM();
+    
 
     /**
      * Generate the first trajectory.
