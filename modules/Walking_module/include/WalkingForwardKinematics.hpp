@@ -121,10 +121,9 @@ public:
     /**
      * Update Omega and DCM correction term.
      * @param inclPlaneAngle is the inclined plane angle
-     * @param yawAngle is the yaw angle during walking w.r.t. world frame.
      * @return true/false in case of success/failure.
      */
-    bool updateOmegaDCM(double inclPlaneAngle, double yawAngle);
+    bool updateOmegaDCM(double inclPlaneAngle);
 
     /**
      * Set the base for the onTheFly feature

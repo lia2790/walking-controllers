@@ -143,7 +143,9 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     // walking on inclined plane
     double m_inclPlaneAngle; /**< angle of the inclined plane. */
     double m_comHeight; /**< height of the centre of the mass. */
-    double m_yawCoMAngle; /**< yaw angle relative to COM position. */
+    int m_newContact; /**< flag to handle new contact. */
+    iDynTree::Transform m_wTcontactFoot; /**< contact foot transformation which provides the inclined plane transform. */
+    iDynTree::Vector2 m_desiredCoMPositionXY; /**< desired CoM XY position at the time step. */
 
     /**
      * Get the robot model from the resource finder and set it.
@@ -214,15 +216,15 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     /**
      *
-     * @return true in case of success and false otherwise.
+     * @return the inclined plane angle.
      */
-    bool imuDetect();
+    double imuDetectGround();
 
     /**
      *
-     * @return true in case of success and false otherwise.
+     * @return the inclined plane angle..
      */
-    bool kinDetect();
+    double kinDetectGround();
 
     /**
      *
@@ -352,6 +354,12 @@ public:
      * @return true in case of success and false otherwise.
      */
     virtual bool stopWalking() override;
+
+    /**
+     * Set angle.
+     * @return true in case of success and false otherwise.
+     */
+    virtual bool setAngle(double angleInDegrees) override;
 
 };
 #endif

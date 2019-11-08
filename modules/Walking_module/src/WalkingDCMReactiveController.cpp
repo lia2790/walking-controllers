@@ -46,7 +46,7 @@ bool WalkingDCMReactiveController::initialize(const yarp::os::Searchable& config
         return false;
     }
 
-    double inclPlaneAngle = 7.0;
+    double inclPlaneAngle = 0.0;
 
     m_omega = sqrt(9.81 * std::cos(iDynTree::deg2rad(inclPlaneAngle)) / m_comHeight * std::cos(iDynTree::deg2rad(inclPlaneAngle)));
 

@@ -230,7 +230,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
     // walking on inclined plane
-    m_inclPlaneAngle = 7.0;
+    m_inclPlaneAngle = 0.0;
     m_omega = sqrt((9.81 * std::cos(iDynTree::deg2rad(m_inclPlaneAngle))) / (m_comHeight*std::cos(iDynTree::deg2rad(m_inclPlaneAngle))));
 
     m_dcmCorrTerm(0) = - m_comHeight * std::tan(iDynTree::deg2rad(m_inclPlaneAngle));
@@ -335,13 +335,10 @@ bool WalkingFK::evaluateWorldToBaseTransformation(const iDynTree::Transform& lef
     return true;
 }
 
-bool WalkingFK::updateOmegaDCM(double inclPlaneAngle, double yawAngle)
+bool WalkingFK::updateOmegaDCM(double inclPlaneAngle)
 {
     m_inclPlaneAngle = inclPlaneAngle;
-
     m_dcmCorrTerm(0) = - m_comHeight * std::tan(iDynTree::deg2rad(m_inclPlaneAngle));
-    m_dcmCorrTerm(1) = 0;
-
     m_omega = sqrt((9.81 * std::cos(iDynTree::deg2rad(m_inclPlaneAngle))) / (m_comHeight*std::cos(iDynTree::deg2rad(m_inclPlaneAngle))));
 
     return true;

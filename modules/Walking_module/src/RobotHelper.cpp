@@ -147,13 +147,11 @@ bool RobotHelper::getFeedbacksRaw(bool getBaseEst, unsigned int maxAttempts)
                         yError() << "[getFeedbacks][ContactFoot] No foot in contact.";
                         return false;
                     }
-
                 }
+                std::cout << "[RobotHelper][FootinContact] foot in contact : " << m_contactFoot << std::endl;
             }
-
-            std::cout << "[RobotHelper][FootinContact] foot in contact : " << m_contactFoot << std::endl;
-
             okContactFoot = true;
+            
         }
 
 
@@ -425,6 +423,7 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
 
     // open foot contact port
     m_robotContactFootPort.open("/" + name + "/robotContact:i");
+
     std::string contactFootPortName;
     if(!YarpHelper::getStringFromSearchable(config, "contactFootPortName", contactFootPortName))
     {
@@ -434,11 +433,14 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
 
     if(!yarp::os::Network::connect(contactFootPortName, "/" + name + "/robotContact:i"))
     {
-        yError() << "Unable to connect to port " << "/base-estimator/feet_contact/state:o";
+        yError() << "Unable to connect to port " << "/icubSim/feet_contact/state:o";
         return false;
     }
-    m_contactFoot = 1; // right foot
+    
+    // right foot
+    m_contactFoot = 1; 
 
+    m_worldToRelativeTransform = iDynTree::Transform::Identity();
 
     return true;
 }
@@ -861,6 +863,12 @@ bool RobotHelper::close()
     return true;
 }
 
+bool RobotHelper::setWorldToRelativeTransform(const iDynTree::Transform worldToRelativeTransform)
+{
+    m_worldToRelativeTransform = worldToRelativeTransform;
+    return true;
+}
+
 const iDynTree::VectorDynSize& RobotHelper::getJointPosition() const
 {
     return m_positionFeedbackRad;
@@ -919,7 +927,19 @@ const iDynTree::Transform& RobotHelper::getBaseTransform() const
     return m_robotBaseTransform;
 }
 
-bool RobotHelper::getContactFoot()
+bool RobotHelper::computeRelativeBaseTransform()
+{
+    m_relativeToBaseTransform = m_worldToRelativeTransform.inverse() * m_robotBaseTransform;
+
+    return true;
+}
+
+const iDynTree::Transform& RobotHelper::getRelativeBaseTransform() const
+{
+    return m_relativeToBaseTransform;
+}
+
+int RobotHelper::getContactFoot()
 {
     return m_contactFoot;
 }

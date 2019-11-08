@@ -159,10 +159,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     }
     setName(name.c_str());
 
-    // walking on inclined plane
-    m_inclPlaneAngle = generalOptions.check("inclined_plane_angle", yarp::os::Value(0.0)).asDouble();
     m_comHeight = generalOptions.check("com_height", yarp::os::Value(0.49)).asDouble();
-    m_yawCoMAngle = 0.0;
 
     m_robotControlHelper = std::make_unique<RobotHelper>();
     yarp::os::Bottle& robotControlHelperOptions = rf.findGroup("ROBOT_CONTROL");
@@ -423,6 +420,15 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         }
     }
     m_waitCondition = false;
+
+    // walking on inclined plane
+    m_inclPlaneAngle = generalOptions.check("inclined_plane_angle", yarp::os::Value(0.0)).asDouble();
+    m_desiredPosition(0) = 0;
+    m_desiredPosition(1) = 0;
+    m_newContact = 1;
+    iDynTree::Transform m_wTcontactFoot = iDynTree::Transform::Identity();
+    m_desiredCoMPositionXY(0) = 0;
+    m_desiredCoMPositionXY(1) = 0;
 
     yInfo() << "[configure] Ready to play!";
 
@@ -804,8 +810,7 @@ bool WalkingModule::updateModule()
                     m_robotState = WalkingFSM::Stopped;
                     return true;
                 }
-
-          // }
+            // }
 
             yarp::sig::Vector buffer(m_qDesired.size());
             yarp::sig::Vector bufferZero(m_qDesired.size());
@@ -820,7 +825,7 @@ bool WalkingModule::updateModule()
             // m_walkingZMPController->reset(m_DCMPositionDesired.front());
 
             iDynTree::Vector2 CoMinitialPosition;
-            CoMinitialPosition(0) = m_DCMPositionDesired.front()(0) + m_comHeight * std::sin(iDynTree::deg2rad(7.0));
+            CoMinitialPosition(0) = m_DCMPositionDesired.front()(0) + m_comHeight * std::sin(iDynTree::deg2rad(m_inclPlaneAngle));
             CoMinitialPosition(1) = m_DCMPositionDesired.front()(1);
             m_stableDCMModel->reset(CoMinitialPosition);
             m_walkingZMPController->reset(CoMinitialPosition);
@@ -853,20 +858,13 @@ bool WalkingModule::updateModule()
             return false;
         }
 
-        // detect the angle of the inclined plane
+        // detect the angle of the inclined plane  
         if(!detectGround())
         {
             yError() << "[updateModule] Unable to detect the angle of the inclined plane";
             return false;
         }
-        std::cout << "[updateModule] Angle detected " << std::endl;
-        // update quantities related to the angle of the inclined plane
-    /*  if(!updateOmegaDCM())
-        {
-            yError() << "[updateModule] Unable to update quantities related to the angle of the inclined plane";
-            return false;
-        }
-*/
+
         // check desired planner input
         yarp::sig::Vector* desiredUnicyclePosition = nullptr;
         desiredUnicyclePosition = m_desiredUnyciclePositionPort.read(false);
@@ -881,9 +879,13 @@ bool WalkingModule::updateModule()
         // the time to attach new one
         if(m_newTrajectoryRequired)
         {
+
+            std::cout << "[updateModule][newTrajectoryRequired] REQUIRED REQUIRED REQUIRED REQUIRED REQUIRED REQUIRED REQUIRED REQUIRED" << std::endl;
+
             // when we are near to the merge point the new trajectory is evaluated
             if(m_newTrajectoryMergeCounter == 20)
             {
+                std::cout << "[updateModule][newTrajectoryEvaluated] EVALUATED EVALUATED EVALUATED EVALUATED EVALUATED EVALUATED EVALUATED " << std::endl;
 
                 double initTimeTrajectory;
                 initTimeTrajectory = m_time + m_newTrajectoryMergeCounter * m_dT;
@@ -902,6 +904,8 @@ bool WalkingModule::updateModule()
                     yError() << "[updateModule] Unable to ask for a new trajectory.";
                     return false;
                 }
+
+                std::cout << "[updateModule][askNewTrajectory] ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK ASK" << std::endl;
             }
 
             if(m_newTrajectoryMergeCounter == 2)
@@ -913,12 +917,58 @@ bool WalkingModule::updateModule()
                 }
                 m_newTrajectoryRequired = false;
                 resetTrajectory = true;
+
+                std::cout << "[updateModule][updateTrajectory] UPDATE UPDATE UPDATE UPDATE UPDATE UPDATE UPDATE UPDATE UPDATE UPDATE UPDATE UPDATE" << std::endl;
+
+                if(m_inclPlaneAngle > 0)
+                {
+                    std::cout<< " UPDATE WORLD TO WALK ON INCLINED PLANE " << std::endl;
+
+                    iDynTree::Transform w_T_dcm;
+                    w_T_dcm.setRotation(m_wTcontactFoot.getRotation());
+
+                    double z_foot = m_wTcontactFoot.getPosition().getVal(2);
+                    double x_foot = z_foot * (std::cos(m_inclPlaneAngle) / std::sin(m_inclPlaneAngle));
+                    double x_foot_dist = m_wTcontactFoot.getPosition().getVal(0) - x_foot;
+                    double x_dcm_dist = m_DCMPositionDesired.front()(0) - x_foot;
+                    double z_dcm = x_dcm_dist * (std::sin(m_inclPlaneAngle) / std::cos(m_inclPlaneAngle));
+
+                    iDynTree::Position w_p_dcm;
+                    w_p_dcm.zero();
+                    w_p_dcm.setVal(0,m_DCMPositionDesired.front()(0));
+                    w_p_dcm.setVal(1,m_DCMPositionDesired.front()(1));
+                    w_p_dcm.setVal(2,z_dcm);
+                    w_T_dcm.setPosition(w_p_dcm);
+
+
+                    iDynTree::Position wIP_p_IP; 
+                    wIP_p_IP.zero();
+                    wIP_p_IP.setVal(0,m_DCMPositionDesired.front()(0));
+                    wIP_p_IP.setVal(1,m_DCMPositionDesired.front()(1));
+
+                    iDynTree::Transform wIP_T_dcm;
+                    wIP_T_dcm.setRotation(iDynTree::Rotation::Identity());
+                    wIP_T_dcm.setPosition(wIP_p_IP);
+
+                    iDynTree::Transform w_T_wIP;
+                    w_T_wIP = w_T_dcm * wIP_T_dcm.inverse();
+
+                    m_robotControlHelper->setWorldToRelativeTransform(w_T_wIP);
+
+                    if(!updateOmegaDCM())
+                    {
+                        yError() << "[updateModule] Unable to update quantities related to the angle of the inclined plane";
+                        return false;
+                    }
+                }
             }
 
             // During the wait condition the time is frozen
             if(!m_waitCondition)
                 m_newTrajectoryMergeCounter--;
         }
+
+        
 
         if (m_robotControlHelper->getPIDHandler().usingGainScheduling())
         {
@@ -929,6 +979,7 @@ bool WalkingModule::updateModule()
             }
         }
 
+        // update forward kinematics (wTb,CoM,DCM)
         if(!updateFKSolver())
         {
             yError() << "[updateModule] Unable to update the FK solver.";
@@ -958,7 +1009,7 @@ bool WalkingModule::updateModule()
         iDynTree::Vector2 desiredCoMAccelerationXY;
         if(!m_waitCondition)
         {
-            // evaluate 3D-LIPM reference signal
+            // evaluate 3D-LIPM reference signal // -------------------------------------------------------------
             m_stableDCMModel->setDCMPosition(m_DCMPositionDesired.front());
             m_stableDCMModel->setZMPPosition(m_ZMPPositionDesired.front());
             if(!m_stableDCMModel->integrateModel())
@@ -985,18 +1036,20 @@ bool WalkingModule::updateModule()
             desiredCoMAccelerationXY.zero();
         }
 
-        iDynTree::Vector2 desiredCoMPositionXY;
-        if(!m_stableDCMModel->getCoMPosition(desiredCoMPositionXY))
+        
+        if(!m_stableDCMModel->getCoMPosition(m_desiredCoMPositionXY)) 
         {
             yError() << "[updateModule] Unable to get the desired CoM position.";
             return false;
         }
 
-        // std::cout << "m_stableDCMModel desiredCoMPositionXY " << desiredCoMPositionXY << std::endl;
+        // std::cout << "m_stableDCMModel m_desiredCoMPositionXY" << m_desiredCoMPositionXY << std::endl;
 
         // DCM controller
         iDynTree::Vector2 desiredZMP;
         iDynTree::Vector3 desiredVRP;
+
+        // ------------------------------------------------------------------------------------------------------ DCM yes 
 
         DCMPositionDesired(0) = m_DCMPositionDesired.front()(0);
         DCMPositionDesired(1) = m_DCMPositionDesired.front()(1);
@@ -1009,7 +1062,7 @@ bool WalkingModule::updateModule()
         if(m_useMPC)
         {
             // Model predictive controller
-            m_profiler->setInitTime("MPC");
+            m_profiler->setInitTime("MPC");  // -------------------------------------------------------------------- feet
             if(!m_walkingController->setConvexHullConstraint(m_leftTrajectory, m_rightTrajectory,
                                                              m_leftInContact, m_rightInContact))
             {
@@ -1025,8 +1078,8 @@ bool WalkingModule::updateModule()
                 yError() << "[updateModule] unable to set the feedback.";
                 return false;
             }
-
-            if(!m_walkingController->setReferenceSignal(m_DCMPositionDesired, resetTrajectory))
+            
+            if(!m_walkingController->setReferenceSignal(m_DCMPositionDesired, resetTrajectory))   // --------------------------
             {
                 yError() << "[updateModule] unable to set the reference Signal.";
                 return false;
@@ -1045,7 +1098,7 @@ bool WalkingModule::updateModule()
             }
 
             // this is not correct
-            desiredVRP(0) = desiredZMP(0);
+            desiredVRP(0) = desiredZMP(0);  // --------------------------------------------------------------------------------
             desiredVRP(1) = desiredZMP(1);
             desiredVRP(2) = m_comHeightTrajectory.front();
 
@@ -1066,7 +1119,7 @@ bool WalkingModule::updateModule()
             // DCMVelocityDesired(1)= 2 * M_PI * frequency *  a * cos(2 * M_PI * frequency * m_time)
             // DCMVelocityDesired(2) = m_comHeightVelocity.front();
 
-            m_walkingDCMReactiveController->setReferenceSignal(DCMPositionDesired, DCMVelocityDesired);
+            m_walkingDCMReactiveController->setReferenceSignal(DCMPositionDesired, DCMVelocityDesired); // --------------------- no 
 
             // m_walkingDCMReactiveController->setReferenceSignal(m_desiredDCMPosition, m_desiredDCMVelocity);
 
@@ -1092,7 +1145,7 @@ bool WalkingModule::updateModule()
 
             // set feedback and the desired signal
             m_walkingZMPController->setFeedback(m_FKSolver->getZMP(), m_FKSolver->getCoMPosition());
-            m_walkingZMPController->setReferenceSignal(desiredZMP, desiredCoMPositionXY,
+            m_walkingZMPController->setReferenceSignal(desiredZMP, m_desiredCoMPositionXY,
                                                        desiredCoMVelocityXY);
 
             if(!m_walkingZMPController->evaluateControl())
@@ -1228,11 +1281,11 @@ bool WalkingModule::updateModule()
                 return false;
             }
         }
-        else
+        else // ------------------ TORQUE CONTROL ------------------------
         {
             // x and y are not taking into account
-            desiredCoMPosition(0) = desiredCoMPositionXY(0);
-            desiredCoMPosition(1) = desiredCoMPositionXY(1);
+            desiredCoMPosition(0) = m_desiredCoMPositionXY(0); // ------------------ com no - already done -
+            desiredCoMPosition(1) = m_desiredCoMPositionXY(1);
             desiredCoMPosition(2) = m_comHeightTrajectory.front();
 
             desiredCoMVelocity(0) = desiredCoMVelocityXY(0);
@@ -1324,7 +1377,7 @@ bool WalkingModule::updateModule()
                         return false;
                     }
 
-                    if(!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
+                    if(!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(), // --------- feet yes
                                               desiredCoMPosition, m_qDesired))
                     {
                         yError() << "[updateModule] Error during the inverse Kinematics iteration.";
@@ -1426,7 +1479,7 @@ bool WalkingModule::updateModule()
 
             m_walkingLogger->sendData(m_FKSolver->getDCM(),
                                       DCMPositionDesired, DCMVelocityDesired,
-				      desiredCoMPositionXY,
+				      m_desiredCoMPositionXY,
                                       m_FKSolver->getZMP(), desiredVRP,
                                       m_FKSolver->getCoMPosition(),
                                       leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
@@ -1484,21 +1537,6 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         return false;
     }
 
-    // detect the angle of the inclined plane
-    if(!detectGround())
-    {
-        yError() << "[updateModule] Unable to detect the angle of the inclined plane";
-        return false;
-    }
-    std::cout << "[updateModule] Angle detected " << std::endl;
-    // update quantities related to the angle of the inclined plane
-    if(!updateOmegaDCM())
-    {
-        yError() << "[updateModule] Unable to update quantities related to the angle of the inclined plane";
-        return false;
-    }
-
-    m_inclPlaneAngle = 7.0;
 
     // TODO
     // if(!updateFKSolver())
@@ -1611,7 +1649,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION))
     // {
     //     yError() << "[prepareRobot] Error while setting the position control.";
-    //     return false;m_comHeight
+    //     return false;
     // }
 
     if(!m_robotControlHelper->setPositionReferences(m_qDesired, 5.0))
@@ -1625,13 +1663,6 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         m_robotState = WalkingFSM::Preparing;
     }
 
-
-    std::cout << " DCM x  " << m_DCMPositionDesired.front()(0) << std::endl;
-    std::cout << " CoM x  " << desiredCoMPosition(0) << std::endl;
-    std::cout << " CoM z  " << desiredCoMPosition(2) << std::endl;
-    std::cout << " Com z flat " << m_comHeight << std::endl;
-    std::cout << " inclined plane angle " << m_inclPlaneAngle << std::endl;
-
     return true;
 }
 
@@ -1641,7 +1672,7 @@ bool  WalkingModule::readIMUData(iDynTree::Position gIMU)
     return true;
 }
 
-bool WalkingModule::imuDetect()
+double WalkingModule::imuDetectGround()
 {
     iDynTree::Position g, gIP, gIMU;
     g.zero();   g.setVal(2, -9.81);
@@ -1668,13 +1699,36 @@ bool WalkingModule::imuDetect()
 
     gIP = soleTft * ftTimu * gIMU;
 
-    m_inclPlaneAngle = std::acos(gIP(2)/g(2)); // radians
-
-    return true;
-
+    return iDynTree::rad2deg(std::acos(gIP(2)/g(2))); // radians to degrees 
 }
 
-bool WalkingModule::kinDetect()
+bool WalkingModule::updateOmegaDCM()
+{
+
+    if(!m_walkingDCMReactiveController->setOmega(iDynTree::deg2rad(m_inclPlaneAngle)))
+    {
+        yError() << "[WalkingModule][updateOmegaDCM] Error coming from m_walkingDCMReactiveController->setOmega(m_inclPlaneAngle)";
+        return false;
+    }
+
+    if(!m_stableDCMModel->setStableDCMModel(iDynTree::deg2rad(m_inclPlaneAngle)))
+    {
+        yError() << "[WalkingModule][updateOmegaDCM] Error coming from m_stableDCMModel->setStableDCMModel(m_inclPlaneAngle,m_yawCoMAngle)";
+        return false;
+    }
+
+    if(!m_FKSolver->updateOmegaDCM(iDynTree::deg2rad(m_inclPlaneAngle)))
+    {
+        yError() << "[WalkingModule][updateOmegaDCM] Error coming from m_FKSolver->updateOmegaDCM(m_inclPlaneAngle,m_yawCoMAngle";
+        return false;
+    }
+
+    std::cout << "[WalkingModule][updateOmegaDCM] Passing functions" << std::endl;
+
+    return true;
+}
+
+double WalkingModule::kinDetectGround()
 {
     iDynTree::Transform wTcontactFoot;
 
@@ -1683,77 +1737,53 @@ bool WalkingModule::kinDetect()
     else
         wTcontactFoot = m_FKSolver->getRightFootToWorldTransform();
 
-    double r = 0;
-    double p = 0;
-    double y = 0;
-
-    wTcontactFoot.getRotation().getRPY(r,p,y);
-
-    m_inclPlaneAngle = -p;
-    m_yawCoMAngle = y;
-
-    std::cout<< "[WalkingModule][kinDetect] m_inclPlaneAngle : " << m_inclPlaneAngle * (180.0/3.141592653589793238463) << std::endl;
-    std::cout<< "[WalkingModule][kinDetect] m_yawCoMAngle : " << m_yawCoMAngle * (180.0/3.141592653589793238463) << std::endl;
-
-    m_inclPlaneAngle = 7.0;
-
-    return true;
+    return iDynTree::rad2deg(-wTcontactFoot.getRotation().asRPY()(1));
 }
 
 bool WalkingModule::detectGround()
 {    
     bool method = true;
+    double inclPlaneAngle = 0.0;
 
     if(method)
-        kinDetect();
+        inclPlaneAngle = kinDetectGround();
     else
-        imuDetect();
+        inclPlaneAngle = imuDetectGround();
 
-    return true;
-}
+    std::cout<< "------------------------------------------------ inclPlaneAngle DETECTED : " << inclPlaneAngle << std::endl;
 
-/*bool WalkingModule::computeYaw()
-{
-    if( desiredCoMPosX == 0 )
+    if(inclPlaneAngle >= m_inclPlaneAngle + 2)
     {
-        yError() << "[WalkingModule][computeYaw] I can not divide by zero.";
-        return false;
+        m_inclPlaneAngle = inclPlaneAngle;
+
+        if(!m_robotControlHelper->getContactFoot()) // left foot touch
+            m_wTcontactFoot = m_FKSolver->getLeftFootToWorldTransform();
+        else
+            m_wTcontactFoot = m_FKSolver->getRightFootToWorldTransform();
+
+        double xref = 0;
+        double yref = 0;
+
+        xref = m_desiredPosition(0) - m_desiredCoMPositionXY(0);
+        yref = m_desiredPosition(1) - m_desiredCoMPositionXY(1);
+
+        if(!m_trajectoryGenerator->updateOmegaTrajectories(iDynTree::deg2rad(m_inclPlaneAngle)))
+        {
+            yError() << "[WalkingModule][updateOmegaDCM] Error coming from m_trajectoryGenerator->updateOmegaTrajectories(m_inclPlaneAngle)";
+            return false;
+        }
+
+        if(!setPlannerInput(xref,yref))
+        {
+            yError() << "[updateModule] Unable to set the planner input related to the quantities related of the angle of the inclined plane";
+            return false;
+        }
+
+        std::cout<< "------------------------------------------- m_inclPlaneAngle UPDATED: " << m_inclPlaneAngle << std::endl;
     }
 
-    m_yawCoMAngle = std::acos( actualCoMPosX / desiredCoMPosX );
-
-    return true;
-}*/
-
-bool WalkingModule::updateOmegaDCM()
-{
-    // computeYaw();
-    if(!m_walkingDCMReactiveController->setOmega(7.0))
-    {
-        yError() << "[WalkingModule][updateOmegaDCM] Error coming from m_walkingDCMReactiveController->setOmega(m_inclPlaneAngle) ";
-        return false;
-    }
-
-    if(!m_trajectoryGenerator->updateOmegaTrajectories(7.0))
-    {
-        yError() << "[WalkingModule][updateOmegaDCM] Error coming from m_trajectoryGenerator->updateOmegaTrajectories(m_inclPlaneAngle)";
-        return false;
-    }
-
-    if(!m_stableDCMModel->setStableDCMModel(7.0,0.0))
-    {
-        yError() << "[WalkingModule][updateOmegaDCM] Error coming from m_stableDCMModel->setStableDCMModel(m_inclPlaneAngle,m_yawCoMAngle)";
-        return false;
-    }
-
-    if(!m_FKSolver->updateOmegaDCM(7.0,0.0))
-    {
-        yError() << "[WalkingModule][updateOmegaDCM] Error coming from m_FKSolver->updateOmegaDCM(m_inclPlaneAngle,m_yawCoMAngle";
-        return false;
-    }
-
-    std::cout << "[WalkingModule][updateOmegaDCM] Passing functions" << std::endl;
-
+    std::cout<< "--------------------------------------- m_inclPlaneAngle : " << m_inclPlaneAngle << std::endl;
+    
     return true;
 }
 
@@ -1936,8 +1966,15 @@ bool WalkingModule::updateFKSolver()
 {
     if(m_robotControlHelper->isExternalRobotBaseUsed())
     {
-        m_FKSolver->evaluateWorldToBaseTransformation(m_robotControlHelper->getBaseTransform(),
+        //std::cout<< "updateFKSOLVER " << std::endl;
+        //std::cout<< "UP BASE EST : " << std::endl;
+
+        m_robotControlHelper->computeRelativeBaseTransform();
+
+        m_FKSolver->evaluateWorldToBaseTransformation(m_robotControlHelper->getRelativeBaseTransform(),
                                                       m_robotControlHelper->getBaseTwist());
+        //std::cout<< "UP BASE EST DONE : " << std::endl;
+
 
         if(!m_FKSolverDebug->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
                                                                m_rightTrajectory.front(),
@@ -1958,7 +1995,7 @@ bool WalkingModule::updateFKSolver()
             return false;
         }
 
-        m_FKSolverDebug->evaluateWorldToBaseTransformation(m_robotControlHelper->getBaseTransform(),
+        m_FKSolverDebug->evaluateWorldToBaseTransformation(m_robotControlHelper->getRelativeBaseTransform(),
                                                       m_robotControlHelper->getBaseTwist());
 
     }
@@ -2156,7 +2193,8 @@ bool WalkingModule::startWalking()
 
 bool WalkingModule::setPlannerInput(double x, double y)
 {
-    // the trajectory was already finished the new trajectory will be attached as soon as possible
+    // the trajectory was already finished
+    // the new trajectory will be attached as soon as possible
     if(m_mergePoints.empty())
     {
         if(!(m_leftInContact.front() && m_rightInContact.front()))
@@ -2167,6 +2205,7 @@ bool WalkingModule::setPlannerInput(double x, double y)
 
         if(m_newTrajectoryRequired) //boolean
             return true;
+
 
         // Since the evaluation of a new trajectory takes time the new trajectory will be merged after x cycles
         m_newTrajectoryMergeCounter = 20;
@@ -2208,6 +2247,8 @@ bool WalkingModule::setGoal(double x, double y)
     if(m_robotState != WalkingFSM::Walking)
         return false;
 
+    std::cout << " SET GOAL : " << x << ' ' << y << std::endl;
+
     return setPlannerInput(x, y);
 }
 
@@ -2241,5 +2282,20 @@ bool WalkingModule::stopWalking()
     reset();
 
     m_robotState = WalkingFSM::Stopped;
+    return true;
+}
+
+bool WalkingModule::setAngle(double angleInDegrees)
+{
+    std::lock_guard<std::mutex> guard(m_mutex);
+
+    m_inclPlaneAngle = angleInDegrees;
+
+    if(!updateOmegaDCM())
+    {
+        yError() << "[setAngle]] Can not update.";
+        return false;
+    }
+
     return true;
 }

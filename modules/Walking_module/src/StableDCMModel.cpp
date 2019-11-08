@@ -44,14 +44,14 @@ bool StableDCMModel::initialize(const yarp::os::Searchable& config)
     buffer.resize(2, 0.0);
     m_comIntegrator = std::make_unique<iCub::ctrl::Integrator>(samplingTime, buffer);
 
-    m_inclPlaneAngle = 0.0;
-    m_omega = sqrt((9.81*std::cos(iDynTree::deg2rad(m_inclPlaneAngle))) / (m_comHeight * std::cos(iDynTree::deg2rad(m_inclPlaneAngle))));
+    double inclPlaneAngle = 0.0;
+    m_omega = sqrt((9.81*std::cos(iDynTree::deg2rad(inclPlaneAngle))) / (m_comHeight * std::cos(iDynTree::deg2rad(inclPlaneAngle))));
     
-    m_lipCorrTerm(0) = - 9.81 * std::sin(iDynTree::deg2rad(m_inclPlaneAngle));
-    m_lipCorrTerm(1) = 0;
+    m_lipCorrTerm(0) = - 9.81 * std::sin(iDynTree::deg2rad(inclPlaneAngle));
+    m_lipCorrTerm(1) = 0.0;
 
-    m_dcmCorrTerm(0) = - m_comHeight * std::tan(iDynTree::deg2rad(m_inclPlaneAngle));
-    m_dcmCorrTerm(1) = 0;
+    m_dcmCorrTerm(0) = - m_comHeight * std::sin(iDynTree::deg2rad(inclPlaneAngle));
+    m_dcmCorrTerm(1) = 0.0;
 
     return true;
 }
@@ -66,17 +66,11 @@ void StableDCMModel::setZMPPosition(const iDynTree::Vector2& input)
     m_zmpPosition = input;
 }
 
-bool StableDCMModel::setStableDCMModel(double inclPlaneAngle, double yawAngle)
+bool StableDCMModel::setStableDCMModel(double inclPlaneAngle)
 {
     m_omega = sqrt((9.81 * std::cos(iDynTree::deg2rad(inclPlaneAngle))) / (m_comHeight * std::cos(iDynTree::deg2rad(inclPlaneAngle))));
-
     m_lipCorrTerm(0) = - 9.81 * std::sin(iDynTree::deg2rad(inclPlaneAngle));
-    m_lipCorrTerm(1) = 0;
-
     m_dcmCorrTerm(0) = - m_comHeight * std::sin(iDynTree::deg2rad(inclPlaneAngle));
-    m_dcmCorrTerm(1) = 0;
-
-    std::cout << "setStableDCMModel inclPlaneAngle " << inclPlaneAngle << std::endl;
 
     return true;
 }
@@ -101,17 +95,6 @@ bool StableDCMModel::integrateModel()
     yarp::sig::Vector comVelocityYarp(2);
     iDynTree::toEigen(comVelocityYarp) = - m_omega * ((iDynTree::toEigen(m_comPosition) + iDynTree::toEigen(m_dcmCorrTerm)) -
                                                      iDynTree::toEigen(m_dcmPosition));
-
-        std::cout << " STABLE DCM  integrateModel() comVelocityYarp " << comVelocityYarp.toString() << std::endl;
-
-        std::cout << " STABLE DCM  integrateModel() m_comPosition " << m_comPosition.toString() << std::endl;
-
-        std::cout << " STABLE DCM  integrateModel() m_dcmCorrTerm " << m_dcmCorrTerm.toString() << std::endl;
-
-        std::cout << " STABLE DCM  integrateModel() m_dcmPosition " << m_dcmPosition.toString() << std::endl;
-
-
-    std::cout<< " m_lipCorrTerm " << m_lipCorrTerm.toString() << std::endl;
 
     // integrate velocities
     yarp::sig::Vector comPositionYarp(2);
@@ -177,9 +160,5 @@ bool StableDCMModel::reset(const iDynTree::Vector2& initialValue)
 
     m_comIntegrator->reset(buffer);
     m_comPosition = initialValue;
-
-    std::cout << " STABLE DCM  " << buffer.toString() << std::endl;
-
-
     return true;
 }

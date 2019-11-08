@@ -98,9 +98,13 @@ class RobotHelper
     yarp::os::BufferedPort<yarp::sig::Vector> m_robotBasePort; /**< Right foot wrench port. */
     double m_heightOffset;
 
-    // contact
+    // port to read the contact of the foot
     yarp::os::BufferedPort<yarp::sig::Vector> m_robotContactFootPort; /**< contact Foot port. */
-    bool m_contactFoot; /**< booalean to identify which foot is in contact : 0 left foot - 1 right foot. */
+    int m_contactFoot; /**< booalean to identify which foot is in contact : 0 left foot - 1 right foot. */
+
+    // to change the reference frame to walk on inclined plane
+    iDynTree::Transform m_worldToRelativeTransform; 
+    iDynTree::Transform m_relativeToBaseTransform;
 
     /**
      * Get the higher position error among all joints.
@@ -178,11 +182,15 @@ public:
      */
     bool setTorqueReferences(const iDynTree::VectorDynSize& desiredTorque);
 
+    bool setWorldToRelativeTransform(const iDynTree::Transform worldToRelativeTransform);
+
     void setHeightOffset(const double& offset);
 
     bool resetFilters();
 
     bool close();
+
+    bool computeRelativeBaseTransform();
 
     const iDynTree::VectorDynSize& getJointPosition() const;
     const iDynTree::VectorDynSize& getJointVelocity() const;
@@ -201,11 +209,12 @@ public:
     int getActuatedDoFs();
 
     const iDynTree::Transform& getBaseTransform() const;
+    const iDynTree::Transform& getRelativeBaseTransform() const;
 
-    const iDynTree::Twist&getBaseTwist() const;
+    const iDynTree::Twist& getBaseTwist() const;
 
     bool isExternalRobotBaseUsed();
-    bool getContactFoot();
+    int getContactFoot();
 
     WalkingPIDHandler& getPIDHandler();
 };

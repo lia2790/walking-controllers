@@ -40,4 +40,11 @@ service WalkingCommands
      * @return true/false in case of success/failure;
      */
     bool stopWalking();
+
+    /**
+     * Set the angle
+     * @return true/false in case of success/failure;
+     */
+    bool setAngle(1:double angleInDegrees);
+
 }
