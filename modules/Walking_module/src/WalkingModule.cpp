@@ -1750,9 +1750,9 @@ bool WalkingModule::detectGround()
     else
         inclPlaneAngle = imuDetectGround();
 
-    std::cout<< "------------------------------------------------ inclPlaneAngle DETECTED : " << inclPlaneAngle << std::endl;
+    std::cout<< "--------------------- -------------------- inclPlaneAngle DETECTED : " << inclPlaneAngle << std::endl;
 
-    if(inclPlaneAngle >= m_inclPlaneAngle + 2)
+    if(inclPlaneAngle >= m_inclPlaneAngle + 2 )
     {
         m_inclPlaneAngle = inclPlaneAngle;
 
